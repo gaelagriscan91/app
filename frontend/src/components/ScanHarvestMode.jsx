@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Camera, CameraOff, ScanLine, Minus, Plus, Save, Loader2,
   Play, RotateCcw, UserCheck, Package, Users, Clock, DollarSign, Lock,
+  CheckCircle2, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatCurrency, formatNumber, formatApiErrorDetail, todayISO } from "@/lib/api";
@@ -39,6 +40,10 @@ export default function ScanHarvestMode() {
   const [payMode, setPayMode] = useState("piece");
   const [pricePerHour, setPricePerHour] = useState("");
   const [attendance, setAttendance] = useState({ rows: [] });
+
+  // Share mode: when ON, scans accumulate into a buffer; "Confirmar pieza" distributes 1/N
+  const [shareMode, setShareMode] = useState(false);
+  const [shareBuffer, setShareBuffer] = useState([]); // [{id, name}]
 
   useEffect(() => {
     (async () => {
@@ -189,9 +194,21 @@ export default function ScanHarvestMode() {
         }
       }
       setTally((prev) => {
+        // Share mode: buffer the worker; actual tally update happens on Confirmar
+        if (shareMode) {
+          setShareBuffer((buf) => {
+            if (buf.some((b) => b.id === w.id)) {
+              toast.info(`${w.name} ya está en la pieza compartida`, { duration: 1200 });
+              return buf;
+            }
+            toast.success(`+ ${w.name} comparte esta pieza (${buf.length + 1})`, { duration: 1200 });
+            return [...buf, { id: w.id, name: w.name }];
+          });
+          return prev; // don't change tally yet
+        }
         const cur = prev[w.id] || { name: w.name, count: 0, pieces: [] };
         const next = { ...prev, [w.id]: { name: w.name, count: cur.count + 1, pieces: cur.pieces } };
-        toast.success(`+1 ${w.name} (${cur.count + 1} u.)`, { duration: 1200 });
+        toast.success(`+1 ${w.name} (${(cur.count + 1).toFixed(2)} u.)`, { duration: 1200 });
         return next;
       });
       return;
@@ -240,11 +257,51 @@ export default function ScanHarvestMode() {
   const addManual = (workerId) => {
     const w = workers.find((x) => x.id === workerId);
     if (!w) return;
+    if (shareMode) {
+      setShareBuffer((buf) => {
+        if (buf.some((b) => b.id === w.id)) {
+          toast.info(`${w.name} ya está en la pieza compartida`, { duration: 1200 });
+          return buf;
+        }
+        toast.success(`+ ${w.name} comparte esta pieza (${buf.length + 1})`, { duration: 1200 });
+        return [...buf, { id: w.id, name: w.name }];
+      });
+      return;
+    }
     setTally((prev) => {
       const cur = prev[w.id] || { name: w.name, count: 0, pieces: [] };
       return { ...prev, [w.id]: { name: w.name, count: cur.count + 1, pieces: cur.pieces } };
     });
   };
+
+  const confirmSharedPiece = () => {
+    if (shareBuffer.length === 0) {
+      toast.error("Escanea al menos un trabajador para la pieza compartida");
+      return;
+    }
+    const share = 1 / shareBuffer.length;
+    setTally((prev) => {
+      const next = { ...prev };
+      for (const b of shareBuffer) {
+        const cur = next[b.id] || { name: b.name, count: 0, pieces: [] };
+        next[b.id] = { name: b.name, count: cur.count + share, pieces: cur.pieces };
+      }
+      return next;
+    });
+    toast.success(
+      shareBuffer.length === 1
+        ? `✓ 1 pieza para ${shareBuffer[0].name}`
+        : `✓ Pieza dividida entre ${shareBuffer.length} trabajadores (${share.toFixed(2)} c/u)`,
+      { duration: 1800 }
+    );
+    setShareBuffer([]);
+  };
+
+  const removeFromShareBuffer = (id) => {
+    setShareBuffer((buf) => buf.filter((b) => b.id !== id));
+  };
+
+  const clearShareBuffer = () => setShareBuffer([]);
 
   const totals = useMemo(() => {
     const entries = Object.entries(tally);
@@ -577,6 +634,94 @@ export default function ScanHarvestMode() {
               )}
             </div>
           )}
+
+          {/* Share-piece toggle — only visible in piece mode */}
+          {payMode === "piece" && (
+            <div className="pt-3 border-t border-[#E2DDD0]">
+              <label className="flex items-center justify-between gap-3 cursor-pointer">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 text-sm font-bold text-[#1A2210]">
+                    <Users className="w-4 h-4 text-[#E89C3F]" /> Compartir pieza
+                  </div>
+                  <p className="text-[11px] text-[#889078] font-semibold mt-0.5">
+                    Escanea varios trabajadores y toca <b>Confirmar pieza</b>: el precio se divide entre ellos.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={shareMode}
+                  onChange={(e) => {
+                    setShareMode(e.target.checked);
+                    if (!e.target.checked) setShareBuffer([]);
+                  }}
+                  className="w-6 h-6 accent-[#E89C3F] flex-shrink-0"
+                  data-testid="share-mode-toggle"
+                />
+              </label>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Share buffer card — only in piece + shareMode with buffer */}
+      {started && payMode === "piece" && shareMode && (
+        <div className="field-card p-4 border-l-4 border-l-[#E89C3F] bg-[#FDF6EC]/50" data-testid="share-buffer-card">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-[#1A2210] flex items-center gap-1.5" style={{ fontFamily: "Outfit, sans-serif" }}>
+              <Users className="w-4 h-4 text-[#E89C3F]" /> Pieza compartida
+              {shareBuffer.length > 0 && (
+                <span className="font-mono-stat text-sm text-[#E89C3F]">({shareBuffer.length})</span>
+              )}
+            </h3>
+            {shareBuffer.length > 0 && (
+              <button
+                onClick={clearShareBuffer}
+                className="text-xs font-bold text-[#889078] hover:text-red-600"
+                data-testid="share-clear-button"
+              >
+                Vaciar
+              </button>
+            )}
+          </div>
+          {shareBuffer.length === 0 ? (
+            <p className="text-xs text-[#556047] font-semibold text-center py-3">
+              Escanea los trabajadores que comparten esta pieza
+            </p>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {shareBuffer.map((b) => (
+                  <button
+                    key={b.id}
+                    onClick={() => removeFromShareBuffer(b.id)}
+                    className="h-8 pl-3 pr-2 rounded-full bg-white border-2 border-[#E89C3F] text-[#1A2210] text-xs font-bold flex items-center gap-1.5"
+                    data-testid={`share-chip-${b.id}`}
+                  >
+                    {b.name}
+                    <X className="w-3 h-3 text-[#889078]" />
+                  </button>
+                ))}
+              </div>
+              <div className="bg-white rounded-xl border border-[#E2DDD0] p-3 mb-3 text-center">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-[#889078]">Cada uno recibirá</div>
+                <div className="font-mono-stat text-lg text-[#1A2210]">
+                  {(1 / shareBuffer.length).toFixed(3)} pieza
+                  {" "}·{" "}
+                  <span className="text-[#15803D]">
+                    {formatCurrency((parseFloat(pricePerUnit) || 0) / shareBuffer.length)}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={confirmSharedPiece}
+                className="w-full h-12 rounded-xl bg-[#E89C3F] hover:bg-[#D08929] text-white font-extrabold flex items-center justify-center gap-2 shadow-md"
+                data-testid="share-confirm-button"
+                style={{ fontFamily: "Outfit, sans-serif" }}
+              >
+                <CheckCircle2 className="w-5 h-5" /> Confirmar pieza compartida
+              </button>
+            </>
+          )}
         </div>
       )}
 
@@ -761,7 +906,7 @@ export default function ScanHarvestMode() {
                         <div className="min-w-0 flex-1">
                           <div className="font-bold text-[#1A2210] truncate">{v.name}</div>
                           <div className="text-xs text-[#556047] font-semibold">
-                            {formatNumber(v.count, 0)} pieza{v.count !== 1 ? "s" : ""} • <span className="text-[#15803D] font-bold">{formatCurrency(payment)}</span>
+                            {formatNumber(v.count, v.count % 1 === 0 ? 0 : 2)} pieza{v.count !== 1 ? "s" : ""} • <span className="text-[#15803D] font-bold">{formatCurrency(payment)}</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
@@ -772,7 +917,9 @@ export default function ScanHarvestMode() {
                           >
                             <Minus className="w-4 h-4" />
                           </button>
-                          <div className="font-mono-stat text-xl text-[#1A2210] w-10 text-center" data-testid={`scan-count-${wid}`}>{v.count}</div>
+                          <div className="font-mono-stat text-xl text-[#1A2210] w-12 text-center" data-testid={`scan-count-${wid}`}>
+                            {v.count % 1 === 0 ? v.count : v.count.toFixed(2)}
+                          </div>
                           <button
                             onClick={() => bump(wid, 1)}
                             className="w-10 h-10 rounded-xl bg-[#1E4620] hover:bg-[#153417] text-white flex items-center justify-center"
