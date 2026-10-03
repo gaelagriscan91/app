@@ -16,6 +16,7 @@ import QrScanner from "@/components/QrScanner";
 export default function ScanHarvestMode() {
   const navigate = useNavigate();
   const [urlParams] = useSearchParams();
+  const autoFromCheckin = Boolean(urlParams.get("parcel") && urlParams.get("product"));
 
   const [workers, setWorkers] = useState([]);
   const [parcels, setParcels] = useState([]);
@@ -26,8 +27,8 @@ export default function ScanHarvestMode() {
   const [date, setDate] = useState(todayISO());
   const [pricePerUnit, setPricePerUnit] = useState("");
 
-  const [started, setStarted] = useState(false);
-  const [scannerOn, setScannerOn] = useState(false);
+  const [started, setStarted] = useState(autoFromCheckin);
+  const [scannerOn, setScannerOn] = useState(autoFromCheckin);
   const [tally, setTally] = useState({}); // { worker_id: {name, count, pieces:[]} }
   const [saving, setSaving] = useState(false);
   const [scanMode, setScanMode] = useState("worker"); // "worker" | "piece"
@@ -215,9 +216,31 @@ export default function ScanHarvestMode() {
     }
   };
 
+  const selectedParcel = parcels.find((p) => p.id === parcelId);
+
   return (
     <div className="space-y-5" data-testid="scan-harvest-mode">
-      {/* Setup */}
+      {/* Session banner when autoloaded from check-in */}
+      {autoFromCheckin && started && (
+        <div className="rounded-2xl bg-[#1E2746] text-white p-4 flex items-center justify-between" data-testid="scan-session-banner">
+          <div className="min-w-0">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-white/60">Jornada activa</div>
+            <div className="font-bold truncate">
+              {selectedParcel?.name || "—"} • {selectedProduct?.name || "—"}
+            </div>
+          </div>
+          <button
+            onClick={() => navigate("/asistencia")}
+            className="text-sm font-bold bg-white/10 hover:bg-white/20 rounded-full px-3 h-9"
+            data-testid="scan-back-hub"
+          >
+            Hub
+          </button>
+        </div>
+      )}
+
+      {/* Setup — hidden when auto-started from check-in */}
+      {!autoFromCheckin && (
       <div className="field-card p-4 sm:p-5 space-y-4">
         <div className="flex items-center gap-2">
           <ScanLine className="w-5 h-5 text-[#1E4620]" />
@@ -334,6 +357,34 @@ export default function ScanHarvestMode() {
           </>
         )}
       </div>
+      )}
+
+      {/* Compact toolbar when auto-started from check-in */}
+      {autoFromCheckin && started && (
+        <div className="flex gap-2">
+          <button
+            onClick={() => setScannerOn((v) => !v)}
+            className={`flex-1 h-12 rounded-xl font-bold text-base flex items-center justify-center gap-1.5 border-2 ${
+              scannerOn
+                ? "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                : "bg-[#1E4620] text-white border-[#1E4620] hover:bg-[#153417]"
+            }`}
+            data-testid="scan-toggle-camera-compact"
+          >
+            {scannerOn ? <><CameraOff className="w-5 h-5" /> Pausar cámara</> : <><Camera className="w-5 h-5" /> Reanudar cámara</>}
+          </button>
+          <button
+            onClick={() => {
+              if (Object.keys(tally).length > 0 && !window.confirm("¿Reiniciar conteos?")) return;
+              setTally({});
+            }}
+            className="h-12 px-4 bg-white border-2 border-[#E2DDD0] hover:bg-[#F7F5EE] text-[#556047] font-bold rounded-xl flex items-center gap-1.5"
+            data-testid="scan-reset-compact"
+          >
+            <RotateCcw className="w-4 h-4" /> Reiniciar
+          </button>
+        </div>
+      )}
 
       {/* Scanner */}
       {started && (

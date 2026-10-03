@@ -473,8 +473,7 @@ function SessionModal({ session, saveSession, parcels, products, crews, onClose 
   const [parcelId, setParcelId] = useState(session.parcelId || "");
   const [crewId, setCrewId] = useState(session.crewId || "");
   const [productId, setProductId] = useState(session.productId || "");
-  const canSave = parcelId && crewId;
-
+  const canSave = parcelId && crewId && productId;
   const confirm = () => {
     if (!canSave) return;
     saveSession({ parcelId, crewId, productId });
@@ -542,7 +541,7 @@ function SessionModal({ session, saveSession, parcels, products, crews, onClose 
               className="field-input w-full"
               data-testid="session-product-select"
             >
-              <option value="">— Opcional —</option>
+              <option value="">— Elige un trabajo —</option>
               {products.map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
