@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Sprout, User, Mail, Lock, Loader2 } from "lucide-react";
+import { User, Mail, Lock, Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
+import LogoHandCherry from "@/components/LogoHandCherry";
 
 export default function Register() {
   const { register } = useAuth();
@@ -36,8 +37,8 @@ export default function Register() {
     <div className="min-h-screen flex items-center justify-center bg-[#F7F5EE] p-4">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-5">
-          <div className="w-14 h-14 rounded-2xl bg-[#1E4620] flex items-center justify-center shadow-lg mb-3">
-            <Sprout className="w-8 h-8 text-[#E65100]" strokeWidth={2.5} />
+          <div className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center shadow-lg mb-3 border-2 border-[#E2DDD0]">
+            <LogoHandCherry size={46} />
           </div>
           <h1 className="text-2xl font-extrabold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>
             Crear cuenta

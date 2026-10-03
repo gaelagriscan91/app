@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Camera, Loader2, Save, X, Edit3, ScanLine } from "lucide-react";
+import { Camera, Loader2, Save, X, Edit3, ScanLine, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatCurrency, formatNumber, todayISO, formatApiErrorDetail } from "@/lib/api";
 import ScanHarvestMode from "@/components/ScanHarvestMode";
+import QuickAddWorker from "@/components/QuickAddWorker";
 
 export default function RegistrarCosecha() {
   const navigate = useNavigate();
@@ -28,6 +29,7 @@ export default function RegistrarCosecha() {
   const [photoPreview, setPhotoPreview] = useState("");
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -174,20 +176,31 @@ export default function RegistrarCosecha() {
         <div className="field-card p-4 sm:p-5 space-y-4">
           <div>
             <label className="block text-sm font-bold text-[#1A2210] mb-1.5">Trabajador</label>
-            <select
-              value={workerId}
-              onChange={(e) => setWorkerId(e.target.value)}
-              className="field-input"
-              required
-              data-testid="worker-select"
-            >
-              <option value="">— Seleccionar —</option>
-              {workers.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.name}
-                </option>
-              ))}
-            </select>
+            <div className="flex gap-2">
+              <select
+                value={workerId}
+                onChange={(e) => setWorkerId(e.target.value)}
+                className="field-input flex-1"
+                required
+                data-testid="worker-select"
+              >
+                <option value="">— Seleccionar —</option>
+                {workers.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setQuickAddOpen(true)}
+                className="h-14 w-14 bg-[#1E4620] hover:bg-[#153417] text-white rounded-xl flex items-center justify-center shadow-sm"
+                title="Agregar nuevo trabajador"
+                data-testid="quick-add-worker-button"
+              >
+                <UserPlus className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           <div>
@@ -379,6 +392,14 @@ export default function RegistrarCosecha() {
         </button>
       </form>
       )}
+      <QuickAddWorker
+        open={quickAddOpen}
+        onClose={() => setQuickAddOpen(false)}
+        onCreated={(w) => {
+          setWorkers((prev) => [...prev, w]);
+          setWorkerId(w.id);
+        }}
+      />
     </div>
   );
 }

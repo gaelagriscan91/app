@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Camera, CameraOff, LogIn, LogOut, Users, Clock, Loader2, Trash2, UserCheck } from "lucide-react";
+import { Camera, CameraOff, LogIn, LogOut, Users, Clock, Loader2, Trash2, UserCheck, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatApiErrorDetail, todayISO } from "@/lib/api";
 import QrScanner from "@/components/QrScanner";
+import QuickAddWorker from "@/components/QuickAddWorker";
 
 export default function Asistencia() {
   const [scannerOn, setScannerOn] = useState(false);
@@ -12,6 +13,7 @@ export default function Asistencia() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [manualWorker, setManualWorker] = useState("");
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const lastScanRef = useRef({ code: "", at: 0 });
 
   const load = async () => {
@@ -160,6 +162,15 @@ export default function Asistencia() {
               ))}
             </select>
             <button
+              onClick={() => setQuickAddOpen(true)}
+              type="button"
+              className="h-12 w-12 bg-[#1E4620] hover:bg-[#153417] text-white rounded-xl flex items-center justify-center"
+              title="Agregar nuevo trabajador"
+              data-testid="asist-quick-add-button"
+            >
+              <UserPlus className="w-4 h-4" />
+            </button>
+            <button
               onClick={onManualSubmit}
               disabled={processing || !manualWorker}
               className="h-12 px-4 bg-[#E65100] hover:bg-[#C63D00] text-white font-bold rounded-xl disabled:opacity-50 flex items-center gap-1.5"
@@ -258,6 +269,14 @@ export default function Asistencia() {
           </div>
         )}
       </div>
+      <QuickAddWorker
+        open={quickAddOpen}
+        onClose={() => setQuickAddOpen(false)}
+        onCreated={(w) => {
+          setWorkers((prev) => [...prev, w]);
+          setManualWorker(w.qr_code || w.id);
+        }}
+      />
     </div>
   );
 }

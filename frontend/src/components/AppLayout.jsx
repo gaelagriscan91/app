@@ -1,6 +1,7 @@
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
-import { Sprout, ClipboardList, CalendarCheck, FileSpreadsheet, Boxes, LogOut, Home, ScanLine } from "lucide-react";
+import { ClipboardList, CalendarCheck, FileSpreadsheet, Boxes, LogOut, Home, ScanLine } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import LogoHandCherry from "@/components/LogoHandCherry";
 
 const navItems = [
   { to: "/", label: "Inicio", icon: Home, testid: "nav-dashboard" },
@@ -26,8 +27,8 @@ export default function AppLayout() {
       <header className="bg-[#1E4620] text-white sticky top-0 z-40 shadow-md">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-[#E65100] flex items-center justify-center shadow-sm">
-              <Sprout className="w-5 h-5 text-white" strokeWidth={2.5} />
+            <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm">
+              <LogoHandCherry size={30} />
             </div>
             <div>
               <div className="font-extrabold text-lg leading-tight tracking-tight" style={{ fontFamily: "Outfit, sans-serif" }}>

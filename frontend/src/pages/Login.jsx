@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Sprout, Lock, Mail, Loader2 } from "lucide-react";
+import { Lock, Mail, Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
+import LogoHandCherry from "@/components/LogoHandCherry";
 
 export default function Login() {
   const { login } = useAuth();
@@ -40,8 +41,8 @@ export default function Login() {
 
       <div className="relative w-full max-w-md">
         <div className="flex flex-col items-center mb-6">
-          <div className="w-16 h-16 rounded-2xl bg-[#1E4620] flex items-center justify-center shadow-lg mb-3">
-            <Sprout className="w-9 h-9 text-[#E65100]" strokeWidth={2.5} />
+          <div className="w-20 h-20 rounded-3xl bg-white flex items-center justify-center shadow-lg mb-3 border-2 border-[#E2DDD0]">
+            <LogoHandCherry size={56} />
           </div>
           <h1 className="text-3xl sm:text-4xl font-extrabold text-[#1A2210] tracking-tight" style={{ fontFamily: "Outfit, sans-serif" }}>
             AgriScan
