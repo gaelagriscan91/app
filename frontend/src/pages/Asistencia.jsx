@@ -78,7 +78,7 @@ export default function Asistencia() {
   const selectedParcel = parcels.find((p) => p.id === session.parcelId);
   const selectedProduct = products.find((p) => p.id === session.productId);
   const selectedCrew = crews.find((c) => c.id === session.crewId);
-  const mayordomoName = selectedCrew?.boss?.name || "—";
+  const mayordomoName = session.mayordomo || selectedCrew?.boss?.name || "—";
 
   const presentCount = data.rows.length;
   const openCount = data.rows.filter((r) => !r.check_out_hhmm).length;
@@ -162,7 +162,7 @@ export default function Asistencia() {
 
   // ============== Tile Click Handlers ==============
   const onCheckIn = () => {
-    if (!session.parcelId || !session.crewId) {
+    if (!session.parcelId || !session.mayordomo) {
       toast.info("Primero elige Rancho y Mayordomo");
       setSessionModalOpen(true);
       return;
@@ -471,12 +471,27 @@ function MiniStat({ label, value, color }) {
 
 function SessionModal({ session, saveSession, parcels, products, crews, onClose }) {
   const [parcelId, setParcelId] = useState(session.parcelId || "");
-  const [crewId, setCrewId] = useState(session.crewId || "");
+  const [mayordomo, setMayordomo] = useState(session.mayordomo || "");
   const [productId, setProductId] = useState(session.productId || "");
-  const canSave = parcelId && crewId && productId;
+  const canSave = parcelId && mayordomo.trim() && productId;
+
+  const suggestions = Array.from(new Set([
+    ...crews.map((c) => c.name).filter(Boolean),
+    ...crews.map((c) => c.boss?.name).filter(Boolean),
+  ]));
+
   const confirm = () => {
     if (!canSave) return;
-    saveSession({ parcelId, crewId, productId });
+    const matchedCrew = crews.find(
+      (c) => c.name?.toLowerCase() === mayordomo.trim().toLowerCase() ||
+             c.boss?.name?.toLowerCase() === mayordomo.trim().toLowerCase()
+    );
+    saveSession({
+      parcelId,
+      mayordomo: mayordomo.trim(),
+      crewId: matchedCrew?.id || "",
+      productId,
+    });
     toast.success("Sesión guardada");
     onClose();
   };
@@ -511,23 +526,35 @@ function SessionModal({ session, saveSession, parcels, products, crews, onClose 
             <label className="flex items-center gap-1.5 text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">
               <UserCircle2 className="w-4 h-4 text-[#E89C3F]" /> Mayordomo / Cuadrilla
             </label>
-            <select
-              value={crewId}
-              onChange={(e) => setCrewId(e.target.value)}
+            <input
+              type="text"
+              value={mayordomo}
+              onChange={(e) => setMayordomo(e.target.value)}
+              list="mayordomo-suggestions"
+              placeholder="Escribe el nombre del mayordomo"
               className="field-input w-full"
-              data-testid="session-crew-select"
-            >
-              <option value="">— Elige una cuadrilla —</option>
-              {crews.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}{c.boss?.name ? ` — ${c.boss.name}` : ""}
-                </option>
+              data-testid="session-mayordomo-input"
+              autoComplete="off"
+            />
+            <datalist id="mayordomo-suggestions">
+              {suggestions.map((name) => (
+                <option key={name} value={name} />
               ))}
-            </select>
-            {crews.length === 0 && (
-              <p className="text-xs text-[#889078] mt-1.5 font-semibold">
-                No hay cuadrillas. Créalas en <b>Módulos → Cuadrillas</b>.
-              </p>
+            </datalist>
+            {crews.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {crews.slice(0, 6).map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setMayordomo(c.boss?.name || c.name)}
+                    className="h-8 px-3 text-xs font-bold rounded-full bg-[#F0EDE1] border border-[#E2DDD0] hover:bg-[#E2DDD0] text-[#1A2210]"
+                    data-testid={`crew-suggestion-${c.id}`}
+                  >
+                    {c.boss?.name || c.name}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
 
