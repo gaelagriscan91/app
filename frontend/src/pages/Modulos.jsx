@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { Users, Map, Package } from "lucide-react";
+import { Users, Map, Package, UserCog } from "lucide-react";
 import WorkersTab from "@/components/modules/WorkersTab";
 import ParcelsTab from "@/components/modules/ParcelsTab";
 import ProductsTab from "@/components/modules/ProductsTab";
+import CrewsTab from "@/components/modules/CrewsTab";
 
 const tabs = [
   { id: "workers", label: "Trabajadores", Icon: Users, testid: "tab-workers" },
+  { id: "crews", label: "Cuadrillas", Icon: UserCog, testid: "tab-crews" },
   { id: "parcels", label: "Parcelas", Icon: Map, testid: "tab-parcels" },
   { id: "products", label: "Productos", Icon: Package, testid: "tab-products" },
 ];
@@ -40,6 +42,7 @@ export default function Modulos() {
       </div>
 
       {tab === "workers" && <WorkersTab />}
+      {tab === "crews" && <CrewsTab />}
       {tab === "parcels" && <ParcelsTab />}
       {tab === "products" && <ProductsTab />}
     </div>

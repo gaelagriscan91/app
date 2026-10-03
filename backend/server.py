@@ -195,12 +195,21 @@ class WorkerIn(BaseModel):
     document_id: Optional[str] = ""
     phone: Optional[str] = ""
     role: Optional[str] = "Cosechador"
+    crew_id: Optional[str] = ""
+    active: bool = True
+
+
+class CrewIn(BaseModel):
+    name: str
+    boss_worker_id: Optional[str] = ""  # worker id of the crew boss
+    worker_ids: List[str] = Field(default_factory=list)
+    notes: Optional[str] = ""
     active: bool = True
 
 
 class AttendanceScanIn(BaseModel):
-    code: str  # QR code value OR worker_id as fallback
-    date: Optional[str] = None  # YYYY-MM-DD (defaults today)
+    code: str
+    date: Optional[str] = None
 
 
 class ParcelIn(BaseModel):
@@ -336,6 +345,83 @@ async def regenerate_qr(wid: str, user: CurrentUser):
     await db.workers.update_one({"_id": ObjectId(wid)}, {"$set": {"qr_code": new_qr}})
     row = await db.workers.find_one({"_id": ObjectId(wid)})
     return doc_out(row)
+
+
+# ---------------------------------------------------------------------------
+# Crews (Cuadrillas)
+# ---------------------------------------------------------------------------
+async def _enrich_crew(c: dict) -> dict:
+    out = doc_out(c)
+    workers_map = {}
+    boss = None
+    all_ids = list(set((out.get("worker_ids") or []) + ([out.get("boss_worker_id")] if out.get("boss_worker_id") else [])))
+    for wid in all_ids:
+        try:
+            w = await db.workers.find_one({"_id": ObjectId(wid)})
+            if w:
+                workers_map[wid] = {"id": str(w["_id"]), "name": w.get("name"), "role": w.get("role", "")}
+        except Exception:
+            pass
+    if out.get("boss_worker_id"):
+        boss = workers_map.get(out["boss_worker_id"])
+    out["boss"] = boss
+    out["workers"] = [workers_map[wid] for wid in (out.get("worker_ids") or []) if wid in workers_map]
+    out["worker_count"] = len(out["workers"])
+    return out
+
+
+@api_router.get("/crews")
+async def list_crews(user: CurrentUser):
+    rows = await db.crews.find({}).sort("name", 1).to_list(1000)
+    return [await _enrich_crew(r) for r in rows]
+
+
+@api_router.post("/crews")
+async def create_crew(data: CrewIn, user: CurrentUser):
+    doc = data.model_dump()
+    doc["created_at"] = datetime.now(timezone.utc).isoformat()
+    res = await db.crews.insert_one(doc)
+    # Backlink crew_id onto workers for easy filtering
+    if doc.get("worker_ids"):
+        await db.workers.update_many(
+            {"_id": {"$in": [ObjectId(w) for w in doc["worker_ids"]]}},
+            {"$set": {"crew_id": str(res.inserted_id)}},
+        )
+    doc["_id"] = res.inserted_id
+    return await _enrich_crew(doc)
+
+
+@api_router.put("/crews/{cid}")
+async def update_crew(cid: str, data: CrewIn, user: CurrentUser):
+    existing = await db.crews.find_one({"_id": ObjectId(cid)})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Cuadrilla no encontrada")
+    old_workers = set(existing.get("worker_ids", []))
+    new_workers = set(data.worker_ids)
+    removed = old_workers - new_workers
+    added = new_workers - old_workers
+    upd = data.model_dump()
+    await db.crews.update_one({"_id": ObjectId(cid)}, {"$set": upd})
+    # Update worker backlinks
+    if removed:
+        await db.workers.update_many(
+            {"_id": {"$in": [ObjectId(w) for w in removed]}, "crew_id": cid},
+            {"$set": {"crew_id": ""}},
+        )
+    if added:
+        await db.workers.update_many(
+            {"_id": {"$in": [ObjectId(w) for w in added]}},
+            {"$set": {"crew_id": cid}},
+        )
+    row = await db.crews.find_one({"_id": ObjectId(cid)})
+    return await _enrich_crew(row)
+
+
+@api_router.delete("/crews/{cid}")
+async def delete_crew(cid: str, user: CurrentUser):
+    await db.crews.delete_one({"_id": ObjectId(cid)})
+    await db.workers.update_many({"crew_id": cid}, {"$set": {"crew_id": ""}})
+    return {"ok": True}
 
 
 @api_router.delete("/workers/{wid}")
@@ -674,6 +760,7 @@ async def receipts(
     date_from: str,
     date_to: str,
     worker_id: Optional[str] = None,
+    crew_id: Optional[str] = None,
 ):
     """Returns per-worker summary combining attendance (hours) + harvests (payment)
     for a date range. Used to generate printable pay slips."""
@@ -683,6 +770,8 @@ async def receipts(
             workers_q["_id"] = ObjectId(worker_id)
         except Exception:
             raise HTTPException(status_code=400, detail="ID de trabajador inválido")
+    if crew_id:
+        workers_q["crew_id"] = crew_id
     workers = await db.workers.find(workers_q).sort("name", 1).to_list(1000)
 
     all_harvests = await db.harvests.find({

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Printer, Loader2, Calendar, Users, Clock, DollarSign, FileText, PrinterIcon } from "lucide-react";
+import { Printer, Loader2, Calendar, Users, Clock, DollarSign, FileText, PrinterIcon, Bluetooth, BluetoothSearching, Receipt, FileCheck } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatCurrency, formatNumber } from "@/lib/api";
+import { thermalPrinter, buildReceiptLines, receiptTicketHtml } from "@/lib/thermalPrinter";
 
 function startOfMonthISO() {
   const d = new Date();
@@ -156,15 +157,22 @@ export default function RecibosTab() {
   const [dateFrom, setDateFrom] = useState(startOfMonthISO());
   const [dateTo, setDateTo] = useState(todayISO());
   const [workers, setWorkers] = useState([]);
+  const [crews, setCrews] = useState([]);
   const [workerId, setWorkerId] = useState("");
+  const [crewId, setCrewId] = useState("");
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [format, setFormat] = useState("carta"); // "carta" | "ticket"
+  const [btConnected, setBtConnected] = useState(false);
+  const [btName, setBtName] = useState("");
+  const [btPrinting, setBtPrinting] = useState("");
 
   useEffect(() => {
     (async () => {
       try {
-        const { data } = await api.get("/workers");
-        setWorkers(data);
+        const [w, c] = await Promise.all([api.get("/workers"), api.get("/crews")]);
+        setWorkers(w.data);
+        setCrews(c.data);
       } catch (_) {}
     })();
   }, []);
@@ -177,6 +185,7 @@ export default function RecibosTab() {
           date_from: dateFrom,
           date_to: dateTo,
           worker_id: workerId || undefined,
+          crew_id: crewId || undefined,
         },
       });
       setRows(data);
@@ -194,8 +203,9 @@ export default function RecibosTab() {
   }, []);
 
   const printReceipt = (receipt) => {
-    const html = receiptHtml(receipt);
-    const win = window.open("", "_blank", "width=820,height=900");
+    const html = format === "ticket" ? receiptTicketHtml(receipt) : receiptHtml(receipt);
+    const w = format === "ticket" ? 380 : 820;
+    const win = window.open("", "_blank", `width=${w},height=900`);
     if (!win) {
       toast.error("Permite ventanas emergentes para imprimir");
       return;
@@ -209,6 +219,18 @@ export default function RecibosTab() {
       toast.error("Nada para imprimir");
       return;
     }
+    if (format === "ticket") {
+      // One ticket per worker, consecutive
+      const html = `<!doctype html><html><head><meta charset="utf-8"><title>Tickets</title>
+        <style>@page{size:80mm auto;margin:4mm} .page{page-break-after:always}</style></head><body>
+        ${rows.map((r) => `<div class="page">${receiptTicketHtml(r).replace(/<!doctype[\s\S]*?<body>/, "").replace(/<\/body><\/html>$/, "")}</div>`).join("")}
+        </body></html>`;
+      const win = window.open("", "_blank", "width=400,height=900");
+      if (!win) { toast.error("Permite ventanas emergentes para imprimir"); return; }
+      win.document.write(html);
+      win.document.close();
+      return;
+    }
     const html = `
       <!doctype html><html lang="es"><head><meta charset="utf-8"><title>Recibos en lote</title></head>
       <body>${rows.map((r) => receiptHtml(r).replace(/<!doctype[\s\S]*?<body>/, "").replace(/<\/body><\/html>$/, "") + '<div style="page-break-after: always;"></div>').join("")}</body></html>
@@ -218,6 +240,59 @@ export default function RecibosTab() {
     win.document.write(html);
     win.document.close();
     setTimeout(() => { try { win.print(); } catch (_) {} }, 400);
+  };
+
+  const connectBluetooth = async () => {
+    try {
+      const name = await thermalPrinter.connect();
+      setBtConnected(true);
+      setBtName(name);
+      toast.success(`Impresora conectada: ${name}`);
+    } catch (e) {
+      toast.error(e?.message || "No se pudo conectar la impresora");
+    }
+  };
+
+  const disconnectBluetooth = async () => {
+    await thermalPrinter.disconnect();
+    setBtConnected(false);
+    setBtName("");
+    toast.info("Impresora desconectada");
+  };
+
+  const printBluetooth = async (receipt) => {
+    if (!thermalPrinter.isConnected()) {
+      toast.error("Primero conecta la impresora Bluetooth");
+      return;
+    }
+    setBtPrinting(receipt.worker_id);
+    try {
+      const parts = buildReceiptLines(receipt);
+      await thermalPrinter.print(parts);
+      toast.success(`Ticket enviado: ${receipt.worker_name}`);
+    } catch (e) {
+      toast.error("Error imprimiendo: " + (e?.message || ""));
+    } finally {
+      setBtPrinting("");
+    }
+  };
+
+  const printAllBluetooth = async () => {
+    if (!thermalPrinter.isConnected()) {
+      toast.error("Primero conecta la impresora Bluetooth");
+      return;
+    }
+    for (const r of rows) {
+      setBtPrinting(r.worker_id);
+      try {
+        await thermalPrinter.print(buildReceiptLines(r));
+      } catch (e) {
+        toast.error(`Error: ${r.worker_name}`);
+      }
+      await new Promise((res) => setTimeout(res, 600));
+    }
+    setBtPrinting("");
+    toast.success(`${rows.length} tickets enviados`);
   };
 
   const totals = useMemo(() => {
@@ -249,12 +324,67 @@ export default function RecibosTab() {
             <label className="block text-xs font-bold text-[#1A2210] mb-1 uppercase tracking-wider">Hasta</label>
             <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="field-input !h-12 !text-base" data-testid="recibos-date-to" />
           </div>
-          <div className="col-span-2">
-            <label className="block text-xs font-bold text-[#1A2210] mb-1 uppercase tracking-wider">Trabajador (opcional)</label>
+          <div>
+            <label className="block text-xs font-bold text-[#1A2210] mb-1 uppercase tracking-wider">Cuadrilla</label>
+            <select value={crewId} onChange={(e) => setCrewId(e.target.value)} className="field-input !h-12 !text-base" data-testid="recibos-crew">
+              <option value="">Todas</option>
+              {crews.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-[#1A2210] mb-1 uppercase tracking-wider">Trabajador</label>
             <select value={workerId} onChange={(e) => setWorkerId(e.target.value)} className="field-input !h-12 !text-base" data-testid="recibos-worker">
-              <option value="">Todos los trabajadores</option>
+              <option value="">Todos</option>
               {workers.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
             </select>
+          </div>
+        </div>
+
+        {/* Format toggle + Bluetooth */}
+        <div className="pt-3 border-t border-[#E2DDD0] space-y-3">
+          <div>
+            <label className="block text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">Formato de impresión</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setFormat("carta")}
+                data-testid="format-carta"
+                className={`h-11 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 border-2 ${
+                  format === "carta" ? "bg-[#1E4620] text-white border-[#1E4620]" : "bg-white text-[#556047] border-[#E2DDD0] hover:bg-[#F7F5EE]"
+                }`}
+              >
+                <FileCheck className="w-4 h-4" /> Carta / A4
+              </button>
+              <button
+                onClick={() => setFormat("ticket")}
+                data-testid="format-ticket"
+                className={`h-11 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 border-2 ${
+                  format === "ticket" ? "bg-[#1E4620] text-white border-[#1E4620]" : "bg-white text-[#556047] border-[#E2DDD0] hover:bg-[#F7F5EE]"
+                }`}
+              >
+                <Receipt className="w-4 h-4" /> Ticket 80mm
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-2 bg-[#F0EDE1] rounded-xl p-3 border border-[#D4CEB8]">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 text-sm font-bold text-[#1A2210]">
+                <Bluetooth className={`w-4 h-4 ${btConnected ? "text-[#15803D]" : "text-[#889078]"}`} />
+                Impresora Bluetooth
+              </div>
+              <div className="text-xs text-[#556047] font-semibold truncate">
+                {btConnected ? `Conectada: ${btName}` : "No conectada • Ticketera térmica ESC/POS"}
+              </div>
+            </div>
+            {btConnected ? (
+              <button onClick={disconnectBluetooth} className="h-10 px-3 bg-white border-2 border-red-200 text-red-700 hover:bg-red-50 font-bold rounded-xl text-sm" data-testid="bt-disconnect">
+                Desconectar
+              </button>
+            ) : (
+              <button onClick={connectBluetooth} className="h-10 px-3 bg-[#1E4620] hover:bg-[#153417] text-white font-bold rounded-xl text-sm flex items-center gap-1.5" data-testid="bt-connect">
+                <BluetoothSearching className="w-4 h-4" /> Conectar
+              </button>
+            )}
           </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
@@ -262,8 +392,13 @@ export default function RecibosTab() {
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><FileText className="w-5 h-5" /> Generar recibos</>}
           </button>
           <button onClick={printAll} disabled={rows.length === 0} className="field-btn-accent flex-1 disabled:opacity-60" data-testid="recibos-print-all">
-            <PrinterIcon className="w-5 h-5" /> Imprimir lote ({rows.length})
+            <PrinterIcon className="w-5 h-5" /> Imprimir todos ({rows.length})
           </button>
+          {btConnected && rows.length > 0 && (
+            <button onClick={printAllBluetooth} disabled={!!btPrinting} className="h-14 px-5 bg-[#1E4620] hover:bg-[#153417] text-white font-bold rounded-xl flex items-center justify-center gap-2 disabled:opacity-60" data-testid="bt-print-all">
+              {btPrinting ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Bluetooth className="w-5 h-5" /> Imprimir en ticketera</>}
+            </button>
+          )}
         </div>
       </div>
 
@@ -306,13 +441,26 @@ export default function RecibosTab() {
                     {r.document_id || "sin ID"} {r.role ? "• " + r.role : ""}
                   </div>
                 </div>
+                <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => printReceipt(r)}
                   className="h-10 px-4 bg-[#1E4620] hover:bg-[#153417] text-white font-bold rounded-xl flex items-center gap-1.5 shadow-sm"
                   data-testid={`recibo-print-${r.worker_id}`}
                 >
-                  <Printer className="w-4 h-4" /> Imprimir
+                  <Printer className="w-4 h-4" /> {format === "ticket" ? "Ticket" : "Imprimir"}
                 </button>
+                {btConnected && (
+                  <button
+                    onClick={() => printBluetooth(r)}
+                    disabled={btPrinting === r.worker_id}
+                    className="h-10 px-3 bg-white border-2 border-[#1E4620] text-[#1E4620] hover:bg-emerald-50 font-bold rounded-xl flex items-center gap-1.5 disabled:opacity-60"
+                    data-testid={`bt-print-${r.worker_id}`}
+                    title="Imprimir en ticketera Bluetooth"
+                  >
+                    {btPrinting === r.worker_id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bluetooth className="w-4 h-4" />}
+                  </button>
+                )}
+                </div>
               </div>
 
               <div className="grid grid-cols-4 gap-2">
