@@ -106,3 +106,17 @@ h4 {
 .stat-card-dark {
     @apply bg-[#1E4620] text-white rounded-2xl border border-[#153417] shadow-md;
 }
+
+/* Force html5-qrcode video to cover the square container */
+.qr-square-wrap video {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    display: block;
+}
+.qr-square-wrap > div > div:first-child {
+    display: none !important; /* hide library's status text */
+}
+.qr-square-wrap canvas {
+    display: none !important;
+}

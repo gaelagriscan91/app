@@ -393,6 +393,8 @@ export default function Asistencia() {
           parcels={parcels}
           products={products}
           crews={crews}
+          setParcels={setParcels}
+          setProducts={setProducts}
           onClose={() => setSessionModalOpen(false)}
         />
       )}
@@ -469,31 +471,69 @@ function MiniStat({ label, value, color }) {
   );
 }
 
-function SessionModal({ session, saveSession, parcels, products, crews, onClose }) {
-  const [parcelId, setParcelId] = useState(session.parcelId || "");
+function SessionModal({ session, saveSession, parcels, products, crews, setParcels, setProducts, onClose }) {
+  const [rancho, setRancho] = useState(() => {
+    const p = parcels.find((x) => x.id === session.parcelId);
+    return p?.name || session.ranchoName || "";
+  });
   const [mayordomo, setMayordomo] = useState(session.mayordomo || "");
-  const [productId, setProductId] = useState(session.productId || "");
-  const canSave = parcelId && mayordomo.trim() && productId;
+  const [trabajo, setTrabajo] = useState(() => {
+    const p = products.find((x) => x.id === session.productId);
+    return p?.name || session.trabajoName || "";
+  });
+  const [saving, setSaving] = useState(false);
+  const canSave = rancho.trim() && mayordomo.trim() && trabajo.trim();
 
-  const suggestions = Array.from(new Set([
+  const mayordomoSuggestions = Array.from(new Set([
     ...crews.map((c) => c.name).filter(Boolean),
     ...crews.map((c) => c.boss?.name).filter(Boolean),
   ]));
 
-  const confirm = () => {
-    if (!canSave) return;
-    const matchedCrew = crews.find(
-      (c) => c.name?.toLowerCase() === mayordomo.trim().toLowerCase() ||
-             c.boss?.name?.toLowerCase() === mayordomo.trim().toLowerCase()
-    );
-    saveSession({
-      parcelId,
-      mayordomo: mayordomo.trim(),
-      crewId: matchedCrew?.id || "",
-      productId,
-    });
-    toast.success("Sesión guardada");
-    onClose();
+  const confirm = async () => {
+    if (!canSave || saving) return;
+    setSaving(true);
+    try {
+      // Resolve or create parcel
+      let parcel = parcels.find(
+        (p) => p.name?.toLowerCase() === rancho.trim().toLowerCase()
+      );
+      if (!parcel) {
+        const { data } = await api.post("/parcels", { name: rancho.trim() });
+        parcel = data;
+        setParcels?.((prev) => [...prev, data]);
+      }
+
+      // Resolve or create product
+      let product = products.find(
+        (p) => p.name?.toLowerCase() === trabajo.trim().toLowerCase()
+      );
+      if (!product) {
+        const { data } = await api.post("/products", { name: trabajo.trim() });
+        product = data;
+        setProducts?.((prev) => [...prev, data]);
+      }
+
+      // Match crew if mayordomo name matches
+      const matchedCrew = crews.find(
+        (c) => c.name?.toLowerCase() === mayordomo.trim().toLowerCase() ||
+               c.boss?.name?.toLowerCase() === mayordomo.trim().toLowerCase()
+      );
+
+      saveSession({
+        parcelId: parcel.id,
+        ranchoName: parcel.name,
+        mayordomo: mayordomo.trim(),
+        crewId: matchedCrew?.id || "",
+        productId: product.id,
+        trabajoName: product.name,
+      });
+      toast.success("Sesión guardada");
+      onClose();
+    } catch (e) {
+      toast.error(formatApiErrorDetail(e.response?.data?.detail) || "No se pudo guardar");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -509,17 +549,34 @@ function SessionModal({ session, saveSession, parcels, products, crews, onClose 
             <label className="flex items-center gap-1.5 text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">
               <MapPin className="w-4 h-4 text-[#E89C3F]" /> Rancho
             </label>
-            <select
-              value={parcelId}
-              onChange={(e) => setParcelId(e.target.value)}
+            <input
+              type="text"
+              value={rancho}
+              onChange={(e) => setRancho(e.target.value)}
+              list="rancho-suggestions"
+              placeholder="Escribe o elige un rancho"
               className="field-input w-full"
-              data-testid="session-parcel-select"
-            >
-              <option value="">— Elige un rancho —</option>
-              {parcels.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
+              data-testid="session-rancho-input"
+              autoComplete="off"
+            />
+            <datalist id="rancho-suggestions">
+              {parcels.map((p) => <option key={p.id} value={p.name} />)}
+            </datalist>
+            {parcels.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {parcels.slice(0, 6).map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setRancho(p.name)}
+                    className="h-8 px-3 text-xs font-bold rounded-full bg-[#F0EDE1] border border-[#E2DDD0] hover:bg-[#E2DDD0] text-[#1A2210]"
+                    data-testid={`rancho-suggestion-${p.id}`}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>
@@ -537,7 +594,7 @@ function SessionModal({ session, saveSession, parcels, products, crews, onClose 
               autoComplete="off"
             />
             <datalist id="mayordomo-suggestions">
-              {suggestions.map((name) => (
+              {mayordomoSuggestions.map((name) => (
                 <option key={name} value={name} />
               ))}
             </datalist>
@@ -562,23 +619,41 @@ function SessionModal({ session, saveSession, parcels, products, crews, onClose 
             <label className="flex items-center gap-1.5 text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">
               <ShoppingBasket className="w-4 h-4 text-[#E89C3F]" /> Trabajo / Producto
             </label>
-            <select
-              value={productId}
-              onChange={(e) => setProductId(e.target.value)}
+            <input
+              type="text"
+              value={trabajo}
+              onChange={(e) => setTrabajo(e.target.value)}
+              list="trabajo-suggestions"
+              placeholder="Escribe o elige un trabajo"
               className="field-input w-full"
-              data-testid="session-product-select"
-            >
-              <option value="">— Elige un trabajo —</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
+              data-testid="session-trabajo-input"
+              autoComplete="off"
+            />
+            <datalist id="trabajo-suggestions">
+              {products.map((p) => <option key={p.id} value={p.name} />)}
+            </datalist>
+            {products.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {products.slice(0, 6).map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setTrabajo(p.name)}
+                    className="h-8 px-3 text-xs font-bold rounded-full bg-[#F0EDE1] border border-[#E2DDD0] hover:bg-[#E2DDD0] text-[#1A2210]"
+                    data-testid={`trabajo-suggestion-${p.id}`}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-2">
           <button
             onClick={onClose}
+            disabled={saving}
             className="h-12 rounded-xl bg-white border-2 border-[#E2DDD0] text-[#556047] font-bold"
             data-testid="session-cancel-button"
           >
@@ -586,11 +661,11 @@ function SessionModal({ session, saveSession, parcels, products, crews, onClose 
           </button>
           <button
             onClick={confirm}
-            disabled={!canSave}
-            className="h-12 rounded-xl bg-[#1E4620] hover:bg-[#153417] text-white font-bold disabled:opacity-50"
+            disabled={!canSave || saving}
+            className="h-12 rounded-xl bg-[#1E4620] hover:bg-[#153417] text-white font-bold disabled:opacity-50 flex items-center justify-center gap-2"
             data-testid="session-save-button"
           >
-            Guardar
+            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : "Guardar"}
           </button>
         </div>
       </div>

@@ -65,10 +65,18 @@ export default function QrScanner({ onScan, active = true }) {
 
   return (
     <div className="space-y-3" data-testid="qr-scanner-wrapper">
-      <div
-        id={containerId}
-        className="w-full aspect-square max-w-sm mx-auto rounded-2xl overflow-hidden bg-[#1A2210] border-2 border-[#E2DDD0] shadow-inner"
-      />
+      <div className="relative w-full aspect-square max-w-sm mx-auto rounded-2xl overflow-hidden bg-[#1A2210] border-2 border-[#1A2210] shadow-inner qr-square-wrap">
+        <div id={containerId} className="absolute inset-0" />
+        {/* Visor overlay */}
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="relative w-[65%] aspect-square">
+            <span className="absolute -top-0.5 -left-0.5 w-8 h-8 border-t-4 border-l-4 border-[#F4B860] rounded-tl-xl" />
+            <span className="absolute -top-0.5 -right-0.5 w-8 h-8 border-t-4 border-r-4 border-[#F4B860] rounded-tr-xl" />
+            <span className="absolute -bottom-0.5 -left-0.5 w-8 h-8 border-b-4 border-l-4 border-[#F4B860] rounded-bl-xl" />
+            <span className="absolute -bottom-0.5 -right-0.5 w-8 h-8 border-b-4 border-r-4 border-[#F4B860] rounded-br-xl" />
+          </div>
+        </div>
+      </div>
       {starting && (
         <div className="flex items-center justify-center gap-2 text-sm text-[#556047] font-semibold">
           <Loader2 className="w-4 h-4 animate-spin" /> Encendiendo cámara…
