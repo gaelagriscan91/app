@@ -11,6 +11,7 @@ import RegistrarCosecha from "@/pages/RegistrarCosecha";
 import ListaDia from "@/pages/ListaDia";
 import Reportes from "@/pages/Reportes";
 import Modulos from "@/pages/Modulos";
+import Asistencia from "@/pages/Asistencia";
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -46,6 +47,7 @@ function AppRoutes() {
       >
         <Route path="/" element={<Dashboard />} />
         <Route path="/registrar" element={<RegistrarCosecha />} />
+        <Route path="/asistencia" element={<Asistencia />} />
         <Route path="/dia" element={<ListaDia />} />
         <Route path="/reportes" element={<Reportes />} />
         <Route path="/modulos" element={<Modulos />} />

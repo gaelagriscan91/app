@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Wheat, Users, Map, DollarSign, TrendingUp, Loader2, ArrowRight } from "lucide-react";
-import api from "@/lib/api";
-import { formatCurrency, formatNumber } from "@/lib/api";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { Wheat, Users, DollarSign, TrendingUp, Loader2, ArrowRight, ScanLine, UserCheck } from "lucide-react";
+import api, { formatCurrency, formatNumber } from "@/lib/api";
 
 function StatCard({ label, value, sub, Icon, variant = "light", testid }) {
   const base = "rounded-2xl p-4 sm:p-5 border-2 shadow-sm transition-transform hover:-translate-y-0.5";
@@ -57,11 +55,6 @@ export default function Dashboard() {
     );
   }
 
-  const weekly = (data?.weekly || []).map((d) => ({
-    ...d,
-    label: new Date(d.date + "T00:00:00").toLocaleDateString("es-MX", { weekday: "short" }),
-  }));
-
   return (
     <div className="space-y-6" data-testid="dashboard-page">
       <div>
@@ -74,7 +67,14 @@ export default function Dashboard() {
       </div>
 
       {/* Quick CTAs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <button
+          onClick={() => navigate("/asistencia")}
+          className="field-btn-primary"
+          data-testid="dashboard-cta-asistencia"
+        >
+          <ScanLine className="w-6 h-6" /> Escanear asistencia
+        </button>
         <button
           onClick={() => navigate("/registrar")}
           className="field-btn-accent"
@@ -94,11 +94,25 @@ export default function Dashboard() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard
+          label="En campo ahora"
+          value={data?.present_now || 0}
+          sub="Trabajadores sin salida"
+          Icon={UserCheck}
+          variant="dark"
+          testid="stat-present-now"
+        />
+        <StatCard
+          label="Jornadas cerradas"
+          value={data?.closed_today || 0}
+          sub="Hoy"
+          Icon={Users}
+          testid="stat-closed-today"
+        />
+        <StatCard
           label="Kilos hoy"
           value={formatNumber(data?.today_kilos, 1)}
           sub="Kg cosechados"
           Icon={Wheat}
-          variant="dark"
           testid="stat-today-kilos"
         />
         <StatCard
@@ -109,53 +123,31 @@ export default function Dashboard() {
           variant="accent"
           testid="stat-today-payment"
         />
-        <StatCard
-          label="Kilos del mes"
-          value={formatNumber(data?.month_kilos, 0)}
-          sub={formatCurrency(data?.month_payment)}
-          Icon={TrendingUp}
-          testid="stat-month-kilos"
-        />
-        <StatCard
-          label="Equipo"
-          value={`${data?.workers_count || 0} / ${data?.parcels_count || 0}`}
-          sub="Trabajadores / Parcelas"
-          Icon={Users}
-          testid="stat-team"
-        />
       </div>
 
-      {/* Weekly chart */}
-      <div className="field-card p-4 sm:p-5">
-        <div className="flex items-center justify-between mb-3">
+      {/* Month summary */}
+      <div className="field-card p-5">
+        <div className="flex items-center justify-between gap-3">
           <div>
-            <h3 className="text-lg font-bold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>
-              Rendimiento semanal
-            </h3>
-            <p className="text-xs text-[#556047] font-semibold">Kilos cosechados los últimos 7 días</p>
+            <div className="text-xs font-bold uppercase tracking-wider text-[#556047]">Resumen del mes</div>
+            <div className="font-mono-stat text-2xl sm:text-3xl mt-1 text-[#1A2210]">
+              {formatNumber(data?.month_kilos, 0)} <span className="text-base">Kg</span>
+            </div>
+            <div className="text-sm font-bold text-[#15803D] mt-0.5">{formatCurrency(data?.month_payment)}</div>
           </div>
-          <Map className="w-5 h-5 text-[#889078]" />
+          <div className="hidden sm:flex items-center justify-center w-14 h-14 rounded-2xl bg-[#F0EDE1] text-[#1E4620]">
+            <TrendingUp className="w-7 h-7" strokeWidth={2.4} />
+          </div>
         </div>
-        <div className="h-56 sm:h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={weekly} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E2DDD0" vertical={false} />
-              <XAxis dataKey="label" tick={{ fill: "#556047", fontWeight: 600, fontSize: 12 }} axisLine={{ stroke: "#D4CEB8" }} />
-              <YAxis tick={{ fill: "#556047", fontWeight: 600, fontSize: 12 }} axisLine={{ stroke: "#D4CEB8" }} />
-              <Tooltip
-                contentStyle={{
-                  background: "#1E4620",
-                  border: "none",
-                  borderRadius: 12,
-                  color: "#fff",
-                  fontWeight: 700,
-                }}
-                labelStyle={{ color: "#fff" }}
-                formatter={(v) => [`${formatNumber(v, 1)} Kg`, "Kilos"]}
-              />
-              <Bar dataKey="kilos" fill="#1E4620" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="mt-4 pt-4 border-t border-[#E2DDD0] grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <div className="text-xs text-[#556047] font-bold uppercase tracking-wider">Trabajadores</div>
+            <div className="font-mono-stat text-xl text-[#1A2210]">{data?.workers_count || 0}</div>
+          </div>
+          <div>
+            <div className="text-xs text-[#556047] font-bold uppercase tracking-wider">Parcelas</div>
+            <div className="font-mono-stat text-xl text-[#1A2210]">{data?.parcels_count || 0}</div>
+          </div>
         </div>
       </div>
     </div>

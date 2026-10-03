@@ -198,6 +198,11 @@ class WorkerIn(BaseModel):
     active: bool = True
 
 
+class AttendanceScanIn(BaseModel):
+    code: str  # QR code value OR worker_id as fallback
+    date: Optional[str] = None  # YYYY-MM-DD (defaults today)
+
+
 class ParcelIn(BaseModel):
     name: str
     hectares: Optional[float] = 0
@@ -300,9 +305,14 @@ async def list_workers(user: CurrentUser):
     return [doc_out(r) for r in rows]
 
 
+def _gen_qr() -> str:
+    return f"AGW-{uuid.uuid4().hex[:10].upper()}"
+
+
 @api_router.post("/workers")
 async def create_worker(data: WorkerIn, user: CurrentUser):
     doc = data.model_dump()
+    doc["qr_code"] = _gen_qr()
     doc["created_at"] = datetime.now(timezone.utc).isoformat()
     res = await db.workers.insert_one(doc)
     doc["_id"] = res.inserted_id
@@ -311,7 +321,19 @@ async def create_worker(data: WorkerIn, user: CurrentUser):
 
 @api_router.put("/workers/{wid}")
 async def update_worker(wid: str, data: WorkerIn, user: CurrentUser):
-    await db.workers.update_one({"_id": ObjectId(wid)}, {"$set": data.model_dump()})
+    existing = await db.workers.find_one({"_id": ObjectId(wid)})
+    upd = data.model_dump()
+    if existing and not existing.get("qr_code"):
+        upd["qr_code"] = _gen_qr()
+    await db.workers.update_one({"_id": ObjectId(wid)}, {"$set": upd})
+    row = await db.workers.find_one({"_id": ObjectId(wid)})
+    return doc_out(row)
+
+
+@api_router.post("/workers/{wid}/regenerate-qr")
+async def regenerate_qr(wid: str, user: CurrentUser):
+    new_qr = _gen_qr()
+    await db.workers.update_one({"_id": ObjectId(wid)}, {"$set": {"qr_code": new_qr}})
     row = await db.workers.find_one({"_id": ObjectId(wid)})
     return doc_out(row)
 
@@ -542,6 +564,10 @@ async def dashboard(user: CurrentUser):
 
     workers_count = await db.workers.count_documents({"active": True})
     parcels_count = await db.parcels.count_documents({"active": True})
+    today = now.isoformat()
+    att_today = await db.attendance.find({"date": today}).to_list(1000)
+    present_now = sum(1 for r in att_today if r.get("check_in") and not r.get("check_out"))
+    closed_today = sum(1 for r in att_today if r.get("check_in") and r.get("check_out"))
 
     # Weekly breakdown
     weekly: dict = {}
@@ -561,6 +587,8 @@ async def dashboard(user: CurrentUser):
         "month_payment": round(month_payment, 2),
         "workers_count": workers_count,
         "parcels_count": parcels_count,
+        "present_now": present_now,
+        "closed_today": closed_today,
         "weekly": list(weekly.values()),
     }
 
@@ -635,6 +663,125 @@ async def export_excel(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+# ---------------------------------------------------------------------------
+# Attendance (Asistencia) - Entrada / Salida
+# ---------------------------------------------------------------------------
+def _hhmm(iso_ts: Optional[str]) -> str:
+    if not iso_ts:
+        return ""
+    try:
+        dt = datetime.fromisoformat(iso_ts)
+        return dt.strftime("%H:%M")
+    except Exception:
+        return ""
+
+
+def _duration_hours(ci: Optional[str], co: Optional[str]) -> float:
+    if not ci or not co:
+        return 0.0
+    try:
+        a = datetime.fromisoformat(ci)
+        b = datetime.fromisoformat(co)
+        return round((b - a).total_seconds() / 3600.0, 2)
+    except Exception:
+        return 0.0
+
+
+async def _resolve_worker_by_code(code: str) -> Optional[dict]:
+    code = (code or "").strip()
+    if not code:
+        return None
+    # Try qr_code field first
+    w = await db.workers.find_one({"qr_code": code})
+    if w:
+        return w
+    # Fallback: treat as ObjectId
+    try:
+        w = await db.workers.find_one({"_id": ObjectId(code)})
+        if w:
+            return w
+    except Exception:
+        pass
+    # Last fallback: document_id or name exact match
+    return await db.workers.find_one({"$or": [{"document_id": code}, {"name": code}]})
+
+
+@api_router.post("/attendance/scan")
+async def attendance_scan(data: AttendanceScanIn, user: CurrentUser):
+    date = data.date or today_iso()
+    worker = await _resolve_worker_by_code(data.code)
+    if not worker:
+        raise HTTPException(status_code=404, detail="Trabajador no encontrado para ese código")
+
+    wid = str(worker["_id"])
+    now_iso = datetime.now(timezone.utc).isoformat()
+    row = await db.attendance.find_one({"worker_id": wid, "date": date})
+    action = ""
+
+    if not row:
+        doc = {
+            "worker_id": wid,
+            "worker_name": worker.get("name", ""),
+            "date": date,
+            "check_in": now_iso,
+            "check_out": None,
+            "created_by": user["_id"],
+        }
+        res = await db.attendance.insert_one(doc)
+        doc["_id"] = res.inserted_id
+        action = "check_in"
+        row = doc
+    elif not row.get("check_out"):
+        await db.attendance.update_one({"_id": row["_id"]}, {"$set": {"check_out": now_iso}})
+        row = await db.attendance.find_one({"_id": row["_id"]})
+        action = "check_out"
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{worker.get('name')} ya cerró su jornada hoy ({_hhmm(row.get('check_in'))} - {_hhmm(row.get('check_out'))})",
+        )
+
+    out = doc_out(row)
+    out["action"] = action
+    out["worker_name"] = worker.get("name", "")
+    out["check_in_hhmm"] = _hhmm(out.get("check_in"))
+    out["check_out_hhmm"] = _hhmm(out.get("check_out"))
+    out["hours"] = _duration_hours(out.get("check_in"), out.get("check_out"))
+    return out
+
+
+@api_router.get("/attendance")
+async def list_attendance(user: CurrentUser, date: Optional[str] = None):
+    d = date or today_iso()
+    rows = await db.attendance.find({"date": d}).to_list(2000)
+    out = []
+    for r in rows:
+        o = doc_out(r)
+        o["check_in_hhmm"] = _hhmm(o.get("check_in"))
+        o["check_out_hhmm"] = _hhmm(o.get("check_out"))
+        o["hours"] = _duration_hours(o.get("check_in"), o.get("check_out"))
+        out.append(o)
+    out.sort(key=lambda x: x.get("check_in") or "")
+
+    present = sum(1 for r in out if r.get("check_in") and not r.get("check_out"))
+    closed = sum(1 for r in out if r.get("check_in") and r.get("check_out"))
+    total_hours = round(sum(float(r.get("hours") or 0) for r in out), 2)
+    return {
+        "date": d,
+        "rows": out,
+        "present": present,
+        "closed": closed,
+        "total": len(out),
+        "total_hours": total_hours,
+    }
+
+
+@api_router.delete("/attendance/{aid}")
+async def delete_attendance(aid: str, user: CurrentUser):
+    await db.attendance.delete_one({"_id": ObjectId(aid)})
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
@@ -751,11 +898,20 @@ async def seed_demo():
 # ---------------------------------------------------------------------------
 # Startup
 # ---------------------------------------------------------------------------
+async def backfill_worker_qr():
+    cursor = db.workers.find({"$or": [{"qr_code": {"$exists": False}}, {"qr_code": None}, {"qr_code": ""}]})
+    async for w in cursor:
+        await db.workers.update_one({"_id": w["_id"]}, {"$set": {"qr_code": _gen_qr()}})
+
+
 @app.on_event("startup")
 async def startup_event():
     await db.users.create_index("email", unique=True)
+    await db.attendance.create_index([("worker_id", 1), ("date", 1)], unique=True)
+    await db.workers.create_index("qr_code")
     await seed_admin()
     await seed_demo()
+    await backfill_worker_qr()
     try:
         init_storage()
         logger.info("Object storage inicializado")
