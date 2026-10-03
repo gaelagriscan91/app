@@ -69,25 +69,25 @@ export default function Dashboard() {
       {/* Quick CTAs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <button
-          onClick={() => navigate("/asistencia")}
+          onClick={() => navigate("/registrar?mode=qr")}
           className="field-btn-primary"
-          data-testid="dashboard-cta-asistencia"
+          data-testid="dashboard-cta-scan-harvest"
         >
-          <ScanLine className="w-6 h-6" /> Escanear asistencia
+          <ScanLine className="w-6 h-6" /> Cosechar por QR
         </button>
         <button
           onClick={() => navigate("/registrar")}
           className="field-btn-accent"
           data-testid="dashboard-cta-registrar"
         >
-          <Wheat className="w-6 h-6" /> Registrar cosecha
+          <Wheat className="w-6 h-6" /> Registrar manual
         </button>
         <button
-          onClick={() => navigate("/dia")}
+          onClick={() => navigate("/asistencia")}
           className="field-btn-secondary h-14 text-lg"
-          data-testid="dashboard-cta-dia"
+          data-testid="dashboard-cta-asistencia"
         >
-          Ver lista del día <ArrowRight className="w-5 h-5" />
+          <UserCheck className="w-5 h-5" /> Asistencia
         </button>
       </div>
 

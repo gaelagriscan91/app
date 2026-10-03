@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Camera, Loader2, Wheat, Save, X } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Camera, Loader2, Save, X, Edit3, ScanLine } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatCurrency, formatNumber, todayISO, formatApiErrorDetail } from "@/lib/api";
+import ScanHarvestMode from "@/components/ScanHarvestMode";
 
 export default function RegistrarCosecha() {
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const mode = params.get("mode") === "qr" ? "qr" : "manual";
+  const setMode = (m) => setParams(m === "qr" ? { mode: "qr" } : {});
   const [workers, setWorkers] = useState([]);
   const [parcels, setParcels] = useState([]);
   const [products, setProducts] = useState([]);
@@ -133,6 +137,35 @@ export default function RegistrarCosecha() {
         <p className="text-sm text-[#556047] font-semibold">Captura rápida en el campo</p>
       </div>
 
+      {/* Mode toggle */}
+      <div className="field-card p-1.5 flex gap-1.5">
+        <button
+          onClick={() => setMode("manual")}
+          data-testid="mode-manual-button"
+          className={`flex-1 flex items-center justify-center gap-2 h-12 px-4 rounded-xl font-bold text-sm transition-all ${
+            mode === "manual"
+              ? "bg-[#1E4620] text-white shadow-md"
+              : "text-[#556047] hover:bg-[#F0EDE1]"
+          }`}
+        >
+          <Edit3 className="w-4 h-4" />
+          Manual
+        </button>
+        <button
+          onClick={() => setMode("qr")}
+          data-testid="mode-qr-button"
+          className={`flex-1 flex items-center justify-center gap-2 h-12 px-4 rounded-xl font-bold text-sm transition-all ${
+            mode === "qr"
+              ? "bg-[#1E4620] text-white shadow-md"
+              : "text-[#556047] hover:bg-[#F0EDE1]"
+          }`}
+        >
+          <ScanLine className="w-4 h-4" />
+          Escanear por QR
+        </button>
+      </div>
+
+      {mode === "qr" ? <ScanHarvestMode /> : (
       <form onSubmit={onSubmit} className="space-y-5">
         <div className="field-card p-4 sm:p-5 space-y-4">
           <div>
@@ -331,6 +364,7 @@ export default function RegistrarCosecha() {
           )}
         </button>
       </form>
+      )}
     </div>
   );
 }
