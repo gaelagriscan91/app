@@ -6,6 +6,7 @@ load_dotenv(ROOT_DIR / '.env')
 
 import os
 import io
+import re
 import uuid
 import logging
 import bcrypt
@@ -889,22 +890,43 @@ def _duration_hours(ci: Optional[str], co: Optional[str]) -> float:
 
 
 async def _resolve_worker_by_code(code: str) -> Optional[dict]:
-    code = (code or "").strip()
-    if not code:
+    raw = (code or "").strip()
+    if not raw:
         return None
-    # Try qr_code field first
-    w = await db.workers.find_one({"qr_code": code})
+    # Strip URL/scheme prefix: "agriscan://worker/AGW-xxx" or "https://x/w/AGW-xxx" -> "AGW-xxx"
+    extracted = raw
+    if "/" in extracted:
+        extracted = [p for p in extracted.split("/") if p][-1]
+    if ":" in extracted:
+        extracted = extracted.split(":")[-1]
+    extracted = extracted.strip()
+    upper = extracted.upper()
+
+    # Try qr_code field with case-insensitive match on normalized value
+    w = await db.workers.find_one({"qr_code": upper})
+    if w:
+        return w
+    # Try original (in case qr_code is stored differently)
+    w = await db.workers.find_one({"qr_code": extracted})
+    if w:
+        return w
+    # Case-insensitive regex fallback on qr_code
+    w = await db.workers.find_one({"qr_code": {"$regex": f"^{re.escape(extracted)}$", "$options": "i"}})
     if w:
         return w
     # Fallback: treat as ObjectId
     try:
-        w = await db.workers.find_one({"_id": ObjectId(code)})
+        w = await db.workers.find_one({"_id": ObjectId(extracted)})
         if w:
             return w
     except Exception:
         pass
-    # Last fallback: document_id or name exact match
-    return await db.workers.find_one({"$or": [{"document_id": code}, {"name": code}]})
+    # Last fallback: document_id or name exact match (case-insensitive)
+    return await db.workers.find_one({"$or": [
+        {"document_id": extracted},
+        {"document_id": {"$regex": f"^{re.escape(extracted)}$", "$options": "i"}},
+        {"name": extracted},
+    ]})
 
 
 @api_router.post("/attendance/scan")

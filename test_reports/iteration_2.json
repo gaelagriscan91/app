@@ -1,0 +1,31 @@
+{
+  "summary": "Verified fix for 'QR no reconocido' bug on Picking screen (ScanHarvestMode). Backend sanity: /api/workers returns 3 workers with AGW-XXXXXXXXXX qr_code, POST /api/parcels and /api/products accept {name}-only payloads (auto-fill defaults). Frontend sanity: login → /registrar?mode=qr&parcel=&product= shows session banner, paymode toggle (piece/hour), scanner card with manual-add fallback. Normalization logic (normalizeCode + extractCode + workersByQr map) correctly resolves all QR variants: exact, lowercase, trimmed, URL-prefixed (agriscan://worker/AGW-xxx), https://x/w/agw-xxx, scheme:CODE, and MongoDB _id fallback. Manual-add dropdown increments tally (1→2) and 'scan-save-button' triggers POST /api/harvests then navigates to /dia. Paymode switch piece↔hour toggles UI correctly. All tested data-testids present and functional.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/attendance/scan", "issue": "Server-side worker lookup is case-sensitive and does NOT handle URL-prefixed codes. 'agw-5e8a55913a' and 'agriscan://worker/AGW-...' both return 404. Only exact match works. Picking is unaffected (client-side lookup is normalized), but the Asistencia Check-in orange flow still has this limitation."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Optional: mirror the Picking normalization fix on backend _resolve_worker_by_code (around server.py:891) — uppercase the stored qr_code and incoming code, strip URL/scheme prefix — so Asistencia Check-in also tolerates lowercase/URL-wrapped QR payloads."
+  ],
+  "critical_code_review_comments": [
+    "ScanHarvestMode.jsx: workersByQr map now built with normalizeCode(qr_code|id|document_id) — case-insensitive, trimmed, handles URL/scheme prefix via extractCode. Verified via live browser evaluation.",
+    "handleScan correctly reports the DECODED code in the error toast (slice 0..24) rather than the raw QR payload — easier debugging.",
+    "Backend _resolve_worker_by_code still does case-sensitive db.workers.find_one({'qr_code': code}); not aligned with the frontend normalization. Low priority since Picking is client-side.",
+    "File ScanHarvestMode.jsx is 763 lines — approaching the 700-line split threshold; consider extracting the Pay-by-hour sub-view."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "gaelmartin158@gmail.com / agriscan2026 (admin) — confirmed working",
+  "seed_data_creation": "Created TEST_RanchoScan parcel and TEST_TrabajoScan product via curl to confirm {name}-only POST works; harvest POST also happened via scan-save-button flow (worker Gael Martín, Madera, Cherry, 2 units @ $5).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Primary QR scan bug is FIXED on Picking (frontend-only normalization). Verified by evaluating the normalizeCode/extractCode/workersByQr logic in-browser with all expected variants. Camera scans cannot be driven headlessly — relied on manual-add dropdown + direct JS evaluation of the lookup map. Backend attendance/scan endpoint still has the old limitation (minor). All backend CRUDs green from iteration_1."
+}

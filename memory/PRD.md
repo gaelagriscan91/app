@@ -22,8 +22,12 @@ Funciones: Registrar cosecha (Trabajador, Parcela, Producto, Kilos, Fecha, Foto,
 - Mobile-first, botones ≥ 48px, todo en español
 
 ## Implemented (2026-02-11)
+- **Fix: QR scan "no reconocido"** — ScanHarvestMode (Picking) ahora normaliza códigos a mayúsculas, trim, y extrae de prefijos URL (agriscan://worker/AGW-xxx). Fallback a document_id. Error muestra el código decodificado para debug. Backend `_resolve_worker_by_code` también actualizado con búsqueda case-insensitive y strip de prefijo URL.
+- **Picking rediseñado**: sin setup, hereda rancho/producto del Check in. Banner "Jornada activa" + botón Hub.
+- **Toggle Pago por pieza / por hora** en Picking: Por hora lista automática de trabajadores con asistencia × precio por hora.
+- **Inputs de teclado** en modal "Antes de empezar": Rancho, Mayordomo y Trabajo son inputs de texto con datalist + chips rápidos. Rancho/Trabajo nuevos se crean automáticamente.
 - **PickTrace-style Hub** en /asistencia con navy BG y 3 tiles grandes: Check in (naranja/sol), Picking (rojo/canasta), Check out (púrpura/luna)
-- Selección obligatoria de **Rancho + Mayordomo (Cuadrilla)** antes de dar entrada; persistida en localStorage por fecha
+- Selección obligatoria de Rancho + Mayordomo + Trabajo antes de dar entrada; persistida en localStorage por fecha
 - Bloqueo del botón Picking hasta que al menos 1 trabajador tenga check-in registrado
 - Botón Check out: cierra la jornada de todos los trabajadores con jornada abierta en lote (confirmación)
 - Picking tile navega a /registrar?mode=qr con parcel y product pre-cargados desde la sesión
