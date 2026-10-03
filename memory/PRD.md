@@ -22,11 +22,13 @@ Funciones: Registrar cosecha (Trabajador, Parcela, Producto, Kilos, Fecha, Foto,
 - Mobile-first, botones ≥ 48px, todo en español
 
 ## Implemented (2026-02-11)
-- **Price lock-in por producto** (NUEVO):
-  - El primer `POST /api/harvests` con precio > 0 bloquea el precio del producto (`price_per_unit` y `price_per_hour` según el modo).
-  - Harvests subsiguientes para el mismo producto SIEMPRE usan el precio bloqueado (snapshot override) — no es posible cambiar el precio por harvest ni volver a 0.
-  - Frontend: UI pre-llena desde product, muestra chip verde "Guardado para este producto" con candado cuando ya está locked, bloquea guardado si precio = 0.
-  - Verificado por testing_agent (100% backend 4/4 + frontend E2E).
+- **Pieza compartida (NUEVO)**:
+  - Toggle "Compartir pieza" en Picking modo pieza.
+  - Al activarlo, los escaneos entran a un buffer temporal (chips naranjas con X para eliminar).
+  - Botón "Confirmar pieza compartida" distribuye 1/N piezas a cada trabajador en el buffer.
+  - UI muestra preview: "Cada uno recibirá 0.XXX pieza · $Y.YY".
+  - Conteo con decimales (0.50, 0.33, etc.) visible en lista de trabajadores y totales.
+- **Price lock-in por producto**: Primer harvest con precio > 0 bloquea el precio. Subsiguientes usan el bloqueado (snapshot override).
 - **Multi-tenant por Mayordomo**:
   - Admin ve todos los datos. Mayordomos ven solo lo suyo (`owner_id` scope).
   - Registro público DESHABILITADO (403). Admin gestiona accesos en Módulos → Mayordomos.

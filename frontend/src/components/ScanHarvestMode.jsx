@@ -794,7 +794,7 @@ export default function ScanHarvestMode() {
             </div>
             <div className="rounded-2xl bg-white border-2 border-[#E2DDD0] text-[#1A2210] p-4 shadow-sm" data-testid="scan-total-units">
               <div className="text-[11px] font-bold uppercase tracking-wider text-[#556047]">Total piezas</div>
-              <div className="font-mono-stat text-2xl sm:text-3xl mt-1">{formatNumber(totals.units, 0)}</div>
+              <div className="font-mono-stat text-2xl sm:text-3xl mt-1">{formatNumber(totals.units, totals.units % 1 === 0 ? 0 : 2)}</div>
             </div>
             <div className="rounded-2xl bg-[#E65100] text-white p-4 border-2 border-[#C63D00] shadow-sm" data-testid="scan-total-payment">
               <div className="text-[11px] font-bold uppercase tracking-wider opacity-90">Pago total</div>
@@ -939,7 +939,7 @@ export default function ScanHarvestMode() {
                   <div>
                     <div className="text-[11px] font-bold uppercase tracking-widest opacity-90">Total jornada</div>
                     <div className="text-sm font-bold opacity-95 mt-0.5">
-                      {totals.workers} trabajador{totals.workers !== 1 ? "es" : ""} • {formatNumber(totals.units, 0)} pieza{totals.units !== 1 ? "s" : ""}
+                      {totals.workers} trabajador{totals.workers !== 1 ? "es" : ""} • {formatNumber(totals.units, totals.units % 1 === 0 ? 0 : 2)} pieza{totals.units !== 1 ? "s" : ""}
                     </div>
                   </div>
                   <div className="text-right">
@@ -983,7 +983,7 @@ export default function ScanHarvestMode() {
                 </span>
                 <span className="flex items-center gap-3">
                   <span className="text-[11px] font-bold uppercase tracking-wider opacity-85">
-                    {totals.workers}👤 · {formatNumber(totals.units, 0)}🧺
+                    {totals.workers}👤 · {formatNumber(totals.units, totals.units % 1 === 0 ? 0 : 2)}🧺
                   </span>
                   <span className="font-mono-stat text-lg">{formatCurrency(totals.payment)}</span>
                 </span>
