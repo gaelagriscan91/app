@@ -1,34 +1,55 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Camera, CameraOff, Keyboard, Users, Loader2, Trash2, X, ArrowLeft, UserPlus, Search, CheckCircle2 } from "lucide-react";
+import {
+  Camera, CameraOff, Keyboard, Users, Loader2, Trash2, X, ArrowLeft, UserPlus,
+  Search, CheckCircle2, Sun, Moon, ShoppingBasket, CloudCheck, ChevronRight, MapPin, UserCircle2,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import api, { formatApiErrorDetail, todayISO } from "@/lib/api";
 import QrScanner from "@/components/QrScanner";
 import QuickAddWorker from "@/components/QuickAddWorker";
 
+const SESSION_KEY = (date) => `agriscan.session.${date}`;
+
+function loadSession(date) {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY(date));
+    if (raw) return JSON.parse(raw);
+  } catch (_) {}
+  return { parcelId: "", crewId: "", productId: "" };
+}
+
 export default function Asistencia() {
   const navigate = useNavigate();
-  const [scannerOn, setScannerOn] = useState(false);
+  const [view, setView] = useState("hub"); // "hub" | "checkin" | "summary"
+  const [date] = useState(todayISO());
+  const [data, setData] = useState({ rows: [], present: 0, closed: 0, total: 0, total_hours: 0 });
   const [workers, setWorkers] = useState([]);
   const [parcels, setParcels] = useState([]);
   const [products, setProducts] = useState([]);
   const [crews, setCrews] = useState([]);
-  const [date] = useState(todayISO());
-  const [data, setData] = useState({ rows: [], present: 0, closed: 0, total: 0, total_hours: 0 });
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+
+  // Session (persisted in localStorage per-date)
+  const [session, setSession] = useState(() => loadSession(todayISO()));
+  const [sessionModalOpen, setSessionModalOpen] = useState(false);
+
+  // Check-in sub-view state
+  const [scannerOn, setScannerOn] = useState(false);
   const [showCrewPicker, setShowCrewPicker] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualCode, setManualCode] = useState("");
   const [quickAddOpen, setQuickAddOpen] = useState(false);
-  const [showSummary, setShowSummary] = useState(false);
-
-  // Session
-  const [siteId, setSiteId] = useState("");
-  const [parcelId, setParcelId] = useState("");
-  const [productId, setProductId] = useState("");
-
+  const [confirmCheckout, setConfirmCheckout] = useState(false);
+  const [checkingOutAll, setCheckingOutAll] = useState(false);
   const lastScanRef = useRef({ code: "", at: 0 });
+
+  const saveSession = (patch) => {
+    const next = { ...session, ...patch };
+    setSession(next);
+    try { localStorage.setItem(SESSION_KEY(date), JSON.stringify(next)); } catch (_) {}
+  };
 
   const load = async () => {
     setLoading(true);
@@ -54,11 +75,27 @@ export default function Asistencia() {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
 
-  const selectedParcel = parcels.find((p) => p.id === parcelId);
-  const selectedProduct = products.find((p) => p.id === productId);
+  const selectedParcel = parcels.find((p) => p.id === session.parcelId);
+  const selectedProduct = products.find((p) => p.id === session.productId);
+  const selectedCrew = crews.find((c) => c.id === session.crewId);
+  const mayordomoName = selectedCrew?.boss?.name || "—";
 
+  const presentCount = data.rows.length;
+  const openCount = data.rows.filter((r) => !r.check_out_hhmm).length;
   const presentWorkerIds = useMemo(() => new Set(data.rows.map((r) => r.worker_id)), [data.rows]);
 
+  const nowGreeting = () => {
+    const h = new Date().getHours();
+    if (h < 12) return "Buenos días";
+    if (h < 19) return "Buenas tardes";
+    return "Buenas noches";
+  };
+
+  const prettyDate = new Date().toLocaleDateString("es-MX", {
+    day: "numeric", month: "short", year: "numeric",
+  });
+
+  // ============== Scan / Check-in / Check-out ==============
   const submitCode = async (code) => {
     if (processing || !code) return;
     setProcessing(true);
@@ -96,111 +133,466 @@ export default function Asistencia() {
     }
     toast.success(`Registrando ${toCheck.length} de ${crew.name}…`);
     for (const w of toCheck) {
-      try {
-        await api.post("/attendance/scan", { code: w.id, date });
-      } catch (_) {}
+      try { await api.post("/attendance/scan", { code: w.id, date }); } catch (_) {}
     }
     await load();
     toast.success(`✓ Cuadrilla ${crew.name} registrada`);
   };
 
-  // ======================= Crew Summary View =======================
-  if (showSummary) {
-    const groupedByLocation = {};
-    data.rows.forEach((r) => {
-      const key = selectedParcel?.name || "Sin ubicación";
-      if (!groupedByLocation[key]) groupedByLocation[key] = [];
-      // Find worker to get pieces (harvests today for that worker)
-      groupedByLocation[key].push(r);
-    });
-    const totalWorkers = data.rows.length;
+  const checkoutAll = async () => {
+    const open = data.rows.filter((r) => !r.check_out_hhmm);
+    if (open.length === 0) {
+      toast.info("No hay trabajadores con jornada abierta");
+      setConfirmCheckout(false);
+      return;
+    }
+    setCheckingOutAll(true);
+    let ok = 0, fail = 0;
+    for (const r of open) {
+      try {
+        await api.post("/attendance/scan", { code: r.worker_id, date });
+        ok++;
+      } catch (_) { fail++; }
+    }
+    await load();
+    setCheckingOutAll(false);
+    setConfirmCheckout(false);
+    toast.success(`🏁 Jornada cerrada • ${ok} salida(s)${fail ? ` • ${fail} fallo(s)` : ""}`);
+  };
 
-    return (
-      <div className="min-h-[calc(100vh-5rem)] -mx-4 -my-5 sm:-mx-0 sm:-my-0" data-testid="crew-summary-view">
-        <div className="bg-[#1e40af] text-white px-5 pt-5 pb-6 rounded-b-xl">
-          <div className="flex items-center justify-between mb-5">
-            <button onClick={() => setShowSummary(false)} className="flex items-center gap-1" data-testid="close-summary">
-              <X className="w-6 h-6" />
-            </button>
-            <h2 className="text-xl font-extrabold flex-1 pl-2" style={{ fontFamily: "Outfit, sans-serif" }}>
-              Crew Summary
-            </h2>
-            <div className="flex items-center gap-2">
-              <button className="bg-white text-[#1e40af] px-4 h-9 rounded-full text-sm font-bold flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 bg-gray-500 text-white rounded-full p-0.5" /> Review
-              </button>
-              <button className="w-9 h-9 bg-white rounded-full flex items-center justify-center text-[#1e40af]">
-                <Search className="w-4 h-4" />
-              </button>
-            </div>
+  // ============== Tile Click Handlers ==============
+  const onCheckIn = () => {
+    if (!session.parcelId || !session.crewId) {
+      toast.info("Primero elige Rancho y Mayordomo");
+      setSessionModalOpen(true);
+      return;
+    }
+    setView("checkin");
+  };
+
+  const onPicking = () => {
+    if (!session.parcelId || !session.productId) {
+      toast.info("Primero elige Rancho y Trabajo");
+      setSessionModalOpen(true);
+      return;
+    }
+    if (presentCount === 0) {
+      toast.error("No puedes empezar a cosechar: aún no hay trabajadores con entrada registrada");
+      return;
+    }
+    // Navigate to QR harvest mode with session preloaded
+    const params = new URLSearchParams({
+      mode: "qr",
+      parcel: session.parcelId,
+      product: session.productId,
+    });
+    navigate(`/registrar?${params.toString()}`);
+  };
+
+  const onCheckOut = () => {
+    if (openCount === 0) {
+      toast.info("No hay trabajadores con jornada abierta");
+      return;
+    }
+    setConfirmCheckout(true);
+  };
+
+  // ============== VIEWS ==============
+  if (view === "summary") return (
+    <SummaryView
+      data={data}
+      selectedParcel={selectedParcel}
+      onClose={() => setView("checkin")}
+    />
+  );
+
+  if (view === "checkin") return (
+    <CheckInView
+      navigate={navigate}
+      data={data}
+      loading={loading}
+      scannerOn={scannerOn}
+      setScannerOn={setScannerOn}
+      selectedParcel={selectedParcel}
+      selectedProduct={selectedProduct}
+      session={session}
+      saveSession={saveSession}
+      parcels={parcels}
+      products={products}
+      crews={crews}
+      handleScan={handleScan}
+      removeAttendance={removeAttendance}
+      setManualOpen={setManualOpen}
+      setShowCrewPicker={setShowCrewPicker}
+      goBack={() => setView("hub")}
+      openSummary={() => setView("summary")}
+      // Modals
+      manualOpen={manualOpen}
+      manualCode={manualCode}
+      setManualCode={setManualCode}
+      workers={workers}
+      setWorkers={setWorkers}
+      setManualOpen2={setManualOpen}
+      quickAddOpen={quickAddOpen}
+      setQuickAddOpen={setQuickAddOpen}
+      submitCode={submitCode}
+      processing={processing}
+      showCrewPicker={showCrewPicker}
+      setShowCrewPicker2={setShowCrewPicker}
+      moveCrew={moveCrew}
+    />
+  );
+
+  // ============== HUB VIEW (default) — PickTrace style ==============
+  return (
+    <div className="-mx-4 -my-5 sm:-mx-0 sm:-my-0 min-h-[calc(100vh-5rem)]" data-testid="asistencia-hub">
+      {/* Navy dark top panel */}
+      <div className="bg-[#1E2746] text-white px-5 pt-5 pb-10 rounded-b-[28px]">
+        {/* Top row: back + synced chip */}
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => navigate("/")}
+            className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center"
+            data-testid="hub-back-button"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div className="flex items-center gap-1.5 bg-white/10 border border-white/15 rounded-full px-3 h-9 text-sm font-semibold" data-testid="synced-badge">
+            Sincronizado <CloudCheck className="w-4 h-4" />
           </div>
         </div>
 
-        <div className="px-4 pt-5">
-          <div className="grid grid-cols-4 gap-4 pb-5 border-b border-[#E2DDD0]">
-            <Stat label="Workers" value={totalWorkers} />
-            <Stat label="Bins" value={0} />
-            <Stat label="Cases" value={0} />
-            <Stat label="Clamshells" value={0} />
-          </div>
+        {/* Date */}
+        <div className="mt-4 text-sm text-white/70 font-semibold capitalize">{prettyDate}</div>
 
-          <div className="py-3 text-sm text-[#556047] font-semibold">
-            Employee group by: <span className="text-[#1e40af] font-bold border-b-2 border-[#1e40af]">Location</span>
-            <span className="mx-2 text-[#889078]">|</span>
-            <span className="text-[#556047]">Job</span>
-          </div>
+        {/* Greeting */}
+        <h1
+          className="mt-1 text-[26px] sm:text-3xl font-extrabold leading-tight"
+          style={{ fontFamily: "Outfit, sans-serif" }}
+          data-testid="hub-greeting"
+        >
+          {nowGreeting()}, hoy trabajas en{" "}
+          <span className="text-[#F4B860]">{selectedParcel?.name || "—"}</span>
+          {" "}y{" "}
+          <span className="text-[#F4B860]">{selectedProduct?.name || "—"}</span> picking.
+        </h1>
 
-          {Object.entries(groupedByLocation).map(([loc, rows]) => (
-            <div key={loc} className="mt-2">
-              <div className="text-sm font-bold text-[#1A2210] py-2" style={{ fontFamily: "Outfit, sans-serif" }}>
-                {loc} ({rows.length})
-              </div>
-              <div className="space-y-2">
-                {rows.map((r) => (
-                  <div
-                    key={r.id}
-                    className="bg-white border border-[#E2DDD0] rounded-xl p-4 flex items-stretch border-l-4 border-l-emerald-500"
-                    data-testid={`summary-row-${r.id}`}
-                  >
-                    <div className="flex-1">
-                      <div className="text-xs text-[#889078] font-semibold uppercase tracking-wider">Name</div>
-                      <div className="font-bold text-[#1A2210] text-base">{r.worker_name}</div>
-                    </div>
-                    <div className="text-right pr-6 border-r border-[#E2DDD0]">
-                      <div className="text-xs text-[#889078] font-semibold uppercase tracking-wider">Hours</div>
-                      <div className="font-mono-stat text-base text-[#1A2210]">
-                        {r.hours ? `${Math.floor(r.hours)}h ${Math.round((r.hours % 1) * 60)}min` : "0min"}
-                      </div>
-                    </div>
-                    <div className="text-right pl-6">
-                      <div className="text-xs text-[#889078] font-semibold uppercase tracking-wider">Pieces</div>
-                      <div className="font-mono-stat text-base text-[#1A2210]">0</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+        {/* Rancho / Mayordomo chip-row */}
+        <button
+          onClick={() => setSessionModalOpen(true)}
+          className="mt-4 w-full bg-white/10 hover:bg-white/15 border border-white/15 rounded-2xl px-4 py-3 flex items-center justify-between text-left"
+          data-testid="open-session-modal"
+        >
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 text-xs text-white/60 font-bold uppercase tracking-wider">
+              <MapPin className="w-3.5 h-3.5" /> Rancho
+              <span className="mx-2 opacity-30">•</span>
+              <UserCircle2 className="w-3.5 h-3.5" /> Mayordomo
             </div>
-          ))}
+            <div className="font-bold text-base truncate mt-0.5">
+              {selectedParcel?.name || "Elige rancho"}
+              <span className="text-white/50 mx-2">•</span>
+              {mayordomoName}
+            </div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-white/60" />
+        </button>
 
-          {data.rows.length === 0 && (
-            <p className="text-center text-[#556047] font-semibold py-8">Sin registros</p>
-          )}
+        {/* Three Tiles */}
+        <div className="mt-6 grid grid-cols-3 gap-3 sm:gap-4">
+          <Tile
+            testid="tile-check-in"
+            label="Check in"
+            onClick={onCheckIn}
+            colorFrom="#F6C27A"
+            colorTo="#E89C3F"
+            icon={<Sun className="w-9 h-9" strokeWidth={2.3} />}
+            badge={presentCount > 0 ? presentCount : null}
+          />
+          <Tile
+            testid="tile-picking"
+            label="Picking"
+            onClick={onPicking}
+            colorFrom="#DD6B6B"
+            colorTo="#B23A3A"
+            icon={<ShoppingBasket className="w-9 h-9" strokeWidth={2.3} />}
+          />
+          <Tile
+            testid="tile-check-out"
+            label="Check out"
+            onClick={onCheckOut}
+            colorFrom="#8075C9"
+            colorTo="#5A4A98"
+            icon={<Moon className="w-9 h-9" strokeWidth={2.3} />}
+            badge={openCount > 0 ? openCount : null}
+          />
         </div>
       </div>
-    );
-  }
 
-  // ======================= Check-in View (PickTrace style) =======================
+      {/* White lower panel */}
+      <div className="bg-[#F7F5EE] -mt-5 rounded-t-[28px] px-4 pt-5 pb-10 relative">
+        <button
+          className="absolute right-5 -top-6 w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center text-[#1E2746]"
+          onClick={() => toast.info("Buscar — próximamente")}
+          data-testid="hub-search-button"
+        >
+          <Search className="w-5 h-5" strokeWidth={2.5} />
+        </button>
+
+        {/* Status strip */}
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          <MiniStat label="Entrada" value={presentCount} color="#E89C3F" />
+          <MiniStat label="En campo" value={openCount} color="#1E4620" />
+          <MiniStat label="Salida" value={presentCount - openCount} color="#5A4A98" />
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-8 text-[#1E4620]"><Loader2 className="w-6 h-6 animate-spin" /></div>
+        ) : data.rows.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-[#E2DDD0] py-10 text-center" data-testid="hub-empty">
+            <p className="text-[#889078] font-semibold">No piece work today.</p>
+            <p className="text-xs text-[#889078] mt-1">Toca <b>Check in</b> para registrar entradas.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {data.rows.map((r) => {
+              const w = workers.find((x) => x.id === r.worker_id);
+              const shortId = (w?.id_document || w?.id || "").toString().slice(-3) || "—";
+              return (
+                <div
+                  key={r.id}
+                  className="bg-white border border-[#E2DDD0] rounded-2xl p-3 flex items-center gap-3"
+                  data-testid={`hub-row-${r.id}`}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-[#F0EDE1] flex items-center justify-center text-[#1E2746] font-mono-stat text-sm">
+                    {shortId}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[11px] text-[#889078] font-bold uppercase tracking-wider">Name</div>
+                    <div className="font-bold text-[#1A2210] truncate">{r.worker_name}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[11px] text-[#889078] font-bold uppercase tracking-wider">Hora</div>
+                    <div className="font-mono-stat text-sm text-[#1A2210]">
+                      {r.check_in_hhmm}{r.check_out_hhmm ? ` → ${r.check_out_hhmm}` : ""}
+                    </div>
+                  </div>
+                  <span className={`w-2.5 h-2.5 rounded-full ${r.check_out_hhmm ? "bg-[#5A4A98]" : "bg-emerald-500"}`} />
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Session modal */}
+      {sessionModalOpen && (
+        <SessionModal
+          session={session}
+          saveSession={saveSession}
+          parcels={parcels}
+          products={products}
+          crews={crews}
+          onClose={() => setSessionModalOpen(false)}
+        />
+      )}
+
+      {/* Check-out confirm modal */}
+      {confirmCheckout && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => !checkingOutAll && setConfirmCheckout(false)}>
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl p-6 w-full sm:max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()} data-testid="confirm-checkout-modal">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-[#5A4A98]/10 text-[#5A4A98] flex items-center justify-center">
+              <Moon className="w-7 h-7" />
+            </div>
+            <h3 className="font-extrabold text-xl text-center mt-3" style={{ fontFamily: "Outfit, sans-serif" }}>Finalizar jornada</h3>
+            <p className="text-center text-sm text-[#556047] font-semibold mt-1">
+              Se marcará la salida de <b>{openCount}</b> trabajador(es) con jornada abierta.
+            </p>
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setConfirmCheckout(false)}
+                disabled={checkingOutAll}
+                className="h-12 rounded-xl bg-white border-2 border-[#E2DDD0] text-[#556047] font-bold"
+                data-testid="checkout-cancel-button"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={checkoutAll}
+                disabled={checkingOutAll}
+                className="h-12 rounded-xl bg-[#5A4A98] hover:bg-[#453785] text-white font-bold flex items-center justify-center gap-2 disabled:opacity-60"
+                data-testid="checkout-confirm-button"
+              >
+                {checkingOutAll ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Moon className="w-5 h-5" /> Salida de todos</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* =========================== Sub-components =========================== */
+
+function Tile({ label, icon, onClick, colorFrom, colorTo, badge, testid }) {
   return (
-    <div className="-mx-4 -my-5 sm:-mx-0 sm:-my-0" data-testid="asistencia-page">
+    <button
+      onClick={onClick}
+      data-testid={testid}
+      className="flex flex-col items-center group"
+    >
+      <div
+        className="w-full aspect-square rounded-[22px] flex items-center justify-center text-white shadow-lg active:scale-[0.97] transition-transform relative"
+        style={{ background: `linear-gradient(145deg, ${colorFrom}, ${colorTo})` }}
+      >
+        {icon}
+        {badge ? (
+          <span className="absolute -top-1.5 -right-1.5 bg-white text-[#1A2210] font-mono-stat text-xs min-w-[24px] h-6 rounded-full px-1.5 flex items-center justify-center shadow-md border-2 border-white">
+            {badge}
+          </span>
+        ) : null}
+      </div>
+      <div className="mt-2 text-white text-sm font-bold text-center" style={{ fontFamily: "Outfit, sans-serif" }}>
+        {label}
+      </div>
+    </button>
+  );
+}
+
+function MiniStat({ label, value, color }) {
+  return (
+    <div className="bg-white rounded-xl border border-[#E2DDD0] px-3 py-2">
+      <div className="text-[10px] font-bold uppercase tracking-wider text-[#889078]">{label}</div>
+      <div className="font-mono-stat text-xl" style={{ color }}>{value}</div>
+    </div>
+  );
+}
+
+function SessionModal({ session, saveSession, parcels, products, crews, onClose }) {
+  const [parcelId, setParcelId] = useState(session.parcelId || "");
+  const [crewId, setCrewId] = useState(session.crewId || "");
+  const [productId, setProductId] = useState(session.productId || "");
+  const canSave = parcelId && crewId;
+
+  const confirm = () => {
+    if (!canSave) return;
+    saveSession({ parcelId, crewId, productId });
+    toast.success("Sesión guardada");
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose} data-testid="session-modal">
+      <div className="bg-white rounded-t-3xl sm:rounded-3xl p-6 w-full sm:max-w-md shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-extrabold text-xl" style={{ fontFamily: "Outfit, sans-serif" }}>Antes de empezar</h3>
+          <button onClick={onClose}><X className="w-5 h-5" /></button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="flex items-center gap-1.5 text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">
+              <MapPin className="w-4 h-4 text-[#E89C3F]" /> Rancho
+            </label>
+            <select
+              value={parcelId}
+              onChange={(e) => setParcelId(e.target.value)}
+              className="field-input w-full"
+              data-testid="session-parcel-select"
+            >
+              <option value="">— Elige un rancho —</option>
+              {parcels.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="flex items-center gap-1.5 text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">
+              <UserCircle2 className="w-4 h-4 text-[#E89C3F]" /> Mayordomo / Cuadrilla
+            </label>
+            <select
+              value={crewId}
+              onChange={(e) => setCrewId(e.target.value)}
+              className="field-input w-full"
+              data-testid="session-crew-select"
+            >
+              <option value="">— Elige una cuadrilla —</option>
+              {crews.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}{c.boss?.name ? ` — ${c.boss.name}` : ""}
+                </option>
+              ))}
+            </select>
+            {crews.length === 0 && (
+              <p className="text-xs text-[#889078] mt-1.5 font-semibold">
+                No hay cuadrillas. Créalas en <b>Módulos → Cuadrillas</b>.
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="flex items-center gap-1.5 text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">
+              <ShoppingBasket className="w-4 h-4 text-[#E89C3F]" /> Trabajo / Producto
+            </label>
+            <select
+              value={productId}
+              onChange={(e) => setProductId(e.target.value)}
+              className="field-input w-full"
+              data-testid="session-product-select"
+            >
+              <option value="">— Opcional —</option>
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          <button
+            onClick={onClose}
+            className="h-12 rounded-xl bg-white border-2 border-[#E2DDD0] text-[#556047] font-bold"
+            data-testid="session-cancel-button"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={confirm}
+            disabled={!canSave}
+            className="h-12 rounded-xl bg-[#1E4620] hover:bg-[#153417] text-white font-bold disabled:opacity-50"
+            data-testid="session-save-button"
+          >
+            Guardar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ======================= Check-In Sub-View (Orange) ======================= */
+function CheckInView(props) {
+  const {
+    data, loading, scannerOn, setScannerOn, selectedParcel, selectedProduct, session,
+    crews, handleScan, removeAttendance, setManualOpen, setShowCrewPicker,
+    goBack, openSummary,
+    manualOpen, manualCode, setManualCode, workers, setWorkers, setManualOpen2,
+    quickAddOpen, setQuickAddOpen, submitCode, processing,
+    showCrewPicker, setShowCrewPicker2, moveCrew,
+  } = props;
+
+  return (
+    <div className="-mx-4 -my-5 sm:-mx-0 sm:-my-0" data-testid="asistencia-checkin">
       {/* Orange header card */}
       <div className="bg-[#F4B860] px-5 pt-4 pb-5 rounded-b-2xl">
         <div className="flex items-center justify-between text-[#1A2210] mb-3">
-          <button onClick={() => navigate("/")} className="flex items-center gap-1 font-semibold" data-testid="back-button">
+          <button onClick={goBack} className="flex items-center gap-1 font-semibold" data-testid="checkin-back-button">
             <ArrowLeft className="w-5 h-5" /> Atrás
           </button>
           <h1 className="text-lg font-extrabold" style={{ fontFamily: "Outfit, sans-serif" }}>Check in</h1>
-          <button onClick={() => setShowSummary(true)} data-testid="open-summary-button" className="text-sm font-bold text-[#1A2210]">
+          <button onClick={openSummary} data-testid="open-summary-button" className="text-sm font-bold text-[#1A2210]">
             Resumen
           </button>
         </div>
@@ -237,43 +629,15 @@ export default function Asistencia() {
           </div>
         </div>
 
-        {/* Session card (Site, Location, Job) */}
-        <div className="bg-white rounded-xl p-3 space-y-2">
-          <div className="grid grid-cols-2 gap-2">
-            <div className="bg-[#FDF6EC] rounded-lg px-3 py-2">
-              <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Site</div>
-              <input
-                value={siteId}
-                onChange={(e) => setSiteId(e.target.value)}
-                placeholder="CA Site 1"
-                className="w-full bg-transparent font-bold text-[#1A2210] text-sm outline-none"
-                data-testid="site-input"
-              />
-            </div>
-            <div className="bg-[#FDF6EC] rounded-lg px-3 py-2">
-              <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Location</div>
-              <select
-                value={parcelId}
-                onChange={(e) => setParcelId(e.target.value)}
-                className="w-full bg-transparent font-bold text-[#1A2210] text-sm outline-none truncate"
-                data-testid="location-select"
-              >
-                <option value="">— Parcela —</option>
-                {parcels.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
+        {/* Session summary chips */}
+        <div className="bg-white rounded-xl p-3 grid grid-cols-2 gap-2">
+          <div className="bg-[#FDF6EC] rounded-lg px-3 py-2">
+            <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Rancho</div>
+            <div className="font-bold text-[#1A2210] text-sm truncate">{selectedParcel?.name || "—"}</div>
           </div>
           <div className="bg-[#FDF6EC] rounded-lg px-3 py-2">
-            <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Job</div>
-            <select
-              value={productId}
-              onChange={(e) => setProductId(e.target.value)}
-              className="w-full bg-transparent font-bold text-[#1A2210] text-sm outline-none"
-              data-testid="job-select"
-            >
-              <option value="">— Trabajo / Producto —</option>
-              {products.map((p) => <option key={p.id} value={p.id}>{p.name} — Picking</option>)}
-            </select>
+            <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Trabajo</div>
+            <div className="font-bold text-[#1A2210] text-sm truncate">{selectedProduct?.name || "—"} — Picking</div>
           </div>
         </div>
 
@@ -332,11 +696,11 @@ export default function Asistencia() {
 
       {/* Manual entry modal */}
       {manualOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setManualOpen(false)}>
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setManualOpen2(false)}>
           <div className="bg-white rounded-t-3xl sm:rounded-3xl p-6 w-full sm:max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-lg">Entrada manual</h3>
-              <button onClick={() => setManualOpen(false)}><X className="w-5 h-5" /></button>
+              <button onClick={() => setManualOpen2(false)}><X className="w-5 h-5" /></button>
             </div>
             <select
               value={manualCode}
@@ -356,7 +720,7 @@ export default function Asistencia() {
                 <UserPlus className="w-4 h-4" /> Nuevo
               </button>
               <button
-                onClick={async () => { await submitCode(manualCode); setManualCode(""); setManualOpen(false); }}
+                onClick={async () => { await submitCode(manualCode); setManualCode(""); setManualOpen2(false); }}
                 disabled={!manualCode || processing}
                 className="flex-1 h-11 bg-[#1E4620] hover:bg-[#153417] text-white font-bold rounded-xl disabled:opacity-50"
                 data-testid="manual-submit-button"
@@ -370,11 +734,11 @@ export default function Asistencia() {
 
       {/* Crew picker modal */}
       {showCrewPicker && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowCrewPicker(false)}>
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowCrewPicker2(false)}>
           <div className="bg-white rounded-t-3xl sm:rounded-3xl p-6 w-full sm:max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-lg">Mover cuadrilla</h3>
-              <button onClick={() => setShowCrewPicker(false)}><X className="w-5 h-5" /></button>
+              <button onClick={() => setShowCrewPicker2(false)}><X className="w-5 h-5" /></button>
             </div>
             <p className="text-sm text-[#556047] mb-3 font-semibold">Registra la entrada de todos los trabajadores de una cuadrilla</p>
             <div className="space-y-2 max-h-80 overflow-auto">
@@ -404,6 +768,91 @@ export default function Asistencia() {
           setManualCode(w.qr_code || w.id);
         }}
       />
+    </div>
+  );
+}
+
+/* ========================= Summary Sub-View (Blue) ========================= */
+function SummaryView({ data, selectedParcel, onClose }) {
+  const groupedByLocation = {};
+  data.rows.forEach((r) => {
+    const key = selectedParcel?.name || "Sin ubicación";
+    if (!groupedByLocation[key]) groupedByLocation[key] = [];
+    groupedByLocation[key].push(r);
+  });
+  const totalWorkers = data.rows.length;
+
+  return (
+    <div className="min-h-[calc(100vh-5rem)] -mx-4 -my-5 sm:-mx-0 sm:-my-0" data-testid="crew-summary-view">
+      <div className="bg-[#1e40af] text-white px-5 pt-5 pb-6 rounded-b-xl">
+        <div className="flex items-center justify-between mb-5">
+          <button onClick={onClose} className="flex items-center gap-1" data-testid="close-summary">
+            <X className="w-6 h-6" />
+          </button>
+          <h2 className="text-xl font-extrabold flex-1 pl-2" style={{ fontFamily: "Outfit, sans-serif" }}>
+            Crew Summary
+          </h2>
+          <div className="flex items-center gap-2">
+            <button className="bg-white text-[#1e40af] px-4 h-9 rounded-full text-sm font-bold flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 bg-gray-500 text-white rounded-full p-0.5" /> Review
+            </button>
+            <button className="w-9 h-9 bg-white rounded-full flex items-center justify-center text-[#1e40af]">
+              <Search className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-4 pt-5">
+        <div className="grid grid-cols-4 gap-4 pb-5 border-b border-[#E2DDD0]">
+          <Stat label="Workers" value={totalWorkers} />
+          <Stat label="Bins" value={0} />
+          <Stat label="Cases" value={0} />
+          <Stat label="Clamshells" value={0} />
+        </div>
+
+        <div className="py-3 text-sm text-[#556047] font-semibold">
+          Employee group by: <span className="text-[#1e40af] font-bold border-b-2 border-[#1e40af]">Location</span>
+          <span className="mx-2 text-[#889078]">|</span>
+          <span className="text-[#556047]">Job</span>
+        </div>
+
+        {Object.entries(groupedByLocation).map(([loc, rows]) => (
+          <div key={loc} className="mt-2">
+            <div className="text-sm font-bold text-[#1A2210] py-2" style={{ fontFamily: "Outfit, sans-serif" }}>
+              {loc} ({rows.length})
+            </div>
+            <div className="space-y-2">
+              {rows.map((r) => (
+                <div
+                  key={r.id}
+                  className="bg-white border border-[#E2DDD0] rounded-xl p-4 flex items-stretch border-l-4 border-l-emerald-500"
+                  data-testid={`summary-row-${r.id}`}
+                >
+                  <div className="flex-1">
+                    <div className="text-xs text-[#889078] font-semibold uppercase tracking-wider">Name</div>
+                    <div className="font-bold text-[#1A2210] text-base">{r.worker_name}</div>
+                  </div>
+                  <div className="text-right pr-6 border-r border-[#E2DDD0]">
+                    <div className="text-xs text-[#889078] font-semibold uppercase tracking-wider">Hours</div>
+                    <div className="font-mono-stat text-base text-[#1A2210]">
+                      {r.hours ? `${Math.floor(r.hours)}h ${Math.round((r.hours % 1) * 60)}min` : "0min"}
+                    </div>
+                  </div>
+                  <div className="text-right pl-6">
+                    <div className="text-xs text-[#889078] font-semibold uppercase tracking-wider">Pieces</div>
+                    <div className="font-mono-stat text-base text-[#1A2210]">0</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        {data.rows.length === 0 && (
+          <p className="text-center text-[#556047] font-semibold py-8">Sin registros</p>
+        )}
+      </div>
     </div>
   );
 }

@@ -21,6 +21,13 @@ Funciones: Registrar cosecha (Trabajador, Parcela, Producto, Kilos, Fecha, Foto,
 - Exportación a Excel (.xlsx) con totales
 - Mobile-first, botones ≥ 48px, todo en español
 
+## Implemented (2026-02-11)
+- **PickTrace-style Hub** en /asistencia con navy BG y 3 tiles grandes: Check in (naranja/sol), Picking (rojo/canasta), Check out (púrpura/luna)
+- Selección obligatoria de **Rancho + Mayordomo (Cuadrilla)** antes de dar entrada; persistida en localStorage por fecha
+- Bloqueo del botón Picking hasta que al menos 1 trabajador tenga check-in registrado
+- Botón Check out: cierra la jornada de todos los trabajadores con jornada abierta en lote (confirmación)
+- Picking tile navega a /registrar?mode=qr con parcel y product pre-cargados desde la sesión
+
 ## Implemented (2026-10-03)
 - JWT auth: register, login, logout, me (admin seed: gaelmartin158@gmail.com / agriscan2026)
 - CRUD completo /api/workers, /api/parcels, /api/products

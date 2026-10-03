@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Camera, CameraOff, ScanLine, Minus, Plus, Save, Loader2,
   Play, RotateCcw, UserCheck, Package, Users,
@@ -15,13 +15,14 @@ import QrScanner from "@/components/QrScanner";
  */
 export default function ScanHarvestMode() {
   const navigate = useNavigate();
+  const [urlParams] = useSearchParams();
 
   const [workers, setWorkers] = useState([]);
   const [parcels, setParcels] = useState([]);
   const [products, setProducts] = useState([]);
 
-  const [parcelId, setParcelId] = useState("");
-  const [productId, setProductId] = useState("");
+  const [parcelId, setParcelId] = useState(urlParams.get("parcel") || "");
+  const [productId, setProductId] = useState(urlParams.get("product") || "");
   const [date, setDate] = useState(todayISO());
   const [pricePerUnit, setPricePerUnit] = useState("");
 
