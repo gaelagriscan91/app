@@ -225,6 +225,7 @@ class ProductIn(BaseModel):
     name: str
     price_per_kg: float = 0
     price_per_unit: float = 0
+    price_per_hour: float = 0
     unit_label: Optional[str] = "unidad"
     weight_unit: Optional[str] = "kg"  # "kg" | "lb"
     pricing_mode: Optional[str] = "both"  # "unit" | "weight" | "both"
@@ -239,6 +240,7 @@ class HarvestIn(BaseModel):
     units: float = 0
     price_per_kg: Optional[float] = None  # overrides product snapshot
     price_per_unit: Optional[float] = None
+    price_mode: Optional[str] = "piece"  # "piece" | "hour" — affects which product field to lock-in
     date: str  # YYYY-MM-DD
     photo_path: Optional[str] = ""
     notes: Optional[str] = ""
@@ -623,6 +625,22 @@ async def create_harvest(data: HarvestIn, user: CurrentUser):
     price_per_kg = data.price_per_kg if data.price_per_kg is not None else float(prod.get("price_per_kg", 0))
     price_per_unit = data.price_per_unit if data.price_per_unit is not None else float(prod.get("price_per_unit", 0))
     payment = round(float(data.kilos) * price_per_kg + float(data.units) * price_per_unit, 2)
+
+    # Lock-in price: if product doesn't have a price yet, save this one so it's remembered next time
+    lock_updates: dict = {}
+    if (data.price_mode or "piece") == "hour":
+        current_hour = float(prod.get("price_per_hour", 0) or 0)
+        if price_per_unit > 0 and current_hour <= 0:
+            lock_updates["price_per_hour"] = price_per_unit
+    else:
+        current_unit = float(prod.get("price_per_unit", 0) or 0)
+        if price_per_unit > 0 and current_unit <= 0:
+            lock_updates["price_per_unit"] = price_per_unit
+    if price_per_kg > 0 and float(prod.get("price_per_kg", 0) or 0) <= 0:
+        lock_updates["price_per_kg"] = price_per_kg
+    if lock_updates:
+        await db.products.update_one({"_id": ObjectId(data.product_id)}, {"$set": lock_updates})
+
     doc = {
         "worker_id": data.worker_id,
         "parcel_id": data.parcel_id,

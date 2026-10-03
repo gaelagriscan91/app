@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Camera, CameraOff, ScanLine, Minus, Plus, Save, Loader2,
-  Play, RotateCcw, UserCheck, Package, Users, Clock, DollarSign,
+  Play, RotateCcw, UserCheck, Package, Users, Clock, DollarSign, Lock,
 } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatCurrency, formatNumber, formatApiErrorDetail, todayISO } from "@/lib/api";
@@ -83,9 +83,17 @@ export default function ScanHarvestMode() {
 
   useEffect(() => {
     if (selectedProduct) {
-      setPricePerUnit(String(selectedProduct.price_per_unit ?? 0));
+      // Pre-fill prices from product so once set they persist across sessions
+      const pu = Number(selectedProduct.price_per_unit) || 0;
+      const ph = Number(selectedProduct.price_per_hour) || 0;
+      if (pu > 0) setPricePerUnit(String(pu));
+      if (ph > 0) setPricePerHour(String(ph));
     }
   }, [selectedProduct]);
+
+  // Lock state: true when the product already has a non-zero price saved (admin can't accidentally zero it)
+  const pieceLocked = Number(selectedProduct?.price_per_unit) > 0;
+  const hourLocked = Number(selectedProduct?.price_per_hour) > 0;
 
   // When pay mode = "hour", fetch today's attendance to compute hours per worker
   useEffect(() => {
@@ -247,6 +255,11 @@ export default function ScanHarvestMode() {
 
   const save = async () => {
     if (payMode === "hour") {
+      const price = parseFloat(pricePerHour) || 0;
+      if (price <= 0) {
+        toast.error("Pon el precio por hora antes de guardar — no puede ser 0");
+        return;
+      }
       const rows = hourTotals.rows.filter((r) => r.hours > 0);
       if (rows.length === 0) {
         toast.error("No hay trabajadores con horas registradas");
@@ -254,7 +267,6 @@ export default function ScanHarvestMode() {
       }
       setSaving(true);
       try {
-        const price = parseFloat(pricePerHour) || 0;
         await Promise.all(
           rows.map((r) =>
             api.post("/harvests", {
@@ -265,6 +277,7 @@ export default function ScanHarvestMode() {
               units: r.hours,
               price_per_kg: 0,
               price_per_unit: price,
+              price_mode: "hour",
               date,
               photo_path: "",
               notes: `Pago por horas: ${r.hours.toFixed(2)} h × ${price} = ${r.payment.toFixed(2)}`,
@@ -288,9 +301,13 @@ export default function ScanHarvestMode() {
       toast.error("No hay escaneos para guardar");
       return;
     }
+    const price = parseFloat(pricePerUnit) || 0;
+    if (price <= 0) {
+      toast.error("Pon el precio por pieza antes de guardar — no puede ser 0");
+      return;
+    }
     setSaving(true);
     try {
-      const price = parseFloat(pricePerUnit) || 0;
       await Promise.all(
         entries.map(([workerId, v]) =>
           api.post("/harvests", {
@@ -301,6 +318,7 @@ export default function ScanHarvestMode() {
             units: v.count,
             price_per_kg: 0,
             price_per_unit: price,
+            price_mode: "piece",
             date,
             photo_path: "",
             notes: v.pieces?.length
@@ -500,14 +518,21 @@ export default function ScanHarvestMode() {
 
           {payMode === "piece" ? (
             <div>
-              <label className="block text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">Precio por pieza ($)</label>
+              <label className="flex items-center justify-between text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">
+                <span>Precio por pieza ($)</span>
+                {pieceLocked && (
+                  <span className="flex items-center gap-1 text-emerald-700 normal-case tracking-normal" data-testid="price-locked-piece">
+                    <Lock className="w-3 h-3" /> Guardado para este producto
+                  </span>
+                )}
+              </label>
               <div className="relative">
                 <DollarSign className="w-5 h-5 text-[#889078] absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="number"
                   inputMode="decimal"
                   step="0.01"
-                  min="0"
+                  min="0.01"
                   value={pricePerUnit}
                   onChange={(e) => setPricePerUnit(e.target.value)}
                   placeholder="0.00"
@@ -515,17 +540,29 @@ export default function ScanHarvestMode() {
                   data-testid="paymode-piece-price"
                 />
               </div>
+              {!pieceLocked && (
+                <p className="text-[11px] text-[#889078] font-semibold mt-1">
+                  Pon el precio UNA vez. Se guardará para todos los trabajadores de este rancho.
+                </p>
+              )}
             </div>
           ) : (
             <div>
-              <label className="block text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">Precio por hora ($)</label>
+              <label className="flex items-center justify-between text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">
+                <span>Precio por hora ($)</span>
+                {hourLocked && (
+                  <span className="flex items-center gap-1 text-emerald-700 normal-case tracking-normal" data-testid="price-locked-hour">
+                    <Lock className="w-3 h-3" /> Guardado para este producto
+                  </span>
+                )}
+              </label>
               <div className="relative">
                 <DollarSign className="w-5 h-5 text-[#889078] absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="number"
                   inputMode="decimal"
                   step="0.01"
-                  min="0"
+                  min="0.01"
                   value={pricePerHour}
                   onChange={(e) => setPricePerHour(e.target.value)}
                   placeholder="0.00"
@@ -533,6 +570,11 @@ export default function ScanHarvestMode() {
                   data-testid="paymode-hour-price"
                 />
               </div>
+              {!hourLocked && (
+                <p className="text-[11px] text-[#889078] font-semibold mt-1">
+                  Pon el precio UNA vez. Se guardará para todos los trabajadores de este rancho.
+                </p>
+              )}
             </div>
           )}
         </div>
