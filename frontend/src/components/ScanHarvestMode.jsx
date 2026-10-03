@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Camera, CameraOff, ScanLine, Minus, Plus, Save, Loader2,
-  Play, RotateCcw, UserCheck, Package, Users,
+  Play, RotateCcw, UserCheck, Package, Users, Clock, DollarSign,
 } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatCurrency, formatNumber, formatApiErrorDetail, todayISO } from "@/lib/api";
@@ -34,6 +34,11 @@ export default function ScanHarvestMode() {
   const [scanMode, setScanMode] = useState("worker"); // "worker" | "piece"
   const [activeWorkerId, setActiveWorkerId] = useState("");
   const lastRef = useRef({ code: "", at: 0 });
+
+  // Pay mode: "piece" (count * price_per_piece) | "hour" (hours_worked * price_per_hour)
+  const [payMode, setPayMode] = useState("piece");
+  const [pricePerHour, setPricePerHour] = useState("");
+  const [attendance, setAttendance] = useState({ rows: [] });
 
   useEffect(() => {
     (async () => {
@@ -72,6 +77,36 @@ export default function ScanHarvestMode() {
       setPricePerUnit(String(selectedProduct.price_per_unit ?? 0));
     }
   }, [selectedProduct]);
+
+  // When pay mode = "hour", fetch today's attendance to compute hours per worker
+  useEffect(() => {
+    if (!started || payMode !== "hour") return;
+    (async () => {
+      try {
+        const { data } = await api.get("/attendance", { params: { date } });
+        setAttendance(data);
+      } catch (_) {
+        toast.error("No se pudo cargar asistencia");
+      }
+    })();
+  }, [started, payMode, date]);
+
+  // Totals for "hour" pay mode come from attendance rows
+  const hourTotals = useMemo(() => {
+    const price = parseFloat(pricePerHour) || 0;
+    const rows = (attendance.rows || []).map((r) => ({
+      id: r.id,
+      worker_id: r.worker_id,
+      name: r.worker_name,
+      hours: parseFloat(r.hours) || 0,
+      check_in: r.check_in_hhmm,
+      check_out: r.check_out_hhmm,
+      payment: (parseFloat(r.hours) || 0) * price,
+    }));
+    const totalHours = rows.reduce((a, r) => a + r.hours, 0);
+    const totalPay = rows.reduce((a, r) => a + r.payment, 0);
+    return { rows, totalHours, totalPay, workers: rows.length };
+  }, [attendance, pricePerHour]);
 
   const startSession = () => {
     if (!parcelId || !productId) {
@@ -177,6 +212,43 @@ export default function ScanHarvestMode() {
   }, [tally, pricePerUnit]);
 
   const save = async () => {
+    if (payMode === "hour") {
+      const rows = hourTotals.rows.filter((r) => r.hours > 0);
+      if (rows.length === 0) {
+        toast.error("No hay trabajadores con horas registradas");
+        return;
+      }
+      setSaving(true);
+      try {
+        const price = parseFloat(pricePerHour) || 0;
+        await Promise.all(
+          rows.map((r) =>
+            api.post("/harvests", {
+              worker_id: r.worker_id,
+              parcel_id: parcelId,
+              product_id: productId,
+              kilos: 0,
+              units: r.hours,
+              price_per_kg: 0,
+              price_per_unit: price,
+              date,
+              photo_path: "",
+              notes: `Pago por horas: ${r.hours.toFixed(2)} h × ${price} = ${r.payment.toFixed(2)}`,
+            })
+          )
+        );
+        toast.success(`Jornada guardada: ${rows.length} trabajador(es) por horas`);
+        setScannerOn(false);
+        navigate("/dia");
+      } catch (e) {
+        toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Error al guardar");
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    // Piece mode (default)
     const entries = Object.entries(tally);
     if (entries.length === 0) {
       toast.error("No hay escaneos para guardar");
@@ -359,8 +431,81 @@ export default function ScanHarvestMode() {
       </div>
       )}
 
-      {/* Compact toolbar when auto-started from check-in */}
-      {autoFromCheckin && started && (
+      {/* Pay-mode toggle + price (visible when started) */}
+      {started && (
+        <div className="field-card p-4 space-y-3">
+          <div>
+            <label className="block text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">¿Cómo se paga?</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setPayMode("piece")}
+                data-testid="paymode-piece"
+                className={`h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 border-2 ${
+                  payMode === "piece"
+                    ? "bg-[#1E4620] text-white border-[#1E4620]"
+                    : "bg-white text-[#556047] border-[#E2DDD0]"
+                }`}
+              >
+                <Package className="w-4 h-4" /> Por pieza
+              </button>
+              <button
+                type="button"
+                onClick={() => setPayMode("hour")}
+                data-testid="paymode-hour"
+                className={`h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 border-2 ${
+                  payMode === "hour"
+                    ? "bg-[#1E4620] text-white border-[#1E4620]"
+                    : "bg-white text-[#556047] border-[#E2DDD0]"
+                }`}
+              >
+                <Clock className="w-4 h-4" /> Por hora
+              </button>
+            </div>
+          </div>
+
+          {payMode === "piece" ? (
+            <div>
+              <label className="block text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">Precio por pieza ($)</label>
+              <div className="relative">
+                <DollarSign className="w-5 h-5 text-[#889078] absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  value={pricePerUnit}
+                  onChange={(e) => setPricePerUnit(e.target.value)}
+                  placeholder="0.00"
+                  className="field-input !h-12 !text-base w-full !pl-10"
+                  data-testid="paymode-piece-price"
+                />
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">Precio por hora ($)</label>
+              <div className="relative">
+                <DollarSign className="w-5 h-5 text-[#889078] absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  value={pricePerHour}
+                  onChange={(e) => setPricePerHour(e.target.value)}
+                  placeholder="0.00"
+                  className="field-input !h-12 !text-base w-full !pl-10"
+                  data-testid="paymode-hour-price"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Compact toolbar when auto-started from check-in (piece mode only) */}
+      {autoFromCheckin && started && payMode === "piece" && (
         <div className="flex gap-2">
           <button
             onClick={() => setScannerOn((v) => !v)}
@@ -386,8 +531,8 @@ export default function ScanHarvestMode() {
         </div>
       )}
 
-      {/* Scanner */}
-      {started && (
+      {/* Scanner — only in piece mode */}
+      {started && payMode === "piece" && (
         <div className="field-card p-4 sm:p-5">
           {scannerOn ? (
             <QrScanner active={scannerOn} onScan={handleScan} />
@@ -419,7 +564,7 @@ export default function ScanHarvestMode() {
       )}
 
       {/* Totals */}
-      {started && (
+      {started && payMode === "piece" && (
         <div className="sticky top-[64px] z-30 -mx-4 px-4 py-2 bg-[#F7F5EE]/95 backdrop-blur-sm sm:static sm:bg-transparent sm:px-0 sm:py-0 sm:mx-0">
           <div className="grid grid-cols-3 gap-3">
             <div className="rounded-2xl bg-[#1E4620] text-white p-4 border-2 border-[#153417] shadow-sm" data-testid="scan-total-workers">
@@ -427,7 +572,7 @@ export default function ScanHarvestMode() {
               <div className="font-mono-stat text-2xl sm:text-3xl mt-1">{totals.workers}</div>
             </div>
             <div className="rounded-2xl bg-white border-2 border-[#E2DDD0] text-[#1A2210] p-4 shadow-sm" data-testid="scan-total-units">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-[#556047]">Total {unitLabel}s</div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-[#556047]">Total piezas</div>
               <div className="font-mono-stat text-2xl sm:text-3xl mt-1">{formatNumber(totals.units, 0)}</div>
             </div>
             <div className="rounded-2xl bg-[#E65100] text-white p-4 border-2 border-[#C63D00] shadow-sm" data-testid="scan-total-payment">
@@ -438,8 +583,81 @@ export default function ScanHarvestMode() {
         </div>
       )}
 
-      {/* Tally list */}
-      {started && (
+      {/* Hour-mode totals + per-worker list */}
+      {started && payMode === "hour" && (
+        <>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-2xl bg-[#1E4620] text-white p-4 border-2 border-[#153417] shadow-sm" data-testid="hour-total-workers">
+              <div className="text-[11px] font-bold uppercase tracking-wider opacity-90 flex items-center gap-1"><UserCheck className="w-3.5 h-3.5" /> Trabajadores</div>
+              <div className="font-mono-stat text-2xl sm:text-3xl mt-1">{hourTotals.workers}</div>
+            </div>
+            <div className="rounded-2xl bg-white border-2 border-[#E2DDD0] text-[#1A2210] p-4 shadow-sm" data-testid="hour-total-hours">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-[#556047]">Total horas</div>
+              <div className="font-mono-stat text-2xl sm:text-3xl mt-1">{formatNumber(hourTotals.totalHours, 2)}</div>
+            </div>
+            <div className="rounded-2xl bg-[#E65100] text-white p-4 border-2 border-[#C63D00] shadow-sm" data-testid="hour-total-payment">
+              <div className="text-[11px] font-bold uppercase tracking-wider opacity-90">Pago total</div>
+              <div className="font-mono-stat text-xl sm:text-2xl mt-1">{formatCurrency(hourTotals.totalPay)}</div>
+            </div>
+          </div>
+
+          <div className="field-card p-4 sm:p-5">
+            <h3 className="text-lg font-bold text-[#1A2210] mb-3" style={{ fontFamily: "Outfit, sans-serif" }}>
+              Pago por horas trabajadas
+            </h3>
+            {hourTotals.rows.length === 0 ? (
+              <p className="text-sm text-[#556047] font-semibold py-4 text-center" data-testid="hour-empty">
+                Sin trabajadores con asistencia hoy. Da entrada en Check in primero.
+              </p>
+            ) : (
+              <>
+                <div className="divide-y divide-[#E2DDD0]">
+                  {hourTotals.rows.map((r) => (
+                    <div key={r.id} className="py-3 flex items-center justify-between gap-3" data-testid={`hour-row-${r.id}`}>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-[#1A2210] truncate">{r.name}</div>
+                        <div className="text-xs text-[#556047] font-semibold">
+                          {r.check_in || "—"}{r.check_out ? ` → ${r.check_out}` : " (en campo)"}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-mono-stat text-lg text-[#1A2210]">{formatNumber(r.hours, 2)} h</div>
+                        <div className="text-xs text-[#15803D] font-bold">{formatCurrency(r.payment)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 pt-3 border-t-2 border-dashed border-[#1E4620]/30">
+                  <div className="rounded-2xl bg-[#1E4620] text-white p-4 flex items-center justify-between" data-testid="hour-grand-total">
+                    <div>
+                      <div className="text-[11px] font-bold uppercase tracking-widest opacity-90">Total jornada</div>
+                      <div className="text-sm font-bold opacity-95 mt-0.5">
+                        {hourTotals.workers} trabajador{hourTotals.workers !== 1 ? "es" : ""} • {formatNumber(hourTotals.totalHours, 2)} h
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-mono-stat text-3xl leading-none">{formatCurrency(hourTotals.totalPay)}</div>
+                      <div className="text-[10px] font-bold uppercase tracking-wider opacity-80 mt-1">A pagar</div>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={save}
+                  disabled={saving || hourTotals.totalHours === 0}
+                  className="field-btn-accent mt-4 disabled:opacity-60"
+                  data-testid="hour-save-button"
+                >
+                  {saving ? <Loader2 className="w-6 h-6 animate-spin" /> : <><Save className="w-6 h-6" /> Guardar pago por horas ({formatCurrency(hourTotals.totalPay)})</>}
+                </button>
+              </>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Tally list — piece mode */}
+      {started && payMode === "piece" && (
         <div className="field-card p-4 sm:p-5">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-bold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>
@@ -467,7 +685,7 @@ export default function ScanHarvestMode() {
                         <div className="min-w-0 flex-1">
                           <div className="font-bold text-[#1A2210] truncate">{v.name}</div>
                           <div className="text-xs text-[#556047] font-semibold">
-                            {formatNumber(v.count, 0)} {unitLabel}{v.count !== 1 ? "s" : ""} • <span className="text-[#15803D] font-bold">{formatCurrency(payment)}</span>
+                            {formatNumber(v.count, 0)} pieza{v.count !== 1 ? "s" : ""} • <span className="text-[#15803D] font-bold">{formatCurrency(payment)}</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
@@ -498,7 +716,7 @@ export default function ScanHarvestMode() {
                   <div>
                     <div className="text-[11px] font-bold uppercase tracking-widest opacity-90">Total jornada</div>
                     <div className="text-sm font-bold opacity-95 mt-0.5">
-                      {totals.workers} trabajador{totals.workers !== 1 ? "es" : ""} • {formatNumber(totals.units, 0)} {unitLabel}{totals.units !== 1 ? "s" : ""}
+                      {totals.workers} trabajador{totals.workers !== 1 ? "es" : ""} • {formatNumber(totals.units, 0)} pieza{totals.units !== 1 ? "s" : ""}
                     </div>
                   </div>
                   <div className="text-right">
