@@ -35,6 +35,8 @@ export default function ScanHarvestMode() {
   const [scanMode, setScanMode] = useState("worker"); // "worker" | "piece"
   const [activeWorkerId, setActiveWorkerId] = useState("");
   const lastRef = useRef({ code: "", at: 0 });
+  const scannedCodesRef = useRef(new Map()); // code -> timestamp (ms), 60s cooldown per code
+  const SCAN_COOLDOWN_MS = 60 * 1000;
 
   // Pay mode: "piece" (count * price_per_piece) | "hour" (hours_worked * price_per_hour)
   const [payMode, setPayMode] = useState("piece");
@@ -163,13 +165,23 @@ export default function ScanHarvestMode() {
 
   const handleScan = async (rawCode) => {
     const now = Date.now();
+    // Short debounce (duplicate burst from decoder)
     if (lastRef.current.code === rawCode && now - lastRef.current.at < 1500) {
-      return; // debounce duplicates
+      return;
     }
     lastRef.current = { code: rawCode, at: now };
 
     const extracted = extractCode(rawCode);
     const key = normalizeCode(extracted);
+
+    // Anti-fraud: same code can only be scanned once per 60 seconds
+    const lastAt = scannedCodesRef.current.get(key) || 0;
+    const elapsed = now - lastAt;
+    if (lastAt > 0 && elapsed < SCAN_COOLDOWN_MS) {
+      const remaining = Math.ceil((SCAN_COOLDOWN_MS - elapsed) / 1000);
+      toast.error(`⏱️ Código ya escaneado. Espera ${remaining}s antes de volver a usarlo.`, { duration: 2000 });
+      return;
+    }
 
     // Mode: scan workers (each scan = +1 unit for that worker)
     if (scanMode === "worker") {
@@ -204,11 +216,13 @@ export default function ScanHarvestMode() {
             toast.success(`+ ${w.name} comparte esta pieza (${buf.length + 1})`, { duration: 1200 });
             return [...buf, { id: w.id, name: w.name }];
           });
+          scannedCodesRef.current.set(key, now);
           return prev; // don't change tally yet
         }
         const cur = prev[w.id] || { name: w.name, count: 0, pieces: [] };
         const next = { ...prev, [w.id]: { name: w.name, count: cur.count + 1, pieces: cur.pieces } };
         toast.success(`+1 ${w.name} (${(cur.count + 1).toFixed(2)} u.)`, { duration: 1200 });
+        scannedCodesRef.current.set(key, now);
         return next;
       });
       return;

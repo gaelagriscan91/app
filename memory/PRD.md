@@ -22,12 +22,8 @@ Funciones: Registrar cosecha (Trabajador, Parcela, Producto, Kilos, Fecha, Foto,
 - Mobile-first, botones ≥ 48px, todo en español
 
 ## Implemented (2026-02-11)
-- **Pieza compartida (NUEVO)**:
-  - Toggle "Compartir pieza" en Picking modo pieza.
-  - Al activarlo, los escaneos entran a un buffer temporal (chips naranjas con X para eliminar).
-  - Botón "Confirmar pieza compartida" distribuye 1/N piezas a cada trabajador en el buffer.
-  - UI muestra preview: "Cada uno recibirá 0.XXX pieza · $Y.YY".
-  - Conteo con decimales (0.50, 0.33, etc.) visible en lista de trabajadores y totales.
+- **Anti-fraude cooldown de 60s (NUEVO)**: Cada código QR solo puede escanearse una vez por minuto en Picking. Si se intenta re-escanear antes, muestra "⏱️ Código ya escaneado. Espera Xs antes de volver a usarlo". Previene inflado de piezas por doble-escaneo.
+- **Pieza compartida**: Toggle "Compartir pieza" → buffer con chips → "Confirmar pieza compartida" divide 1 pieza entre N trabajadores (0.50 c/u si son 2, etc.). Soporte de units fraccionales en backend. Verificado por testing_agent 100%.
 - **Price lock-in por producto**: Primer harvest con precio > 0 bloquea el precio. Subsiguientes usan el bloqueado (snapshot override).
 - **Multi-tenant por Mayordomo**:
   - Admin ve todos los datos. Mayordomos ven solo lo suyo (`owner_id` scope).
