@@ -22,7 +22,7 @@ Funciones: Registrar cosecha (Trabajador, Parcela, Producto, Kilos, Fecha, Foto,
 - Mobile-first, botones ≥ 48px, todo en español
 
 ## Implemented (2026-02-11)
-- **Anti-fraude cooldown de 60s (NUEVO)**: Cada código QR solo puede escanearse una vez por minuto en Picking. Si se intenta re-escanear antes, muestra "⏱️ Código ya escaneado. Espera Xs antes de volver a usarlo". Previene inflado de piezas por doble-escaneo.
+- **Anti-fraude cooldown de 2 minutos**: Cada código QR solo puede escanearse una vez cada 2 minutos en Picking. Si se intenta re-escanear antes, muestra "⏱️ Código ya escaneado. Espera Xm Ys antes de volver a usarlo". Previene doble y triple escaneo.
 - **Pieza compartida**: Toggle "Compartir pieza" → buffer con chips → "Confirmar pieza compartida" divide 1 pieza entre N trabajadores (0.50 c/u si son 2, etc.). Soporte de units fraccionales en backend. Verificado por testing_agent 100%.
 - **Price lock-in por producto**: Primer harvest con precio > 0 bloquea el precio. Subsiguientes usan el bloqueado (snapshot override).
 - **Multi-tenant por Mayordomo**:

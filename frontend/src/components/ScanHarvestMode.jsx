@@ -35,8 +35,8 @@ export default function ScanHarvestMode() {
   const [scanMode, setScanMode] = useState("worker"); // "worker" | "piece"
   const [activeWorkerId, setActiveWorkerId] = useState("");
   const lastRef = useRef({ code: "", at: 0 });
-  const scannedCodesRef = useRef(new Map()); // code -> timestamp (ms), 60s cooldown per code
-  const SCAN_COOLDOWN_MS = 60 * 1000;
+  const scannedCodesRef = useRef(new Map()); // code -> timestamp (ms), 2-minute cooldown per code
+  const SCAN_COOLDOWN_MS = 2 * 60 * 1000;
 
   // Pay mode: "piece" (count * price_per_piece) | "hour" (hours_worked * price_per_hour)
   const [payMode, setPayMode] = useState("piece");
@@ -179,7 +179,10 @@ export default function ScanHarvestMode() {
     const elapsed = now - lastAt;
     if (lastAt > 0 && elapsed < SCAN_COOLDOWN_MS) {
       const remaining = Math.ceil((SCAN_COOLDOWN_MS - elapsed) / 1000);
-      toast.error(`⏱️ Código ya escaneado. Espera ${remaining}s antes de volver a usarlo.`, { duration: 2000 });
+      const mins = Math.floor(remaining / 60);
+      const secs = remaining % 60;
+      const label = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+      toast.error(`⏱️ Código ya escaneado. Espera ${label} antes de volver a usarlo.`, { duration: 2500 });
       return;
     }
 
