@@ -758,6 +758,35 @@ export default function ScanHarvestMode() {
           )}
         </div>
       )}
+
+      {/* Sticky quick-save bar — floats above bottom nav after first scan */}
+      {started && payMode === "piece" && Object.keys(tally).length > 0 && (
+        <>
+          <div className="h-24" aria-hidden />
+          <div className="fixed left-0 right-0 bottom-[72px] z-40 px-3 pointer-events-none" data-testid="quick-save-bar">
+            <div className="max-w-5xl mx-auto pointer-events-auto">
+              <button
+                onClick={save}
+                disabled={saving}
+                className="w-full h-14 rounded-2xl bg-[#E65100] hover:bg-[#C63D00] active:scale-[0.99] text-white font-extrabold text-base shadow-2xl flex items-center justify-between px-5 disabled:opacity-70 border-2 border-[#C63D00]"
+                data-testid="quick-save-button"
+                style={{ fontFamily: "Outfit, sans-serif" }}
+              >
+                <span className="flex items-center gap-2">
+                  {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                  Guardar ahora
+                </span>
+                <span className="flex items-center gap-3">
+                  <span className="text-[11px] font-bold uppercase tracking-wider opacity-85">
+                    {totals.workers}👤 · {formatNumber(totals.units, 0)}🧺
+                  </span>
+                  <span className="font-mono-stat text-lg">{formatCurrency(totals.payment)}</span>
+                </span>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
