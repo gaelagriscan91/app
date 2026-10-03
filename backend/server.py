@@ -978,28 +978,33 @@ async def _resolve_worker_by_code(code: str, user: Optional[dict] = None) -> Opt
     upper = extracted.upper()
 
     scope = scope_filter(user) if user else {}
+    logger.info(f"[resolve_worker] code_raw={raw!r} extracted={extracted!r} upper={upper!r} scope={scope} user={user.get('email') if user else None}")
 
     # Try qr_code field with case-insensitive match on normalized value
     w = await db.workers.find_one({"qr_code": upper, **scope})
     if w:
+        logger.info(f"[resolve_worker] HIT upper qr_code={upper!r}")
         return w
     # Try original (in case qr_code is stored differently)
     w = await db.workers.find_one({"qr_code": extracted, **scope})
     if w:
+        logger.info(f"[resolve_worker] HIT extracted qr_code={extracted!r}")
         return w
     # Case-insensitive regex fallback on qr_code
     w = await db.workers.find_one({"qr_code": {"$regex": f"^{re.escape(extracted)}$", "$options": "i"}, **scope})
     if w:
+        logger.info(f"[resolve_worker] HIT regex qr_code={extracted!r}")
         return w
     # Fallback: treat as ObjectId
     try:
         w = await db.workers.find_one({"_id": ObjectId(extracted), **scope})
         if w:
+            logger.info(f"[resolve_worker] HIT ObjectId")
             return w
     except Exception:
         pass
     # Last fallback: document_id or name exact match (case-insensitive)
-    return await db.workers.find_one({"$and": [
+    found = await db.workers.find_one({"$and": [
         scope or {},
         {"$or": [
             {"document_id": extracted},
@@ -1007,6 +1012,11 @@ async def _resolve_worker_by_code(code: str, user: Optional[dict] = None) -> Opt
             {"name": extracted},
         ]},
     ]})
+    if found:
+        logger.info(f"[resolve_worker] HIT document_id/name fallback")
+    else:
+        logger.warning(f"[resolve_worker] MISS — no worker for code {extracted!r}")
+    return found
 
 
 @api_router.post("/attendance/scan")
