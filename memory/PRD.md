@@ -22,23 +22,15 @@ Funciones: Registrar cosecha (Trabajador, Parcela, Producto, Kilos, Fecha, Foto,
 - Mobile-first, botones ≥ 48px, todo en español
 
 ## Implemented (2026-02-11)
-- **Multi-tenant por Mayordomo** (NUEVO):
-  - Admin ("cuenta maestra") ve todos los datos de todos los mayordomos.
-  - Mayordomos solo ven SUS trabajadores, ranchos, productos, cosechas y asistencia (aislamiento total vía `owner_id` en todas las colecciones).
-  - **Registro público DESHABILITADO** (POST /auth/register → 403). Solo admin crea accesos.
-  - Admin gestiona accesos en Módulos → **Mayordomos** (nuevo tab, admin-only):
-    - Crear mayordomo con nombre + email (Gmail) + contraseña
-    - Editar nombre / cambiar contraseña / activar-desactivar
-    - Eliminar (transfiere datos al admin antes de borrar)
-  - Backend scope_filter aplicado a workers, parcels, products, crews, harvests, attendance, dashboard, receipts, exports
-  - `_resolve_worker_by_code` también scoped — un mayordomo no puede escanear QR de otro
-  - Backfill startup: datos existentes sin `owner_id` se asignan al primer admin
-  - Badge "Admin" visible en header para cuenta maestra
-- **Fix: QR scan "no reconocido"** — ScanHarvestMode (Picking) normaliza códigos a mayúsculas, trim, prefijo URL. Backend `_resolve_worker_by_code` también actualizado.
-- **Picking rediseñado**: sin setup, hereda rancho/producto del Check in.
-- **Toggle Pago por pieza / por hora** en Picking.
-- **Inputs de teclado** en modal "Antes de empezar": Rancho, Mayordomo y Trabajo son inputs de texto con datalist + chips rápidos.
-- **PickTrace-style Hub** en /asistencia con 3 tiles: Check in / Picking / Check out.
+- **Price lock-in por producto** (NUEVO):
+  - El primer `POST /api/harvests` con precio > 0 bloquea el precio del producto (`price_per_unit` y `price_per_hour` según el modo).
+  - Harvests subsiguientes para el mismo producto SIEMPRE usan el precio bloqueado (snapshot override) — no es posible cambiar el precio por harvest ni volver a 0.
+  - Frontend: UI pre-llena desde product, muestra chip verde "Guardado para este producto" con candado cuando ya está locked, bloquea guardado si precio = 0.
+  - Verificado por testing_agent (100% backend 4/4 + frontend E2E).
+- **Multi-tenant por Mayordomo**:
+  - Admin ve todos los datos. Mayordomos ven solo lo suyo (`owner_id` scope).
+  - Registro público DESHABILITADO (403). Admin gestiona accesos en Módulos → Mayordomos.
+  - Backend `_resolve_worker_by_code` + `/workers/resolve` + `/attendance/scan` todos scope-aware.
 
 ## Implemented (2026-10-03)
 - JWT auth: register, login, logout, me (admin seed: gaelmartin158@gmail.com / agriscan2026)

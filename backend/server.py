@@ -622,21 +622,34 @@ async def create_harvest(data: HarvestIn, user: CurrentUser):
     prod = await db.products.find_one({"_id": ObjectId(data.product_id)})
     if not prod:
         raise HTTPException(status_code=400, detail="Producto no válido")
-    price_per_kg = data.price_per_kg if data.price_per_kg is not None else float(prod.get("price_per_kg", 0))
-    price_per_unit = data.price_per_unit if data.price_per_unit is not None else float(prod.get("price_per_unit", 0))
+    mode = (data.price_mode or "piece")
+
+    locked_unit = float(prod.get("price_per_unit", 0) or 0)
+    locked_hour = float(prod.get("price_per_hour", 0) or 0)
+    locked_kg = float(prod.get("price_per_kg", 0) or 0)
+
+    # If product has a locked price for this mode, FORCE snapshot = locked (same price for everyone).
+    if mode == "hour" and locked_hour > 0:
+        price_per_unit = locked_hour
+    elif mode != "hour" and locked_unit > 0:
+        price_per_unit = locked_unit
+    else:
+        price_per_unit = data.price_per_unit if data.price_per_unit is not None else locked_unit
+
+    if locked_kg > 0:
+        price_per_kg = locked_kg
+    else:
+        price_per_kg = data.price_per_kg if data.price_per_kg is not None else 0.0
+
     payment = round(float(data.kilos) * price_per_kg + float(data.units) * price_per_unit, 2)
 
-    # Lock-in price: if product doesn't have a price yet, save this one so it's remembered next time
+    # Lock-in: first non-zero price saved on the product so it persists for all future harvests
     lock_updates: dict = {}
-    if (data.price_mode or "piece") == "hour":
-        current_hour = float(prod.get("price_per_hour", 0) or 0)
-        if price_per_unit > 0 and current_hour <= 0:
-            lock_updates["price_per_hour"] = price_per_unit
-    else:
-        current_unit = float(prod.get("price_per_unit", 0) or 0)
-        if price_per_unit > 0 and current_unit <= 0:
-            lock_updates["price_per_unit"] = price_per_unit
-    if price_per_kg > 0 and float(prod.get("price_per_kg", 0) or 0) <= 0:
+    if mode == "hour" and locked_hour <= 0 and price_per_unit > 0:
+        lock_updates["price_per_hour"] = price_per_unit
+    elif mode != "hour" and locked_unit <= 0 and price_per_unit > 0:
+        lock_updates["price_per_unit"] = price_per_unit
+    if locked_kg <= 0 and price_per_kg > 0:
         lock_updates["price_per_kg"] = price_per_kg
     if lock_updates:
         await db.products.update_one({"_id": ObjectId(data.product_id)}, {"$set": lock_updates})
@@ -649,6 +662,7 @@ async def create_harvest(data: HarvestIn, user: CurrentUser):
         "units": float(data.units),
         "price_per_kg": price_per_kg,
         "price_per_unit": price_per_unit,
+        "price_mode": mode,
         "payment": payment,
         "date": data.date,
         "photo_path": data.photo_path or "",
