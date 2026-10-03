@@ -63,11 +63,20 @@ export default function ScanHarvestMode() {
   );
   const unitLabel = selectedProduct?.unit_label || "unidad";
   const weightLabel = (selectedProduct?.weight_unit === "lb") ? "Lb" : "Kg";
+  const normalizeCode = (s) => (s || "").toString().trim().toUpperCase();
+  const extractCode = (raw) => {
+    const s = (raw || "").toString().trim();
+    // If it looks like a URL or scheme (agriscan://worker/CODE or https://x/w/CODE), take last segment
+    if (s.includes("/")) return s.split("/").filter(Boolean).pop();
+    if (s.includes(":")) return s.split(":").pop();
+    return s;
+  };
   const workersByQr = useMemo(() => {
     const map = {};
     workers.forEach((w) => {
-      if (w.qr_code) map[w.qr_code] = w;
-      map[w.id] = w;
+      if (w.qr_code) map[normalizeCode(w.qr_code)] = w;
+      if (w.id) map[normalizeCode(w.id)] = w;
+      if (w.document_id) map[normalizeCode(w.document_id)] = w;
     });
     return map;
   }, [workers]);
@@ -139,18 +148,27 @@ export default function ScanHarvestMode() {
     });
   };
 
-  const handleScan = (code) => {
+  const handleScan = (rawCode) => {
     const now = Date.now();
-    if (lastRef.current.code === code && now - lastRef.current.at < 1500) {
+    if (lastRef.current.code === rawCode && now - lastRef.current.at < 1500) {
       return; // debounce duplicates
     }
-    lastRef.current = { code, at: now };
+    lastRef.current = { code: rawCode, at: now };
+
+    if (workers.length === 0) {
+      toast.info("Cargando trabajadores… espera un momento");
+      return;
+    }
+
+    const extracted = extractCode(rawCode);
+    const key = normalizeCode(extracted);
 
     // Mode: scan workers (each scan = +1 unit for that worker)
     if (scanMode === "worker") {
-      const w = workersByQr[code] || workersByQr[(code || "").trim()];
+      const w = workersByQr[key];
       if (!w) {
-        toast.error("QR no reconocido");
+        const shown = (extracted || rawCode || "").toString().slice(0, 24);
+        toast.error(`QR no reconocido: "${shown}"`);
         return;
       }
       setTally((prev) => {
@@ -165,7 +183,7 @@ export default function ScanHarvestMode() {
     // Mode: scan pieces (worker must be selected first; each scan is a piece ID)
     if (!activeWorkerId) {
       // If no active worker yet, try to interpret this scan as a worker to activate
-      const w = workersByQr[code];
+      const w = workersByQr[key];
       if (w) {
         setActiveWorkerId(w.id);
         toast.success(`Trabajador activo: ${w.name}`, { duration: 1500 });
@@ -178,7 +196,7 @@ export default function ScanHarvestMode() {
     const active = workers.find((x) => x.id === activeWorkerId);
     setTally((prev) => {
       const cur = prev[activeWorkerId] || { name: active?.name || "—", count: 0, pieces: [] };
-      if (cur.pieces.includes(code)) {
+      if (cur.pieces.includes(rawCode)) {
         toast.info("Pieza ya escaneada", { duration: 1000 });
         return prev;
       }
@@ -187,7 +205,7 @@ export default function ScanHarvestMode() {
         [activeWorkerId]: {
           name: active?.name || "—",
           count: cur.count + 1,
-          pieces: [...cur.pieces, code],
+          pieces: [...cur.pieces, rawCode],
         },
       };
       toast.success(`Pieza #${cur.count + 1}: ${active?.name}`, { duration: 1000 });
