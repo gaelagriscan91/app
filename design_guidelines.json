@@ -1,0 +1,174 @@
+{
+  "project_name": "AgriScan",
+  "app_type": "mobile_web_app",
+  "description": "Mobile-first agricultural harvest tracking web application (PickTrace clone) designed for outdoor field supervisors and agricultural managers in Spanish.",
+  "language": "es",
+  "theme_strategy": {
+    "default_mode": "light",
+    "rationale": "High contrast light mode optimized for direct outdoor sunlight and field readability, with an optional dark mode toggle for evening administrative work.",
+    "color_archetype": "ORGANIC_EARTHY_HIGH_CONTRAST",
+    "primary_palette": {
+      "forest_green": "#1E4620",
+      "harvest_green_light": "#2E7D32",
+      "sunlight_yellow_accent": "#E65100",
+      "earth_sand_bg": "#F7F5EE",
+      "card_surface": "#FFFFFF",
+      "border_tactile": "#D4CEB8",
+      "text_dark_primary": "#1A2210",
+      "text_muted": "#556047",
+      "success_pago": "#15803D",
+      "danger_red": "#DC2626"
+    }
+  },
+  "typography": {
+    "heading_font": "Outfit, sans-serif",
+    "body_font": "Manrope, sans-serif",
+    "mono_font": "JetBrains Mono, monospace",
+    "font_imports": [
+      "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap"
+    ],
+    "scale": {
+      "h1_hero": "text-3xl sm:text-4xl font-extrabold tracking-tight",
+      "h2_section": "text-xl sm:text-2xl font-bold tracking-tight",
+      "h3_card": "text-lg font-bold",
+      "body_lg": "text-base font-medium",
+      "body_sm": "text-sm font-normal",
+      "stat_value": "text-2xl sm:text-3xl font-black font-mono"
+    }
+  },
+  "layout_and_spacing": {
+    "mobile_first": true,
+    "touch_target_min": "48px x 48px",
+    "container_padding": "px-4 py-4 sm:px-6 sm:py-6",
+    "grid_modes": {
+      "field_mobile": "grid grid-cols-1 gap-4",
+      "stats_dashboard": "grid grid-cols-2 md:grid-cols-4 gap-4",
+      "form_split": "grid grid-cols-1 md:grid-cols-2 gap-6",
+      "crud_layout": "grid grid-cols-1 lg:grid-cols-3 gap-6"
+    },
+    "bottom_nav_mobile": "Fixed bottom navigation bar (height 64px, z-50) with high-contrast icons and clear Spanish labels for key field actions (Cosechar, Día, Reportes, Módulos)."
+  },
+  "components_and_ui_rules": {
+    "buttons": {
+      "primary_harvest_action": "h-14 w-full bg-[#1E4620] hover:bg-[#153417] text-white text-lg font-bold rounded-xl shadow-md transition-transform active:scale-95 flex items-center justify-center gap-2 border border-[#1E4620]",
+      "secondary_action": "h-12 bg-white hover:bg-emerald-50 text-[#1E4620] text-base font-semibold rounded-xl border-2 border-[#1E4620] transition-colors",
+      "accent_cta": "h-14 w-full bg-[#E65100] hover:bg-[#C63D00] text-white text-lg font-bold rounded-xl shadow-lg transition-transform active:scale-95",
+      "danger_action": "h-12 bg-red-50 hover:bg-red-100 text-red-700 font-bold rounded-xl border border-red-300"
+    },
+    "inputs": {
+      "field_input": "h-13 text-lg px-4 rounded-xl border-2 border-[#B8B29C] focus:border-[#1E4620] focus:ring-2 focus:ring-[#1E4620]/20 bg-white text-[#1A2210] placeholder:text-[#889078] font-medium shadow-sm",
+      "select_dropdown": "h-13 text-lg px-4 rounded-xl border-2 border-[#B8B29C] focus:border-[#1E4620] bg-white text-[#1A2210] font-medium"
+    },
+    "cards": {
+      "field_card": "bg-white rounded-2xl border-2 border-[#E2DDD0] shadow-sm p-4 hover:border-[#1E4620]/40 transition-all",
+      "stat_card": "bg-emerald-950 text-white rounded-2xl p-5 border border-emerald-800 shadow-md",
+      "summary_card": "bg-[#F0EDE1] rounded-2xl p-4 border border-[#D4CEB8]"
+    },
+    "tables": {
+      "responsive": "Use card-stack view on small mobile screens (<640px) and rich high-contrast horizontal scroll tables on desktop/tablets."
+    }
+  },
+  "key_features_and_views": {
+    "1_auth_login": {
+      "title": "Inicio de Sesión",
+      "components": "JWT Login Form, Quick Demo Credentials selector, High-contrast login button",
+      "spanish_labels": {
+        "title": "AgriScan - Control de Cosechas",
+        "subtitle": "Ingresa tus credenciales para registrar en campo",
+        "email_label": "Correo o Usuario",
+        "password_label": "Contraseña",
+        "submit_button": "Iniciar Sesión en Campo"
+      }
+    },
+    "2_registrar_cosecha": {
+      "title": "Registrar Cosecha (Formulario de Campo)",
+      "components": "Worker Select (con foto mini), Parcel Select, Product/Crop Select, Kilos Input, Date Picker, Photo Upload/Capture preview, Live Auto Payment Calculator Box (Kilos × Precio/Kg = Total $)",
+      "spanish_labels": {
+        "worker_label": "Seleccionar Trabajador",
+        "parcel_label": "Parcela / Lote",
+        "product_label": "Producto / Cultivo",
+        "kilos_label": "Kilos Cosechados (Kg)",
+        "price_label": "Precio por Kilo ($/Kg)",
+        "payment_calc": "Pago Total Calculado",
+        "photo_label": "Foto de Evidencia / Báscula",
+        "submit_btn": "Guardar Cosecha"
+      }
+    },
+    "3_lista_del_dia": {
+      "title": "Lista del Día y Totales",
+      "components": "Kilos Totales del Día Header Badge, Total a Pagar Badge, Search bar by Worker, Worker Summary Cards with total kilos and total pay, Detailed harvest log timeline",
+      "spanish_labels": {
+        "header_title": "Registros de Hoy",
+        "total_kilos": "Total Kilos Hoy",
+        "total_pago": "Total a Pagar Hoy",
+        "worker_breakdown": "Resumen por Trabajador",
+        "empty_state": "No hay cosechas registradas hoy aún"
+      }
+    },
+    "4_reportes_y_exportacion": {
+      "title": "Reportes y Exportación",
+      "components": "Filter bar (Fecha Inicio, Fecha Fin, Trabajador, Parcela), Summary Chart (Bar chart for kilos per crop / per worker), Export to Excel button (.xlsx generation / download trigger), Totals breakdown table",
+      "spanish_labels": {
+        "title": "Reportes de Cosecha",
+        "date_from": "Desde Fecha",
+        "date_to": "Hasta Fecha",
+        "export_excel_btn": "Exportar a Excel (.xlsx)",
+        "export_success": "Reporte Excel descargado exitosamente"
+      }
+    },
+    "5_modulos_crud": {
+      "title": "Módulos de Gestión (CRUD)",
+      "tabs": [
+        "Trabajadores (Nombre, Cédula/ID, Teléfono, Rol, Estado)",
+        "Parcelas (Nombre Lote, Hectáreas, Tipo de Cultivo, Ubicación)",
+        "Cosechas (Histórico, Editar, Eliminar registro con confirmación)"
+      ]
+    },
+    "6_dashboard": {
+      "title": "Panel Principal / Resumen",
+      "components": "Kilos Cosechados Mes, Trabajadores Activos, Parcela Más Productiva, Promedio $/Kg, Gráfica de Rendimiento Semanal"
+    }
+  },
+  "image_urls": {
+    "harvest_field_bg": "https://images.unsplash.com/photo-1605000797499-95a51c5269ae?crop=entropy&cs=srgb&fm=jpg&q=85",
+    "field_worker_1": "https://images.unsplash.com/photo-1626906722163-bd4c03cb3b9b?crop=entropy&cs=srgb&fm=jpg&q=85",
+    "combine_harvest": "https://images.unsplash.com/photo-1632723893457-47e3abc47526?crop=entropy&cs=srgb&fm=jpg&q=85",
+    "aerial_farm": "https://images.unsplash.com/photo-1535379453347-1ffd615e2e08?crop=entropy&cs=srgb&fm=jpg&q=85"
+  },
+  "testing_and_attributes": {
+    "mandatory_rule": "ALL interactive and key data display elements MUST contain data-testid attributes using kebab-case role naming.",
+    "key_test_ids": [
+      "data-testid='login-email-input'",
+      "data-testid='login-password-input'",
+      "data-testid='login-submit-button'",
+      "data-testid='nav-registrar-cosecha'",
+      "data-testid='nav-lista-dia'",
+      "data-testid='nav-reportes'",
+      "data-testid='nav-modulos'",
+      "data-testid='worker-select'",
+      "data-testid='parcel-select'",
+      "data-testid='product-select'",
+      "data-testid='kilos-input'",
+      "data-testid='price-per-kg-input'",
+      "data-testid='calculated-payment-display'",
+      "data-testid='harvest-photo-input'",
+      "data-testid='save-harvest-button'",
+      "data-testid='daily-total-kilos'",
+      "data-testid='daily-total-payment'",
+      "data-testid='export-excel-button'",
+      "data-testid='add-worker-button'",
+      "data-testid='add-parcel-button'"
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Ensure all JS/JSX files are created with modular components in /src/components and pages in /src/pages.",
+    "Strictly follow the Spanish language labels defined in key_features_and_views.",
+    "Include high-contrast tap targets (h-12 or h-14 buttons) for field usability.",
+    "Calculate payment automatically in real-time as users edit Kilos or Precio/Kg.",
+    "Provide demo initial data preloaded in LocalStorage or state for Workers, Parcels, Products, and Harvests so the user can test immediately.",
+    "Implement sheetjs (xlsx) or CSV export function for the Excel export button.",
+    "Use Lucide-react icons for clear, bold icons across mobile navigation and buttons.",
+    "Add toast notifications via sonner upon saving harvest, adding worker, editing parcel, or exporting excel."
+  ],
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": "Follow high contrast outdoor sunlight readability rules, use touch targets >= 48px, never use transparent backgrounds under header or cards, add data-testid to every interactive component."
+}
