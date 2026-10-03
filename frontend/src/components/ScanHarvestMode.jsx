@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Camera, CameraOff, ScanLine, Minus, Plus, Trash2, Save, Loader2,
-  Play, RotateCcw, UserCheck,
+  Camera, CameraOff, ScanLine, Minus, Plus, Save, Loader2,
+  Play, RotateCcw, UserCheck, Package, Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatCurrency, formatNumber, formatApiErrorDetail, todayISO } from "@/lib/api";
@@ -27,8 +27,10 @@ export default function ScanHarvestMode() {
 
   const [started, setStarted] = useState(false);
   const [scannerOn, setScannerOn] = useState(false);
-  const [tally, setTally] = useState({}); // { worker_id: {name, count} }
+  const [tally, setTally] = useState({}); // { worker_id: {name, count, pieces:[]} }
   const [saving, setSaving] = useState(false);
+  const [scanMode, setScanMode] = useState("worker"); // "worker" | "piece"
+  const [activeWorkerId, setActiveWorkerId] = useState("");
   const lastRef = useRef({ code: "", at: 0 });
 
   useEffect(() => {
@@ -107,15 +109,51 @@ export default function ScanHarvestMode() {
     }
     lastRef.current = { code, at: now };
 
-    const w = workersByQr[code] || workersByQr[(code || "").trim()];
-    if (!w) {
-      toast.error("QR no reconocido");
+    // Mode: scan workers (each scan = +1 unit for that worker)
+    if (scanMode === "worker") {
+      const w = workersByQr[code] || workersByQr[(code || "").trim()];
+      if (!w) {
+        toast.error("QR no reconocido");
+        return;
+      }
+      setTally((prev) => {
+        const cur = prev[w.id] || { name: w.name, count: 0, pieces: [] };
+        const next = { ...prev, [w.id]: { name: w.name, count: cur.count + 1, pieces: cur.pieces } };
+        toast.success(`+1 ${w.name} (${cur.count + 1} u.)`, { duration: 1200 });
+        return next;
+      });
       return;
     }
+
+    // Mode: scan pieces (worker must be selected first; each scan is a piece ID)
+    if (!activeWorkerId) {
+      // If no active worker yet, try to interpret this scan as a worker to activate
+      const w = workersByQr[code];
+      if (w) {
+        setActiveWorkerId(w.id);
+        toast.success(`Trabajador activo: ${w.name}`, { duration: 1500 });
+        return;
+      }
+      toast.error("Primero selecciona un trabajador activo");
+      return;
+    }
+    // Avoid double-count of same piece in same session
+    const active = workers.find((x) => x.id === activeWorkerId);
     setTally((prev) => {
-      const cur = prev[w.id] || { name: w.name, count: 0 };
-      const next = { ...prev, [w.id]: { name: w.name, count: cur.count + 1 } };
-      toast.success(`+1 ${w.name} (${cur.count + 1} u.)`, { duration: 1200 });
+      const cur = prev[activeWorkerId] || { name: active?.name || "—", count: 0, pieces: [] };
+      if (cur.pieces.includes(code)) {
+        toast.info("Pieza ya escaneada", { duration: 1000 });
+        return prev;
+      }
+      const next = {
+        ...prev,
+        [activeWorkerId]: {
+          name: active?.name || "—",
+          count: cur.count + 1,
+          pieces: [...cur.pieces, code],
+        },
+      };
+      toast.success(`Pieza #${cur.count + 1}: ${active?.name}`, { duration: 1000 });
       return next;
     });
   };
@@ -124,8 +162,8 @@ export default function ScanHarvestMode() {
     const w = workers.find((x) => x.id === workerId);
     if (!w) return;
     setTally((prev) => {
-      const cur = prev[w.id] || { name: w.name, count: 0 };
-      return { ...prev, [w.id]: { name: w.name, count: cur.count + 1 } };
+      const cur = prev[w.id] || { name: w.name, count: 0, pieces: [] };
+      return { ...prev, [w.id]: { name: w.name, count: cur.count + 1, pieces: cur.pieces } };
     });
   };
 
@@ -157,12 +195,15 @@ export default function ScanHarvestMode() {
             price_per_unit: price,
             date,
             photo_path: "",
-            notes: "Cosecha escaneada por QR",
+            notes: v.pieces?.length
+              ? `Piezas escaneadas: ${v.pieces.join(", ")}`
+              : "Cosecha escaneada por QR",
           })
         )
       );
       toast.success(`Jornada guardada: ${entries.length} trabajador(es)`);
       setTally({});
+      setActiveWorkerId("");
       setScannerOn(false);
       setStarted(false);
       navigate("/dia");
@@ -214,26 +255,82 @@ export default function ScanHarvestMode() {
             <Play className="w-5 h-5" /> Iniciar jornada
           </button>
         ) : (
-          <div className="flex gap-2">
-            <button
-              onClick={() => setScannerOn((v) => !v)}
-              className={`flex-1 h-12 rounded-xl font-bold text-base flex items-center justify-center gap-1.5 border-2 ${
-                scannerOn
-                  ? "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
-                  : "bg-[#1E4620] text-white border-[#1E4620] hover:bg-[#153417]"
-              }`}
-              data-testid="scan-toggle-camera"
-            >
-              {scannerOn ? <><CameraOff className="w-5 h-5" /> Pausar cámara</> : <><Camera className="w-5 h-5" /> Reanudar cámara</>}
-            </button>
-            <button
-              onClick={resetSession}
-              className="h-12 px-4 bg-white border-2 border-[#E2DDD0] hover:bg-[#F7F5EE] text-[#556047] font-bold rounded-xl flex items-center gap-1.5"
-              data-testid="scan-reset-button"
-            >
-              <RotateCcw className="w-4 h-4" /> Reiniciar
-            </button>
-          </div>
+          <>
+            {/* Scan mode toggle */}
+            <div>
+              <label className="block text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">Qué estás escaneando</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setScanMode("worker"); setActiveWorkerId(""); }}
+                  data-testid="scan-mode-worker"
+                  className={`h-11 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 border-2 ${
+                    scanMode === "worker"
+                      ? "bg-[#1E4620] text-white border-[#1E4620]"
+                      : "bg-white text-[#556047] border-[#E2DDD0] hover:bg-[#F7F5EE]"
+                  }`}
+                >
+                  <Users className="w-4 h-4" /> Por trabajador
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScanMode("piece")}
+                  data-testid="scan-mode-piece"
+                  className={`h-11 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 border-2 ${
+                    scanMode === "piece"
+                      ? "bg-[#1E4620] text-white border-[#1E4620]"
+                      : "bg-white text-[#556047] border-[#E2DDD0] hover:bg-[#F7F5EE]"
+                  }`}
+                >
+                  <Package className="w-4 h-4" /> Por pieza
+                </button>
+              </div>
+              <p className="text-[11px] text-[#556047] mt-1.5 font-semibold">
+                {scanMode === "worker"
+                  ? "Cada escaneo del QR del trabajador suma 1 pieza para él."
+                  : "Selecciona un trabajador activo. Cada escaneo registra una pieza única para él."}
+              </p>
+            </div>
+
+            {/* Active worker selector (piece mode) */}
+            {scanMode === "piece" && (
+              <div>
+                <label className="block text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">Trabajador activo</label>
+                <select
+                  value={activeWorkerId}
+                  onChange={(e) => setActiveWorkerId(e.target.value)}
+                  className="field-input !h-12 !text-base"
+                  data-testid="active-worker-select"
+                >
+                  <option value="">— Seleccionar trabajador —</option>
+                  {workers.map((w) => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setScannerOn((v) => !v)}
+                className={`flex-1 h-12 rounded-xl font-bold text-base flex items-center justify-center gap-1.5 border-2 ${
+                  scannerOn
+                    ? "bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                    : "bg-[#1E4620] text-white border-[#1E4620] hover:bg-[#153417]"
+                }`}
+                data-testid="scan-toggle-camera"
+              >
+                {scannerOn ? <><CameraOff className="w-5 h-5" /> Pausar cámara</> : <><Camera className="w-5 h-5" /> Reanudar cámara</>}
+              </button>
+              <button
+                onClick={resetSession}
+                className="h-12 px-4 bg-white border-2 border-[#E2DDD0] hover:bg-[#F7F5EE] text-[#556047] font-bold rounded-xl flex items-center gap-1.5"
+                data-testid="scan-reset-button"
+              >
+                <RotateCcw className="w-4 h-4" /> Reiniciar
+              </button>
+            </div>
+          </>
         )}
       </div>
 

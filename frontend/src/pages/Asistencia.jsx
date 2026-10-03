@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Camera, CameraOff, LogIn, LogOut, Users, Clock, Loader2, Trash2, UserCheck, UserPlus } from "lucide-react";
+import { Camera, CameraOff, LogIn, LogOut, Users, Clock, Loader2, Trash2, UserCheck, UserPlus, ListChecks, CheckCircle2, Circle } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatApiErrorDetail, todayISO } from "@/lib/api";
 import QrScanner from "@/components/QrScanner";
@@ -14,7 +14,21 @@ export default function Asistencia() {
   const [processing, setProcessing] = useState(false);
   const [manualWorker, setManualWorker] = useState("");
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [showRollCall, setShowRollCall] = useState(false);
   const lastScanRef = useRef({ code: "", at: 0 });
+
+  const presentWorkerIds = useMemo(
+    () => new Set((data.rows || []).map((r) => r.worker_id)),
+    [data.rows]
+  );
+  const activeWorkers = useMemo(
+    () => workers.filter((w) => w.active !== false),
+    [workers]
+  );
+  const pendingWorkers = useMemo(
+    () => activeWorkers.filter((w) => !presentWorkerIds.has(w.id)),
+    [activeWorkers, presentWorkerIds]
+  );
 
   const load = async () => {
     setLoading(true);
@@ -111,24 +125,38 @@ export default function Asistencia() {
 
       {/* Scanner */}
       <div className="field-card p-4 sm:p-5 space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Camera className="w-5 h-5 text-[#1E4620]" />
             <h3 className="text-lg font-bold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>
               Escáner QR
             </h3>
           </div>
-          <button
-            onClick={() => setScannerOn((v) => !v)}
-            className={`h-10 px-4 rounded-xl font-bold text-sm flex items-center gap-1.5 transition-colors ${
-              scannerOn
-                ? "bg-red-50 text-red-700 border-2 border-red-200 hover:bg-red-100"
-                : "bg-[#1E4620] text-white border-2 border-[#1E4620] hover:bg-[#153417]"
-            }`}
-            data-testid="toggle-scanner-button"
-          >
-            {scannerOn ? <><CameraOff className="w-4 h-4" /> Detener</> : <><Camera className="w-4 h-4" /> Iniciar</>}
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setShowRollCall((v) => !v)}
+              className={`h-10 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-1 border-2 ${
+                showRollCall
+                  ? "bg-[#1E4620] text-white border-[#1E4620]"
+                  : "bg-white text-[#1E4620] border-[#1E4620] hover:bg-emerald-50"
+              }`}
+              data-testid="toggle-rollcall-button"
+              title="Pase de lista"
+            >
+              <ListChecks className="w-4 h-4" /> Lista
+            </button>
+            <button
+              onClick={() => setScannerOn((v) => !v)}
+              className={`h-10 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-1 transition-colors ${
+                scannerOn
+                  ? "bg-red-50 text-red-700 border-2 border-red-200 hover:bg-red-100"
+                  : "bg-[#1E4620] text-white border-2 border-[#1E4620] hover:bg-[#153417]"
+              }`}
+              data-testid="toggle-scanner-button"
+            >
+              {scannerOn ? <><CameraOff className="w-4 h-4" /> Detener</> : <><Camera className="w-4 h-4" /> Iniciar</>}
+            </button>
+          </div>
         </div>
 
         {scannerOn ? (
@@ -182,6 +210,76 @@ export default function Asistencia() {
           </div>
         </div>
       </div>
+
+      {/* Roll call panel */}
+      {showRollCall && (
+        <div className="field-card p-4 sm:p-5" data-testid="rollcall-panel">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <ListChecks className="w-5 h-5 text-[#1E4620]" />
+              <h3 className="text-lg font-bold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>
+                Pase de lista
+              </h3>
+            </div>
+            <div className="text-xs font-bold text-[#556047] uppercase tracking-wider">
+              {presentWorkerIds.size} / {activeWorkers.length}
+            </div>
+          </div>
+
+          {activeWorkers.length === 0 ? (
+            <p className="text-sm text-[#556047] font-semibold py-4 text-center">
+              Sin trabajadores activos
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {activeWorkers.map((w) => {
+                const present = presentWorkerIds.has(w.id);
+                return (
+                  <div
+                    key={w.id}
+                    className={`p-3 rounded-xl border-2 flex items-center gap-2 transition-colors ${
+                      present
+                        ? "bg-emerald-50 border-emerald-300"
+                        : "bg-[#F7F5EE] border-[#E2DDD0]"
+                    }`}
+                    data-testid={`rollcall-worker-${w.id}`}
+                  >
+                    {present ? (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                    ) : (
+                      <Circle className="w-5 h-5 text-[#889078] flex-shrink-0" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className={`font-bold text-sm truncate ${present ? "text-emerald-900" : "text-[#1A2210]"}`}>
+                        {w.name}
+                      </div>
+                      <div className="text-[10px] font-semibold text-[#556047] uppercase tracking-wider">
+                        {present ? "✓ Presente" : "Pendiente"}
+                      </div>
+                    </div>
+                    {!present && (
+                      <button
+                        onClick={() => submitCode(w.qr_code || w.id)}
+                        disabled={processing}
+                        className="h-8 px-2 bg-[#1E4620] hover:bg-[#153417] text-white text-xs font-bold rounded-lg disabled:opacity-50"
+                        data-testid={`rollcall-check-${w.id}`}
+                      >
+                        Marcar
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {pendingWorkers.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-[#E2DDD0] text-xs font-bold text-[#556047]">
+              Pendientes: {pendingWorkers.map((w) => w.name).join(", ")}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
