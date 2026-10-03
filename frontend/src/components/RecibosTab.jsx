@@ -1,0 +1,344 @@
+import { useEffect, useMemo, useState } from "react";
+import { Printer, Loader2, Calendar, Users, Clock, DollarSign, FileText, PrinterIcon } from "lucide-react";
+import { toast } from "sonner";
+import api, { formatCurrency, formatNumber } from "@/lib/api";
+
+function startOfMonthISO() {
+  const d = new Date();
+  d.setDate(1);
+  return d.toISOString().slice(0, 10);
+}
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function receiptHtml(receipt, businessName = "AgriScan") {
+  const fmtDate = (iso) => {
+    try {
+      const d = new Date(iso + "T00:00:00");
+      return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
+    } catch (_) { return iso; }
+  };
+  const fmtMoney = (n) => Number(n || 0).toLocaleString("es-MX", { style: "currency", currency: "MXN" });
+
+  const attRows = (receipt.attendance || []).map((a) => `
+    <tr>
+      <td>${fmtDate(a.date)}</td>
+      <td>${a.check_in || "—"}</td>
+      <td>${a.check_out || "—"}</td>
+      <td class="right">${a.hours ? a.hours.toFixed(2) + " h" : "—"}</td>
+    </tr>`).join("");
+
+  const harvRows = (receipt.harvests || []).map((h) => `
+    <tr>
+      <td>${fmtDate(h.date)}</td>
+      <td>${h.product_name}</td>
+      <td>${h.parcel_name}</td>
+      <td class="right">${h.kilos ? h.kilos.toFixed(2) + " Kg" : "—"}</td>
+      <td class="right">${h.units ? Math.round(h.units) + " " + h.unit_label : "—"}</td>
+      <td class="right">${fmtMoney(h.payment)}</td>
+    </tr>`).join("");
+
+  return `
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><title>Recibo — ${receipt.worker_name}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #1a2210; padding: 32px; max-width: 780px; margin: 0 auto; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #1E4620; padding-bottom: 16px; margin-bottom: 20px; }
+  .brand { font-size: 24px; font-weight: 900; color: #1E4620; letter-spacing: -0.5px; }
+  .brand small { display: block; font-size: 11px; color: #666; font-weight: 600; margin-top: 2px; letter-spacing: 2px; text-transform: uppercase; }
+  .doc-title { text-align: right; }
+  .doc-title h2 { margin: 0; font-size: 18px; color: #1E4620; }
+  .doc-title .range { color: #666; font-size: 12px; margin-top: 4px; }
+  .worker { background: #F7F5EE; border: 1px solid #E2DDD0; padding: 14px 16px; border-radius: 12px; margin-bottom: 18px; }
+  .worker h3 { margin: 0; font-size: 20px; color: #1A2210; }
+  .worker .meta { font-size: 12px; color: #556047; margin-top: 2px; font-weight: 600; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
+  .stat { background: #FFF; border: 2px solid #E2DDD0; padding: 10px 12px; border-radius: 10px; }
+  .stat .label { font-size: 10px; color: #556047; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+  .stat .value { font-size: 18px; font-weight: 800; color: #1A2210; margin-top: 4px; font-family: 'Courier New', monospace; }
+  .stat.highlight { background: #1E4620; color: white; border-color: #0F2912; }
+  .stat.highlight .label { color: #d7e5d8; }
+  .stat.highlight .value { color: white; }
+  .stat.accent { background: #E65100; color: white; border-color: #c13f00; }
+  .stat.accent .label { color: #ffd9b8; }
+  .stat.accent .value { color: white; }
+  h4 { font-size: 13px; color: #1E4620; margin: 18px 0 8px; letter-spacing: 1px; text-transform: uppercase; border-bottom: 1px solid #E2DDD0; padding-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { text-align: left; background: #F0EDE1; color: #1A2210; font-weight: 700; padding: 7px 10px; border-bottom: 2px solid #D4CEB8; }
+  td { padding: 6px 10px; border-bottom: 1px solid #EEE; color: #333; }
+  td.right, th.right { text-align: right; }
+  .total-row { background: #1E4620; color: white; }
+  .total-row td { color: white; font-weight: 800; padding: 10px; border: none; }
+  .signature { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+  .sign-box { border-top: 1px solid #1A2210; padding-top: 6px; text-align: center; font-size: 11px; color: #556047; font-weight: 600; }
+  .footer { margin-top: 24px; text-align: center; font-size: 10px; color: #999; }
+  @media print { body { padding: 16px; } .no-print { display: none; } }
+  @page { margin: 15mm; }
+  .print-btn { position: fixed; top: 16px; right: 16px; background: #1E4620; color: white; padding: 10px 16px; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 14px; }
+</style></head>
+<body>
+  <button class="print-btn no-print" onclick="window.print()">🖨 Imprimir</button>
+  <div class="header">
+    <div>
+      <div class="brand">${businessName}<small>Control de cosechas</small></div>
+    </div>
+    <div class="doc-title">
+      <h2>RECIBO DE PAGO</h2>
+      <div class="range">${fmtDate(receipt.date_from)} — ${fmtDate(receipt.date_to)}</div>
+      <div class="range">Emitido: ${new Date().toLocaleDateString("es-MX")}</div>
+    </div>
+  </div>
+
+  <div class="worker">
+    <h3>${receipt.worker_name}</h3>
+    <div class="meta">${receipt.document_id || "sin ID"}${receipt.role ? " • " + receipt.role : ""}</div>
+  </div>
+
+  <div class="stats">
+    <div class="stat highlight">
+      <div class="label">Total horas</div>
+      <div class="value">${(receipt.total_hours || 0).toFixed(2)} h</div>
+    </div>
+    <div class="stat">
+      <div class="label">Días trab.</div>
+      <div class="value">${receipt.days_worked || 0}</div>
+    </div>
+    <div class="stat">
+      <div class="label">Kilos</div>
+      <div class="value">${(receipt.total_kilos || 0).toFixed(2)}</div>
+    </div>
+    <div class="stat accent">
+      <div class="label">Total a pagar</div>
+      <div class="value">${fmtMoney(receipt.total_payment)}</div>
+    </div>
+  </div>
+
+  ${(receipt.attendance || []).length ? `
+    <h4>Asistencia (${(receipt.attendance || []).length} días)</h4>
+    <table>
+      <thead><tr><th>Fecha</th><th>Entrada</th><th>Salida</th><th class="right">Horas</th></tr></thead>
+      <tbody>${attRows}
+        <tr class="total-row">
+          <td colspan="3">TOTAL HORAS</td>
+          <td class="right">${(receipt.total_hours || 0).toFixed(2)} h</td>
+        </tr>
+      </tbody>
+    </table>
+  ` : ""}
+
+  ${(receipt.harvests || []).length ? `
+    <h4>Cosechas (${(receipt.harvests || []).length} registros)</h4>
+    <table>
+      <thead><tr><th>Fecha</th><th>Producto</th><th>Parcela</th><th class="right">Kg</th><th class="right">Unid.</th><th class="right">Pago</th></tr></thead>
+      <tbody>${harvRows}
+        <tr class="total-row">
+          <td colspan="5">TOTAL</td>
+          <td class="right">${fmtMoney(receipt.total_payment)}</td>
+        </tr>
+      </tbody>
+    </table>
+  ` : ""}
+
+  <div class="signature">
+    <div class="sign-box">Firma del trabajador</div>
+    <div class="sign-box">Firma del supervisor</div>
+  </div>
+
+  <div class="footer">
+    Documento generado automáticamente por ${businessName} • ${receipt.worker_name} • ${new Date().toLocaleString("es-MX")}
+  </div>
+</body></html>`;
+}
+
+export default function RecibosTab() {
+  const [dateFrom, setDateFrom] = useState(startOfMonthISO());
+  const [dateTo, setDateTo] = useState(todayISO());
+  const [workers, setWorkers] = useState([]);
+  const [workerId, setWorkerId] = useState("");
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await api.get("/workers");
+        setWorkers(data);
+      } catch (_) {}
+    })();
+  }, []);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get("/receipts", {
+        params: {
+          date_from: dateFrom,
+          date_to: dateTo,
+          worker_id: workerId || undefined,
+        },
+      });
+      setRows(data);
+      if (data.length === 0) toast.info("Sin actividad en el rango seleccionado");
+    } catch (e) {
+      toast.error("No se pudieron cargar los recibos");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const printReceipt = (receipt) => {
+    const html = receiptHtml(receipt);
+    const win = window.open("", "_blank", "width=820,height=900");
+    if (!win) {
+      toast.error("Permite ventanas emergentes para imprimir");
+      return;
+    }
+    win.document.write(html);
+    win.document.close();
+  };
+
+  const printAll = () => {
+    if (rows.length === 0) {
+      toast.error("Nada para imprimir");
+      return;
+    }
+    const html = `
+      <!doctype html><html lang="es"><head><meta charset="utf-8"><title>Recibos en lote</title></head>
+      <body>${rows.map((r) => receiptHtml(r).replace(/<!doctype[\s\S]*?<body>/, "").replace(/<\/body><\/html>$/, "") + '<div style="page-break-after: always;"></div>').join("")}</body></html>
+    `;
+    const win = window.open("", "_blank", "width=820,height=900");
+    if (!win) { toast.error("Permite ventanas emergentes para imprimir"); return; }
+    win.document.write(html);
+    win.document.close();
+    setTimeout(() => { try { win.print(); } catch (_) {} }, 400);
+  };
+
+  const totals = useMemo(() => {
+    return rows.reduce(
+      (a, r) => ({
+        hours: a.hours + (r.total_hours || 0),
+        payment: a.payment + (r.total_payment || 0),
+        kilos: a.kilos + (r.total_kilos || 0),
+      }),
+      { hours: 0, payment: 0, kilos: 0 }
+    );
+  }, [rows]);
+
+  return (
+    <div className="space-y-5">
+      <div className="field-card p-4 sm:p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <Calendar className="w-5 h-5 text-[#1E4620]" />
+          <h3 className="text-base font-bold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>
+            Período de pago
+          </h3>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div>
+            <label className="block text-xs font-bold text-[#1A2210] mb-1 uppercase tracking-wider">Desde</label>
+            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="field-input !h-12 !text-base" data-testid="recibos-date-from" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-[#1A2210] mb-1 uppercase tracking-wider">Hasta</label>
+            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="field-input !h-12 !text-base" data-testid="recibos-date-to" />
+          </div>
+          <div className="col-span-2">
+            <label className="block text-xs font-bold text-[#1A2210] mb-1 uppercase tracking-wider">Trabajador (opcional)</label>
+            <select value={workerId} onChange={(e) => setWorkerId(e.target.value)} className="field-input !h-12 !text-base" data-testid="recibos-worker">
+              <option value="">Todos los trabajadores</option>
+              {workers.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <button onClick={load} disabled={loading} className="field-btn-secondary flex-1" data-testid="recibos-load-button">
+            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><FileText className="w-5 h-5" /> Generar recibos</>}
+          </button>
+          <button onClick={printAll} disabled={rows.length === 0} className="field-btn-accent flex-1 disabled:opacity-60" data-testid="recibos-print-all">
+            <PrinterIcon className="w-5 h-5" /> Imprimir lote ({rows.length})
+          </button>
+        </div>
+      </div>
+
+      {/* Totals */}
+      {rows.length > 0 && (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-2xl bg-[#1E4620] text-white p-4 border-2 border-[#153417] shadow-sm" data-testid="recibos-total-hours">
+            <div className="text-[11px] font-bold uppercase tracking-wider opacity-90 flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> Horas</div>
+            <div className="font-mono-stat text-xl sm:text-2xl mt-1">{formatNumber(totals.hours, 2)}</div>
+          </div>
+          <div className="rounded-2xl bg-white border-2 border-[#E2DDD0] text-[#1A2210] p-4 shadow-sm" data-testid="recibos-total-workers">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-[#556047] flex items-center gap-1"><Users className="w-3.5 h-3.5" /> Trabajadores</div>
+            <div className="font-mono-stat text-xl sm:text-2xl mt-1">{rows.length}</div>
+          </div>
+          <div className="rounded-2xl bg-[#E65100] text-white p-4 border-2 border-[#C63D00] shadow-sm" data-testid="recibos-total-payment">
+            <div className="text-[11px] font-bold uppercase tracking-wider opacity-90 flex items-center gap-1"><DollarSign className="w-3.5 h-3.5" /> Nómina</div>
+            <div className="font-mono-stat text-xl sm:text-2xl mt-1">{formatCurrency(totals.payment)}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Receipt cards */}
+      {loading ? (
+        <div className="flex items-center justify-center py-10 text-[#1E4620]"><Loader2 className="w-6 h-6 animate-spin" /></div>
+      ) : rows.length === 0 ? (
+        <div className="field-card p-8 text-center">
+          <FileText className="w-10 h-10 mx-auto text-[#889078] mb-2" />
+          <p className="text-sm text-[#556047] font-semibold">Sin actividad en el período seleccionado</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {rows.map((r) => (
+            <div key={r.worker_id} className="field-card p-4 sm:p-5" data-testid={`recibo-card-${r.worker_id}`}>
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-extrabold text-lg text-[#1A2210] truncate" style={{ fontFamily: "Outfit, sans-serif" }}>
+                    {r.worker_name}
+                  </h3>
+                  <div className="text-xs text-[#556047] font-semibold">
+                    {r.document_id || "sin ID"} {r.role ? "• " + r.role : ""}
+                  </div>
+                </div>
+                <button
+                  onClick={() => printReceipt(r)}
+                  className="h-10 px-4 bg-[#1E4620] hover:bg-[#153417] text-white font-bold rounded-xl flex items-center gap-1.5 shadow-sm"
+                  data-testid={`recibo-print-${r.worker_id}`}
+                >
+                  <Printer className="w-4 h-4" /> Imprimir
+                </button>
+              </div>
+
+              <div className="grid grid-cols-4 gap-2">
+                <div className="bg-[#F7F5EE] rounded-xl p-2.5 border border-[#E2DDD0]">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[#556047]">Horas</div>
+                  <div className="font-mono-stat text-base text-[#1A2210] mt-0.5">{formatNumber(r.total_hours, 2)}</div>
+                </div>
+                <div className="bg-[#F7F5EE] rounded-xl p-2.5 border border-[#E2DDD0]">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[#556047]">Días</div>
+                  <div className="font-mono-stat text-base text-[#1A2210] mt-0.5">{r.days_worked}</div>
+                </div>
+                <div className="bg-[#F7F5EE] rounded-xl p-2.5 border border-[#E2DDD0]">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[#556047]">Kg + Unid.</div>
+                  <div className="font-mono-stat text-base text-[#1A2210] mt-0.5">
+                    {formatNumber(r.total_kilos, 0)}+{formatNumber(r.total_units, 0)}
+                  </div>
+                </div>
+                <div className="bg-[#E65100] rounded-xl p-2.5 border border-[#C63D00] text-white">
+                  <div className="text-[10px] font-bold uppercase tracking-wider opacity-90">Pago</div>
+                  <div className="font-mono-stat text-base mt-0.5">{formatCurrency(r.total_payment)}</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

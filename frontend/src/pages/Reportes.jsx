@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Download, Filter, Loader2, Wheat, DollarSign } from "lucide-react";
+import { Download, Filter, Loader2, Wheat, DollarSign, FileText, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import api, { API, formatCurrency, formatNumber } from "@/lib/api";
+import RecibosTab from "@/components/RecibosTab";
 
 function startOfMonthISO() {
   const d = new Date();
@@ -13,6 +14,7 @@ function todayISO() {
 }
 
 export default function Reportes() {
+  const [tab, setTab] = useState("cosechas");
   const [dateFrom, setDateFrom] = useState(startOfMonthISO());
   const [dateTo, setDateTo] = useState(todayISO());
   const [workerId, setWorkerId] = useState("");
@@ -111,11 +113,41 @@ export default function Reportes() {
     <div className="space-y-5" data-testid="reportes-page">
       <div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1A2210] tracking-tight" style={{ fontFamily: "Outfit, sans-serif" }}>
-          Reportes de cosecha
+          Reportes
         </h1>
-        <p className="text-sm text-[#556047] font-semibold">Filtra y exporta a Excel</p>
+        <p className="text-sm text-[#556047] font-semibold">Cosechas, recibos y exportación</p>
       </div>
 
+      {/* Tabs */}
+      <div className="field-card p-1.5 flex gap-1.5">
+        <button
+          onClick={() => setTab("cosechas")}
+          data-testid="tab-cosechas"
+          className={`flex-1 flex items-center justify-center gap-2 h-11 px-4 rounded-xl font-bold text-sm transition-all ${
+            tab === "cosechas"
+              ? "bg-[#1E4620] text-white shadow-md"
+              : "text-[#556047] hover:bg-[#F0EDE1]"
+          }`}
+        >
+          <FileSpreadsheet className="w-4 h-4" />
+          Cosechas
+        </button>
+        <button
+          onClick={() => setTab("recibos")}
+          data-testid="tab-recibos"
+          className={`flex-1 flex items-center justify-center gap-2 h-11 px-4 rounded-xl font-bold text-sm transition-all ${
+            tab === "recibos"
+              ? "bg-[#1E4620] text-white shadow-md"
+              : "text-[#556047] hover:bg-[#F0EDE1]"
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          Recibos
+        </button>
+      </div>
+
+      {tab === "recibos" ? <RecibosTab /> : (
+      <>
       {/* Filters */}
       <div className="field-card p-4 sm:p-5 space-y-4">
         <div className="flex items-center gap-2">
@@ -240,6 +272,8 @@ export default function Reportes() {
           )}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

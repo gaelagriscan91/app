@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, Loader2, UserPlus, X, Save, QrCode, Printer, RefreshCw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Plus, Pencil, Trash2, Loader2, UserPlus, X, Save, QrCode, Printer, RefreshCw, PrinterIcon } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import api from "@/lib/api";
@@ -13,6 +13,7 @@ export default function WorkersTab() {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [qrWorker, setQrWorker] = useState(null);
+  const hiddenRef = useRef(null);
 
   const load = async () => {
     setLoading(true);
@@ -97,11 +98,78 @@ export default function WorkersTab() {
     win.document.close();
   };
 
+  const printAllQr = () => {
+    const withQr = rows.filter((r) => r.qr_code);
+    if (withQr.length === 0) { toast.error("No hay QRs para imprimir"); return; }
+    // Grab the hidden svgs
+    const svgs = {};
+    withQr.forEach((w) => {
+      const el = hiddenRef.current?.querySelector(`#qr-hidden-${w.id}`);
+      if (el) svgs[w.id] = new XMLSerializer().serializeToString(el);
+    });
+    const cards = withQr.map((w) => `
+      <div class="card">
+        <h3>${w.name}</h3>
+        <div class="meta">${w.document_id || "sin ID"}${w.role ? " • " + w.role : ""}</div>
+        <div class="qr">${svgs[w.id] || ""}</div>
+        <div class="code">${w.qr_code}</div>
+      </div>
+    `).join("");
+    const html = `
+      <!doctype html><html lang="es"><head><meta charset="utf-8"><title>Credenciales QR</title>
+      <style>
+        * { box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 12mm; background: #fff; }
+        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10mm; }
+        .card { border: 2px solid #1E4620; border-radius: 8px; padding: 10px; text-align: center; break-inside: avoid; page-break-inside: avoid; }
+        .card h3 { margin: 0 0 2px; font-size: 16px; color: #1A2210; }
+        .card .meta { font-size: 11px; color: #556047; margin-bottom: 8px; }
+        .card .qr { display: flex; justify-content: center; margin: 4px 0; }
+        .card .qr svg { width: 160px; height: 160px; }
+        .card .code { font-family: monospace; font-size: 11px; color: #555; margin-top: 4px; }
+        .header { text-align: center; margin-bottom: 10mm; }
+        .header h1 { color: #1E4620; margin: 0; font-size: 22px; }
+        .header p { color: #556047; font-size: 12px; margin: 2px 0; }
+        @page { margin: 10mm; }
+        @media print { .no-print { display: none; } }
+        .print-btn { position: fixed; top: 12px; right: 12px; background: #1E4620; color: white; padding: 8px 14px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+      </style></head><body>
+        <button class="print-btn no-print" onclick="window.print()">🖨 Imprimir</button>
+        <div class="header">
+          <h1>AgriScan — Credenciales de Trabajador</h1>
+          <p>Escanea el QR en el módulo de Asistencia o Cosechar para registrar actividad</p>
+        </div>
+        <div class="grid">${cards}</div>
+      </body></html>`;
+    const win = window.open("", "_blank", "width=820,height=900");
+    if (!win) { toast.error("Permite ventanas emergentes para imprimir"); return; }
+    win.document.write(html);
+    win.document.close();
+    setTimeout(() => { try { win.focus(); } catch (_) {} }, 400);
+  };
+
   return (
     <div className="space-y-4">
-      <button onClick={startNew} className="field-btn-primary" data-testid="add-worker-button">
-        <UserPlus className="w-5 h-5" /> Agregar trabajador
-      </button>
+      {/* Hidden QRs for batch printing */}
+      <div ref={hiddenRef} className="hidden">
+        {rows.filter((r) => r.qr_code).map((r) => (
+          <QRCodeSVG key={r.id} id={`qr-hidden-${r.id}`} value={r.qr_code} size={160} level="H" />
+        ))}
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-2">
+        <button onClick={startNew} className="field-btn-primary flex-1" data-testid="add-worker-button">
+          <UserPlus className="w-5 h-5" /> Agregar trabajador
+        </button>
+        <button
+          onClick={printAllQr}
+          disabled={rows.length === 0}
+          className="h-14 px-5 bg-white border-2 border-[#1E4620] text-[#1E4620] hover:bg-emerald-50 font-bold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50"
+          data-testid="print-all-qr-button"
+        >
+          <PrinterIcon className="w-5 h-5" /> Imprimir todos los QR
+        </button>
+      </div>
 
       {editing && (
         <div className="field-card p-4 space-y-3" data-testid="worker-form">

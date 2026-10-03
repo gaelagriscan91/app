@@ -666,6 +666,114 @@ async def export_excel(
 
 
 # ---------------------------------------------------------------------------
+# Receipts (Recibos de pago)
+# ---------------------------------------------------------------------------
+@api_router.get("/receipts")
+async def receipts(
+    user: CurrentUser,
+    date_from: str,
+    date_to: str,
+    worker_id: Optional[str] = None,
+):
+    """Returns per-worker summary combining attendance (hours) + harvests (payment)
+    for a date range. Used to generate printable pay slips."""
+    workers_q = {}
+    if worker_id:
+        try:
+            workers_q["_id"] = ObjectId(worker_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="ID de trabajador inválido")
+    workers = await db.workers.find(workers_q).sort("name", 1).to_list(1000)
+
+    all_harvests = await db.harvests.find({
+        "date": {"$gte": date_from, "$lte": date_to}
+    }).to_list(5000)
+    all_attendance = await db.attendance.find({
+        "date": {"$gte": date_from, "$lte": date_to}
+    }).to_list(5000)
+
+    # Enrich harvests with product/parcel names
+    product_cache: dict = {}
+    parcel_cache: dict = {}
+    for h in all_harvests:
+        pid = h.get("product_id")
+        if pid and pid not in product_cache:
+            try:
+                p = await db.products.find_one({"_id": ObjectId(pid)})
+                product_cache[pid] = p
+            except Exception:
+                product_cache[pid] = None
+        parid = h.get("parcel_id")
+        if parid and parid not in parcel_cache:
+            try:
+                p = await db.parcels.find_one({"_id": ObjectId(parid)})
+                parcel_cache[parid] = p
+            except Exception:
+                parcel_cache[parid] = None
+
+    result = []
+    for w in workers:
+        wid = str(w["_id"])
+        w_harvests = [h for h in all_harvests if h.get("worker_id") == wid]
+        w_attendance = [a for a in all_attendance if a.get("worker_id") == wid]
+
+        total_kilos = round(sum(float(h.get("kilos", 0)) for h in w_harvests), 2)
+        total_units = round(sum(float(h.get("units", 0)) for h in w_harvests), 2)
+        total_payment = round(sum(float(h.get("payment", 0)) for h in w_harvests), 2)
+        total_hours = round(sum(_duration_hours(a.get("check_in"), a.get("check_out")) for a in w_attendance), 2)
+        days_worked = len({a.get("date") for a in w_attendance if a.get("check_in")})
+        harvest_days = len({h.get("date") for h in w_harvests})
+
+        # Breakdown of harvests
+        harvest_lines = []
+        for h in sorted(w_harvests, key=lambda x: x.get("date", "")):
+            prod = product_cache.get(h.get("product_id"))
+            parc = parcel_cache.get(h.get("parcel_id"))
+            harvest_lines.append({
+                "date": h.get("date"),
+                "product_name": prod["name"] if prod else "—",
+                "parcel_name": parc["name"] if parc else "—",
+                "kilos": float(h.get("kilos", 0)),
+                "units": float(h.get("units", 0)),
+                "unit_label": prod.get("unit_label", "u") if prod else "u",
+                "price_per_kg": float(h.get("price_per_kg", 0)),
+                "price_per_unit": float(h.get("price_per_unit", 0)),
+                "payment": float(h.get("payment", 0)),
+            })
+
+        attendance_lines = []
+        for a in sorted(w_attendance, key=lambda x: x.get("date", "")):
+            attendance_lines.append({
+                "date": a.get("date"),
+                "check_in": _hhmm(a.get("check_in")),
+                "check_out": _hhmm(a.get("check_out")),
+                "hours": _duration_hours(a.get("check_in"), a.get("check_out")),
+            })
+
+        # Skip workers with no activity at all
+        if total_payment == 0 and total_hours == 0 and total_kilos == 0 and total_units == 0:
+            continue
+
+        result.append({
+            "worker_id": wid,
+            "worker_name": w.get("name"),
+            "document_id": w.get("document_id", ""),
+            "role": w.get("role", ""),
+            "date_from": date_from,
+            "date_to": date_to,
+            "total_kilos": total_kilos,
+            "total_units": total_units,
+            "total_payment": total_payment,
+            "total_hours": total_hours,
+            "days_worked": days_worked,
+            "harvest_days": harvest_days,
+            "harvests": harvest_lines,
+            "attendance": attendance_lines,
+        })
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Attendance (Asistencia) - Entrada / Salida
 # ---------------------------------------------------------------------------
 def _hhmm(iso_ts: Optional[str]) -> str:
