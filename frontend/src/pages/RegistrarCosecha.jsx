@@ -50,6 +50,10 @@ export default function RegistrarCosecha() {
     () => products.find((p) => p.id === productId),
     [productId, products]
   );
+  const weightLabel = (selectedProduct?.weight_unit === "lb") ? "Lb" : "Kg";
+  const priceMode = selectedProduct?.pricing_mode || (selectedProduct?.price_per_kg > 0 && selectedProduct?.price_per_unit > 0 ? "both" : selectedProduct?.price_per_kg > 0 ? "weight" : "unit");
+  const showKilos = priceMode !== "unit";
+  const showUnits = priceMode !== "weight";
 
   useEffect(() => {
     if (selectedProduct) {
@@ -240,71 +244,81 @@ export default function RegistrarCosecha() {
             Cantidad y precio
           </h3>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">Kilos (Kg)</label>
-              <input
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min="0"
-                value={kilos}
-                onChange={(e) => setKilos(e.target.value)}
-                className="field-input"
-                placeholder="0"
-                data-testid="kilos-input"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">
-                Unidades {selectedProduct?.unit_label ? `(${selectedProduct.unit_label})` : ""}
-              </label>
-              <input
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min="0"
-                value={units}
-                onChange={(e) => setUnits(e.target.value)}
-                className="field-input"
-                placeholder="0"
-                data-testid="units-input"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">$ / Kg</label>
-              <input
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min="0"
-                value={pricePerKg}
-                onChange={(e) => setPricePerKg(e.target.value)}
-                className="field-input"
-                placeholder="0.00"
-                data-testid="price-per-kg-input"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">$ / Unidad</label>
-              <input
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min="0"
-                value={pricePerUnit}
-                onChange={(e) => setPricePerUnit(e.target.value)}
-                className="field-input"
-                placeholder="0.00"
-                data-testid="price-per-unit-input"
-              />
-            </div>
+            {showKilos && (
+              <div>
+                <label className="block text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">{weightLabel === "Lb" ? "Libras" : "Kilos"} ({weightLabel})</label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  value={kilos}
+                  onChange={(e) => setKilos(e.target.value)}
+                  className="field-input"
+                  placeholder="0"
+                  data-testid="kilos-input"
+                />
+              </div>
+            )}
+            {showUnits && (
+              <div>
+                <label className="block text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">
+                  Unidades {selectedProduct?.unit_label ? `(${selectedProduct.unit_label})` : ""}
+                </label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  value={units}
+                  onChange={(e) => setUnits(e.target.value)}
+                  className="field-input"
+                  placeholder="0"
+                  data-testid="units-input"
+                />
+              </div>
+            )}
+            {showKilos && (
+              <div>
+                <label className="block text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">$ / {weightLabel}</label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  value={pricePerKg}
+                  onChange={(e) => setPricePerKg(e.target.value)}
+                  className="field-input"
+                  placeholder="0.00"
+                  data-testid="price-per-kg-input"
+                />
+              </div>
+            )}
+            {showUnits && (
+              <div>
+                <label className="block text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">$ / {selectedProduct?.unit_label || "unidad"}</label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  value={pricePerUnit}
+                  onChange={(e) => setPricePerUnit(e.target.value)}
+                  className="field-input"
+                  placeholder="0.00"
+                  data-testid="price-per-unit-input"
+                />
+              </div>
+            )}
           </div>
 
           <div className="rounded-2xl bg-[#E65100] text-white p-4 flex items-center justify-between" data-testid="calculated-payment-display">
             <div>
               <div className="text-[11px] font-bold uppercase tracking-wider opacity-90">Pago calculado</div>
               <div className="text-xs opacity-85 mt-0.5 font-semibold">
-                {formatNumber(parseFloat(kilos) || 0, 2)} Kg + {formatNumber(parseFloat(units) || 0, 2)} u.
+                {showKilos && `${formatNumber(parseFloat(kilos) || 0, 2)} ${weightLabel}`}
+                {showKilos && showUnits && " + "}
+                {showUnits && `${formatNumber(parseFloat(units) || 0, 2)} ${selectedProduct?.unit_label || "u"}`}
               </div>
             </div>
             <div className="font-mono-stat text-2xl sm:text-3xl">{formatCurrency(payment)}</div>

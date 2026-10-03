@@ -52,6 +52,8 @@ export default function ScanHarvestMode() {
     () => products.find((p) => p.id === productId),
     [productId, products]
   );
+  const unitLabel = selectedProduct?.unit_label || "unidad";
+  const weightLabel = (selectedProduct?.weight_unit === "lb") ? "Lb" : "Kg";
   const workersByQr = useMemo(() => {
     const map = {};
     workers.forEach((w) => {
@@ -170,8 +172,6 @@ export default function ScanHarvestMode() {
       setSaving(false);
     }
   };
-
-  const unitLabel = selectedProduct?.unit_label || "unidad";
 
   return (
     <div className="space-y-5" data-testid="scan-harvest-mode">

@@ -225,6 +225,8 @@ class ProductIn(BaseModel):
     price_per_kg: float = 0
     price_per_unit: float = 0
     unit_label: Optional[str] = "unidad"
+    weight_unit: Optional[str] = "kg"  # "kg" | "lb"
+    pricing_mode: Optional[str] = "both"  # "unit" | "weight" | "both"
     active: bool = True
 
 
@@ -1080,15 +1082,18 @@ async def seed_demo():
         ])
     if await db.products.count_documents({}) == 0:
         await db.products.insert_many([
-            {"name": "Tomate", "price_per_kg": 12.0, "price_per_unit": 0,
-             "unit_label": "caja", "active": True,
-             "created_at": datetime.now(timezone.utc).isoformat()},
-            {"name": "Fresa", "price_per_kg": 25.0, "price_per_unit": 15.0,
-             "unit_label": "canasta", "active": True,
-             "created_at": datetime.now(timezone.utc).isoformat()},
-            {"name": "Aguacate", "price_per_kg": 35.0, "price_per_unit": 5.0,
-             "unit_label": "pieza", "active": True,
-             "created_at": datetime.now(timezone.utc).isoformat()},
+            {"name": "Cherry", "price_per_kg": 0, "price_per_unit": 25.0,
+             "unit_label": "canasta", "weight_unit": "kg", "pricing_mode": "unit",
+             "active": True, "created_at": datetime.now(timezone.utc).isoformat()},
+            {"name": "Naranja", "price_per_kg": 8.0, "price_per_unit": 0,
+             "unit_label": "arpilla", "weight_unit": "kg", "pricing_mode": "weight",
+             "active": True, "created_at": datetime.now(timezone.utc).isoformat()},
+            {"name": "Mandarina", "price_per_kg": 10.0, "price_per_unit": 0,
+             "unit_label": "caja", "weight_unit": "lb", "pricing_mode": "weight",
+             "active": True, "created_at": datetime.now(timezone.utc).isoformat()},
+            {"name": "Durazno", "price_per_kg": 15.0, "price_per_unit": 20.0,
+             "unit_label": "caja", "weight_unit": "kg", "pricing_mode": "both",
+             "active": True, "created_at": datetime.now(timezone.utc).isoformat()},
         ])
 
 
