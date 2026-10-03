@@ -77,11 +77,7 @@ export default function QrScanner({ onScan, active = true }) {
           </div>
         </div>
       </div>
-      {starting && (
-        <div className="flex items-center justify-center gap-2 text-sm text-[#556047] font-semibold">
-          <Loader2 className="w-4 h-4 animate-spin" /> Encendiendo cámara…
-        </div>
-      )}
+      {starting && null}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700 font-semibold flex items-start gap-2">
           <CameraOff className="w-4 h-4 flex-shrink-0 mt-0.5" />
@@ -91,7 +87,7 @@ export default function QrScanner({ onScan, active = true }) {
       {!starting && !error && (
         <div className="flex items-center justify-center gap-2 text-xs text-[#556047] font-semibold">
           <Camera className="w-4 h-4" />
-          {running ? "Enfoca el código QR del trabajador" : "Cámara detenida"}
+          {running ? "Enfoca el QR del trabajador" : "Cámara detenida"}
         </div>
       )}
     </div>

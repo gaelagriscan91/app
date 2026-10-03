@@ -155,11 +155,6 @@ export default function ScanHarvestMode() {
     }
     lastRef.current = { code: rawCode, at: now };
 
-    if (workers.length === 0) {
-      toast.info("Cargando trabajadores… espera un momento");
-      return;
-    }
-
     const extracted = extractCode(rawCode);
     const key = normalizeCode(extracted);
 
