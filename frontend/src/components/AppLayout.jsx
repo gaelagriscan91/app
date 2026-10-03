@@ -41,9 +41,21 @@ export default function AppLayout() {
           </div>
           <div className="flex items-center gap-2">
             <div className="hidden sm:block text-right">
-              <div className="text-sm font-semibold leading-tight" data-testid="header-user-name">{user?.name}</div>
+              <div className="text-sm font-semibold leading-tight flex items-center gap-1.5 justify-end" data-testid="header-user-name">
+                {user?.name}
+                {user?.role === "admin" && (
+                  <span className="bg-[#E89C3F] text-white px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider" data-testid="admin-badge">
+                    Admin
+                  </span>
+                )}
+              </div>
               <div className="text-[11px] text-emerald-200 leading-tight">{user?.email}</div>
             </div>
+            {user?.role === "admin" && (
+              <span className="sm:hidden bg-[#E89C3F] text-white px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider" data-testid="admin-badge-mobile">
+                Admin
+              </span>
+            )}
             <button
               onClick={handleLogout}
               className="h-10 px-3 rounded-lg bg-[#153417] hover:bg-[#0e2410] text-white text-sm font-semibold flex items-center gap-1.5 transition-colors border border-emerald-800"

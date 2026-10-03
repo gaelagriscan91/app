@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Lock, Mail, Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
@@ -118,12 +118,9 @@ export default function Login() {
               )}
             </button>
 
-            <div className="text-center text-sm text-[#556047] pt-2">
-              ¿No tienes cuenta?{" "}
-              <Link to="/register" className="text-[#1E4620] font-bold hover:underline" data-testid="link-register">
-                Crear cuenta
-              </Link>
-            </div>
+            <p className="text-center text-[11px] text-[#889078] pt-2 font-semibold">
+              ¿No tienes cuenta? Pide a tu administrador que te cree una.
+            </p>
           </form>
         </div>
 

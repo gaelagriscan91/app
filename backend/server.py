@@ -259,27 +259,54 @@ def today_iso():
 
 
 # ---------------------------------------------------------------------------
+# Multi-tenant scoping helpers
+# ---------------------------------------------------------------------------
+def is_admin(user: dict) -> bool:
+    return (user or {}).get("role") == "admin"
+
+
+def scope_filter(user: dict, field: str = "owner_id") -> dict:
+    """Admin sees everything; regular users only their own data."""
+    if is_admin(user):
+        return {}
+    return {field: user["_id"]}
+
+
+def owner_of(user: dict) -> str:
+    return user["_id"]
+
+
+def require_admin(user: dict):
+    if not is_admin(user):
+        raise HTTPException(status_code=403, detail="Solo administradores")
+
+
+class MayordomoCreate(BaseModel):
+    email: EmailStr
+    password: str
+    name: str
+    role: Optional[str] = "user"
+    active: bool = True
+
+
+class MayordomoUpdate(BaseModel):
+    name: Optional[str] = None
+    password: Optional[str] = None
+    role: Optional[str] = None
+    active: Optional[bool] = None
+
+
+# ---------------------------------------------------------------------------
 # Auth endpoints
 # ---------------------------------------------------------------------------
 @api_router.post("/auth/register")
 async def register(data: RegisterIn, response: Response):
-    email = data.email.lower().strip()
-    if await db.users.find_one({"email": email}):
-        raise HTTPException(status_code=400, detail="El correo ya está registrado")
-    doc = {
-        "email": email,
-        "password_hash": hash_password(data.password),
-        "name": data.name,
-        "role": "user",
-        "token_version": 0,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-    res = await db.users.insert_one(doc)
-    uid = str(res.inserted_id)
-    access = create_access_token(uid, email, 0)
-    refresh = create_refresh_token(uid, 0)
-    set_auth_cookies(response, access, refresh)
-    return {"id": uid, "email": email, "name": data.name, "role": "user"}
+    # Public registration is DISABLED. Only admins can create mayordomo accounts
+    # via POST /api/admin/mayordomos.
+    raise HTTPException(
+        status_code=403,
+        detail="El registro público está deshabilitado. Pide a tu administrador que te cree una cuenta.",
+    )
 
 
 @api_router.post("/auth/login")
@@ -313,7 +340,7 @@ async def me(user: CurrentUser):
 # ---------------------------------------------------------------------------
 @api_router.get("/workers")
 async def list_workers(user: CurrentUser):
-    rows = await db.workers.find({}).sort("name", 1).to_list(1000)
+    rows = await db.workers.find(scope_filter(user)).sort("name", 1).to_list(1000)
     return [doc_out(r) for r in rows]
 
 
@@ -325,6 +352,7 @@ def _gen_qr() -> str:
 async def create_worker(data: WorkerIn, user: CurrentUser):
     doc = data.model_dump()
     doc["qr_code"] = _gen_qr()
+    doc["owner_id"] = owner_of(user)
     doc["created_at"] = datetime.now(timezone.utc).isoformat()
     res = await db.workers.insert_one(doc)
     doc["_id"] = res.inserted_id
@@ -333,9 +361,11 @@ async def create_worker(data: WorkerIn, user: CurrentUser):
 
 @api_router.put("/workers/{wid}")
 async def update_worker(wid: str, data: WorkerIn, user: CurrentUser):
-    existing = await db.workers.find_one({"_id": ObjectId(wid)})
+    existing = await db.workers.find_one({"_id": ObjectId(wid), **scope_filter(user)})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Trabajador no encontrado")
     upd = data.model_dump()
-    if existing and not existing.get("qr_code"):
+    if not existing.get("qr_code"):
         upd["qr_code"] = _gen_qr()
     await db.workers.update_one({"_id": ObjectId(wid)}, {"$set": upd})
     row = await db.workers.find_one({"_id": ObjectId(wid)})
@@ -344,6 +374,9 @@ async def update_worker(wid: str, data: WorkerIn, user: CurrentUser):
 
 @api_router.post("/workers/{wid}/regenerate-qr")
 async def regenerate_qr(wid: str, user: CurrentUser):
+    existing = await db.workers.find_one({"_id": ObjectId(wid), **scope_filter(user)})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Trabajador no encontrado")
     new_qr = _gen_qr()
     await db.workers.update_one({"_id": ObjectId(wid)}, {"$set": {"qr_code": new_qr}})
     row = await db.workers.find_one({"_id": ObjectId(wid)})
@@ -375,13 +408,14 @@ async def _enrich_crew(c: dict) -> dict:
 
 @api_router.get("/crews")
 async def list_crews(user: CurrentUser):
-    rows = await db.crews.find({}).sort("name", 1).to_list(1000)
+    rows = await db.crews.find(scope_filter(user)).sort("name", 1).to_list(1000)
     return [await _enrich_crew(r) for r in rows]
 
 
 @api_router.post("/crews")
 async def create_crew(data: CrewIn, user: CurrentUser):
     doc = data.model_dump()
+    doc["owner_id"] = owner_of(user)
     doc["created_at"] = datetime.now(timezone.utc).isoformat()
     res = await db.crews.insert_one(doc)
     # Backlink crew_id onto workers for easy filtering
@@ -396,7 +430,7 @@ async def create_crew(data: CrewIn, user: CurrentUser):
 
 @api_router.put("/crews/{cid}")
 async def update_crew(cid: str, data: CrewIn, user: CurrentUser):
-    existing = await db.crews.find_one({"_id": ObjectId(cid)})
+    existing = await db.crews.find_one({"_id": ObjectId(cid), **scope_filter(user)})
     if not existing:
         raise HTTPException(status_code=404, detail="Cuadrilla no encontrada")
     old_workers = set(existing.get("worker_ids", []))
@@ -422,6 +456,9 @@ async def update_crew(cid: str, data: CrewIn, user: CurrentUser):
 
 @api_router.delete("/crews/{cid}")
 async def delete_crew(cid: str, user: CurrentUser):
+    existing = await db.crews.find_one({"_id": ObjectId(cid), **scope_filter(user)})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Cuadrilla no encontrada")
     await db.crews.delete_one({"_id": ObjectId(cid)})
     await db.workers.update_many({"crew_id": cid}, {"$set": {"crew_id": ""}})
     return {"ok": True}
@@ -429,6 +466,9 @@ async def delete_crew(cid: str, user: CurrentUser):
 
 @api_router.delete("/workers/{wid}")
 async def delete_worker(wid: str, user: CurrentUser):
+    existing = await db.workers.find_one({"_id": ObjectId(wid), **scope_filter(user)})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Trabajador no encontrado")
     await db.workers.delete_one({"_id": ObjectId(wid)})
     return {"ok": True}
 
@@ -438,13 +478,14 @@ async def delete_worker(wid: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 @api_router.get("/parcels")
 async def list_parcels(user: CurrentUser):
-    rows = await db.parcels.find({}).sort("name", 1).to_list(1000)
+    rows = await db.parcels.find(scope_filter(user)).sort("name", 1).to_list(1000)
     return [doc_out(r) for r in rows]
 
 
 @api_router.post("/parcels")
 async def create_parcel(data: ParcelIn, user: CurrentUser):
     doc = data.model_dump()
+    doc["owner_id"] = owner_of(user)
     doc["created_at"] = datetime.now(timezone.utc).isoformat()
     res = await db.parcels.insert_one(doc)
     doc["_id"] = res.inserted_id
@@ -453,6 +494,9 @@ async def create_parcel(data: ParcelIn, user: CurrentUser):
 
 @api_router.put("/parcels/{pid}")
 async def update_parcel(pid: str, data: ParcelIn, user: CurrentUser):
+    existing = await db.parcels.find_one({"_id": ObjectId(pid), **scope_filter(user)})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Rancho no encontrado")
     await db.parcels.update_one({"_id": ObjectId(pid)}, {"$set": data.model_dump()})
     row = await db.parcels.find_one({"_id": ObjectId(pid)})
     return doc_out(row)
@@ -460,6 +504,9 @@ async def update_parcel(pid: str, data: ParcelIn, user: CurrentUser):
 
 @api_router.delete("/parcels/{pid}")
 async def delete_parcel(pid: str, user: CurrentUser):
+    existing = await db.parcels.find_one({"_id": ObjectId(pid), **scope_filter(user)})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Rancho no encontrado")
     await db.parcels.delete_one({"_id": ObjectId(pid)})
     return {"ok": True}
 
@@ -469,13 +516,14 @@ async def delete_parcel(pid: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 @api_router.get("/products")
 async def list_products(user: CurrentUser):
-    rows = await db.products.find({}).sort("name", 1).to_list(1000)
+    rows = await db.products.find(scope_filter(user)).sort("name", 1).to_list(1000)
     return [doc_out(r) for r in rows]
 
 
 @api_router.post("/products")
 async def create_product(data: ProductIn, user: CurrentUser):
     doc = data.model_dump()
+    doc["owner_id"] = owner_of(user)
     doc["created_at"] = datetime.now(timezone.utc).isoformat()
     res = await db.products.insert_one(doc)
     doc["_id"] = res.inserted_id
@@ -484,6 +532,9 @@ async def create_product(data: ProductIn, user: CurrentUser):
 
 @api_router.put("/products/{pid}")
 async def update_product(pid: str, data: ProductIn, user: CurrentUser):
+    existing = await db.products.find_one({"_id": ObjectId(pid), **scope_filter(user)})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
     await db.products.update_one({"_id": ObjectId(pid)}, {"$set": data.model_dump()})
     row = await db.products.find_one({"_id": ObjectId(pid)})
     return doc_out(row)
@@ -491,6 +542,9 @@ async def update_product(pid: str, data: ProductIn, user: CurrentUser):
 
 @api_router.delete("/products/{pid}")
 async def delete_product(pid: str, user: CurrentUser):
+    existing = await db.products.find_one({"_id": ObjectId(pid), **scope_filter(user)})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
     await db.products.delete_one({"_id": ObjectId(pid)})
     return {"ok": True}
 
@@ -529,7 +583,7 @@ async def list_harvests(
     parcel_id: Optional[str] = None,
     product_id: Optional[str] = None,
 ):
-    q: dict = {}
+    q: dict = {**scope_filter(user)}
     if date_from or date_to:
         q["date"] = {}
         if date_from:
@@ -568,6 +622,7 @@ async def create_harvest(data: HarvestIn, user: CurrentUser):
         "photo_path": data.photo_path or "",
         "notes": data.notes or "",
         "created_by": user["_id"],
+        "owner_id": owner_of(user),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     res = await db.harvests.insert_one(doc)
@@ -577,6 +632,9 @@ async def create_harvest(data: HarvestIn, user: CurrentUser):
 
 @api_router.put("/harvests/{hid}")
 async def update_harvest(hid: str, data: HarvestIn, user: CurrentUser):
+    existing = await db.harvests.find_one({"_id": ObjectId(hid), **scope_filter(user)})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Cosecha no encontrada")
     prod = await db.products.find_one({"_id": ObjectId(data.product_id)})
     if not prod:
         raise HTTPException(status_code=400, detail="Producto no válido")
@@ -597,6 +655,9 @@ async def update_harvest(hid: str, data: HarvestIn, user: CurrentUser):
 
 @api_router.delete("/harvests/{hid}")
 async def delete_harvest(hid: str, user: CurrentUser):
+    existing = await db.harvests.find_one({"_id": ObjectId(hid), **scope_filter(user)})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Cosecha no encontrada")
     await db.harvests.delete_one({"_id": ObjectId(hid)})
     return {"ok": True}
 
@@ -607,7 +668,7 @@ async def delete_harvest(hid: str, user: CurrentUser):
 @api_router.get("/harvests/daily")
 async def daily_summary(user: CurrentUser, date: Optional[str] = None):
     d = date or today_iso()
-    rows = await db.harvests.find({"date": d}).to_list(2000)
+    rows = await db.harvests.find({"date": d, **scope_filter(user)}).to_list(2000)
     enriched = [await _enrich_harvest(r) for r in rows]
     total_kilos = sum(float(r.get("kilos", 0)) for r in enriched)
     total_units = sum(float(r.get("units", 0)) for r in enriched)
@@ -642,19 +703,19 @@ async def dashboard(user: CurrentUser):
     month_start = now.replace(day=1).isoformat()
     week_start = (now - timedelta(days=6)).isoformat()
 
-    month_rows = await db.harvests.find({"date": {"$gte": month_start}}).to_list(5000)
-    week_rows = await db.harvests.find({"date": {"$gte": week_start}}).to_list(5000)
-    today_rows = await db.harvests.find({"date": now.isoformat()}).to_list(5000)
+    month_rows = await db.harvests.find({"date": {"$gte": month_start}, **scope_filter(user)}).to_list(5000)
+    week_rows = await db.harvests.find({"date": {"$gte": week_start}, **scope_filter(user)}).to_list(5000)
+    today_rows = await db.harvests.find({"date": now.isoformat(), **scope_filter(user)}).to_list(5000)
 
     month_kilos = sum(float(r.get("kilos", 0)) for r in month_rows)
     month_payment = sum(float(r.get("payment", 0)) for r in month_rows)
     today_kilos = sum(float(r.get("kilos", 0)) for r in today_rows)
     today_payment = sum(float(r.get("payment", 0)) for r in today_rows)
 
-    workers_count = await db.workers.count_documents({"active": True})
-    parcels_count = await db.parcels.count_documents({"active": True})
+    workers_count = await db.workers.count_documents({"active": True, **scope_filter(user)})
+    parcels_count = await db.parcels.count_documents({"active": True, **scope_filter(user)})
     today = now.isoformat()
-    att_today = await db.attendance.find({"date": today}).to_list(1000)
+    att_today = await db.attendance.find({"date": today, **scope_filter(user)}).to_list(1000)
     present_now = sum(1 for r in att_today if r.get("check_in") and not r.get("check_out"))
     closed_today = sum(1 for r in att_today if r.get("check_in") and r.get("check_out"))
 
@@ -694,7 +755,7 @@ async def export_excel(
     parcel_id: Optional[str] = None,
     product_id: Optional[str] = None,
 ):
-    q: dict = {}
+    q: dict = {**scope_filter(user)}
     if date_from or date_to:
         q["date"] = {}
         if date_from:
@@ -767,7 +828,7 @@ async def receipts(
 ):
     """Returns per-worker summary combining attendance (hours) + harvests (payment)
     for a date range. Used to generate printable pay slips."""
-    workers_q = {}
+    workers_q = {**scope_filter(user)}
     if worker_id:
         try:
             workers_q["_id"] = ObjectId(worker_id)
@@ -778,10 +839,10 @@ async def receipts(
     workers = await db.workers.find(workers_q).sort("name", 1).to_list(1000)
 
     all_harvests = await db.harvests.find({
-        "date": {"$gte": date_from, "$lte": date_to}
+        "date": {"$gte": date_from, "$lte": date_to}, **scope_filter(user)
     }).to_list(5000)
     all_attendance = await db.attendance.find({
-        "date": {"$gte": date_from, "$lte": date_to}
+        "date": {"$gte": date_from, "$lte": date_to}, **scope_filter(user)
     }).to_list(5000)
 
     # Enrich harvests with product/parcel names
@@ -889,7 +950,7 @@ def _duration_hours(ci: Optional[str], co: Optional[str]) -> float:
         return 0.0
 
 
-async def _resolve_worker_by_code(code: str) -> Optional[dict]:
+async def _resolve_worker_by_code(code: str, user: Optional[dict] = None) -> Optional[dict]:
     raw = (code or "").strip()
     if not raw:
         return None
@@ -902,43 +963,48 @@ async def _resolve_worker_by_code(code: str) -> Optional[dict]:
     extracted = extracted.strip()
     upper = extracted.upper()
 
+    scope = scope_filter(user) if user else {}
+
     # Try qr_code field with case-insensitive match on normalized value
-    w = await db.workers.find_one({"qr_code": upper})
+    w = await db.workers.find_one({"qr_code": upper, **scope})
     if w:
         return w
     # Try original (in case qr_code is stored differently)
-    w = await db.workers.find_one({"qr_code": extracted})
+    w = await db.workers.find_one({"qr_code": extracted, **scope})
     if w:
         return w
     # Case-insensitive regex fallback on qr_code
-    w = await db.workers.find_one({"qr_code": {"$regex": f"^{re.escape(extracted)}$", "$options": "i"}})
+    w = await db.workers.find_one({"qr_code": {"$regex": f"^{re.escape(extracted)}$", "$options": "i"}, **scope})
     if w:
         return w
     # Fallback: treat as ObjectId
     try:
-        w = await db.workers.find_one({"_id": ObjectId(extracted)})
+        w = await db.workers.find_one({"_id": ObjectId(extracted), **scope})
         if w:
             return w
     except Exception:
         pass
     # Last fallback: document_id or name exact match (case-insensitive)
-    return await db.workers.find_one({"$or": [
-        {"document_id": extracted},
-        {"document_id": {"$regex": f"^{re.escape(extracted)}$", "$options": "i"}},
-        {"name": extracted},
+    return await db.workers.find_one({"$and": [
+        scope or {},
+        {"$or": [
+            {"document_id": extracted},
+            {"document_id": {"$regex": f"^{re.escape(extracted)}$", "$options": "i"}},
+            {"name": extracted},
+        ]},
     ]})
 
 
 @api_router.post("/attendance/scan")
 async def attendance_scan(data: AttendanceScanIn, user: CurrentUser):
     date = data.date or today_iso()
-    worker = await _resolve_worker_by_code(data.code)
+    worker = await _resolve_worker_by_code(data.code, user)
     if not worker:
         raise HTTPException(status_code=404, detail="Trabajador no encontrado para ese código")
 
     wid = str(worker["_id"])
     now_iso = datetime.now(timezone.utc).isoformat()
-    row = await db.attendance.find_one({"worker_id": wid, "date": date})
+    row = await db.attendance.find_one({"worker_id": wid, "date": date, **scope_filter(user)})
     action = ""
 
     if not row:
@@ -949,6 +1015,7 @@ async def attendance_scan(data: AttendanceScanIn, user: CurrentUser):
             "check_in": now_iso,
             "check_out": None,
             "created_by": user["_id"],
+            "owner_id": owner_of(user),
         }
         res = await db.attendance.insert_one(doc)
         doc["_id"] = res.inserted_id
@@ -976,7 +1043,7 @@ async def attendance_scan(data: AttendanceScanIn, user: CurrentUser):
 @api_router.get("/attendance")
 async def list_attendance(user: CurrentUser, date: Optional[str] = None):
     d = date or today_iso()
-    rows = await db.attendance.find({"date": d}).to_list(2000)
+    rows = await db.attendance.find({"date": d, **scope_filter(user)}).to_list(2000)
     out = []
     for r in rows:
         o = doc_out(r)
@@ -1001,7 +1068,90 @@ async def list_attendance(user: CurrentUser, date: Optional[str] = None):
 
 @api_router.delete("/attendance/{aid}")
 async def delete_attendance(aid: str, user: CurrentUser):
+    existing = await db.attendance.find_one({"_id": ObjectId(aid), **scope_filter(user)})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Registro no encontrado")
     await db.attendance.delete_one({"_id": ObjectId(aid)})
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Admin: Mayordomos management (admin-only)
+# ---------------------------------------------------------------------------
+@api_router.get("/admin/mayordomos")
+async def admin_list_mayordomos(user: CurrentUser):
+    require_admin(user)
+    rows = await db.users.find({}).sort("created_at", -1).to_list(1000)
+    out = []
+    for r in rows:
+        r.pop("password_hash", None)
+        d = doc_out(r)
+        d["workers_count"] = await db.workers.count_documents({"owner_id": d["id"]})
+        d["parcels_count"] = await db.parcels.count_documents({"owner_id": d["id"]})
+        d["harvests_count"] = await db.harvests.count_documents({"owner_id": d["id"]})
+        out.append(d)
+    return out
+
+
+@api_router.post("/admin/mayordomos")
+async def admin_create_mayordomo(data: MayordomoCreate, user: CurrentUser):
+    require_admin(user)
+    email = data.email.lower().strip()
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(status_code=400, detail="El correo ya está registrado")
+    doc = {
+        "email": email,
+        "password_hash": hash_password(data.password),
+        "name": data.name,
+        "role": data.role or "user",
+        "active": data.active,
+        "token_version": 0,
+        "created_by": user["_id"],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    res = await db.users.insert_one(doc)
+    doc["_id"] = res.inserted_id
+    doc.pop("password_hash", None)
+    return doc_out(doc)
+
+
+@api_router.patch("/admin/mayordomos/{uid}")
+async def admin_update_mayordomo(uid: str, data: MayordomoUpdate, user: CurrentUser):
+    require_admin(user)
+    existing = await db.users.find_one({"_id": ObjectId(uid)})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    upd: dict = {}
+    if data.name is not None:
+        upd["name"] = data.name
+    if data.role is not None:
+        upd["role"] = data.role
+    if data.active is not None:
+        upd["active"] = data.active
+    if data.password:
+        upd["password_hash"] = hash_password(data.password)
+        upd["token_version"] = (existing.get("token_version", 0) or 0) + 1
+    if not upd:
+        raise HTTPException(status_code=400, detail="Nada que actualizar")
+    await db.users.update_one({"_id": ObjectId(uid)}, {"$set": upd})
+    row = await db.users.find_one({"_id": ObjectId(uid)})
+    row.pop("password_hash", None)
+    return doc_out(row)
+
+
+@api_router.delete("/admin/mayordomos/{uid}")
+async def admin_delete_mayordomo(uid: str, user: CurrentUser):
+    require_admin(user)
+    if str(uid) == str(user["_id"]):
+        raise HTTPException(status_code=400, detail="No puedes eliminar tu propia cuenta")
+    existing = await db.users.find_one({"_id": ObjectId(uid)})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    # Transfer orphan data to admin so nothing gets lost
+    aid = str(user["_id"])
+    for coll in ["workers", "parcels", "products", "harvests", "attendance", "crews"]:
+        await db[coll].update_many({"owner_id": uid}, {"$set": {"owner_id": aid}})
+    await db.users.delete_one({"_id": ObjectId(uid)})
     return {"ok": True}
 
 
@@ -1128,6 +1278,19 @@ async def backfill_worker_qr():
         await db.workers.update_one({"_id": w["_id"]}, {"$set": {"qr_code": _gen_qr()}})
 
 
+async def backfill_owner_id():
+    """Assign all pre-existing records without owner_id to the first admin."""
+    admin = await db.users.find_one({"role": "admin"})
+    if not admin:
+        return
+    aid = str(admin["_id"])
+    for coll in ["workers", "parcels", "products", "harvests", "attendance", "crews"]:
+        await db[coll].update_many(
+            {"$or": [{"owner_id": {"$exists": False}}, {"owner_id": None}, {"owner_id": ""}]},
+            {"$set": {"owner_id": aid}},
+        )
+
+
 @app.on_event("startup")
 async def startup_event():
     await db.users.create_index("email", unique=True)
@@ -1136,6 +1299,7 @@ async def startup_event():
     await seed_admin()
     await seed_demo()
     await backfill_worker_qr()
+    await backfill_owner_id()
     try:
         init_storage()
         logger.info("Object storage inicializado")

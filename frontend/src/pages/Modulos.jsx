@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { Users, Map, Package, UserCog } from "lucide-react";
+import { Users, Map, Package, UserCog, Shield } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 import WorkersTab from "@/components/modules/WorkersTab";
 import ParcelsTab from "@/components/modules/ParcelsTab";
 import ProductsTab from "@/components/modules/ProductsTab";
 import CrewsTab from "@/components/modules/CrewsTab";
+import MayordomosTab from "@/components/modules/MayordomosTab";
 
-const tabs = [
+const baseTabs = [
   { id: "workers", label: "Trabajadores", Icon: Users, testid: "tab-workers" },
   { id: "crews", label: "Cuadrillas", Icon: UserCog, testid: "tab-crews" },
   { id: "parcels", label: "Parcelas", Icon: Map, testid: "tab-parcels" },
@@ -13,6 +15,11 @@ const tabs = [
 ];
 
 export default function Modulos() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+  const tabs = isAdmin
+    ? [...baseTabs, { id: "mayordomos", label: "Mayordomos", Icon: Shield, testid: "tab-mayordomos" }]
+    : baseTabs;
   const [tab, setTab] = useState("workers");
   return (
     <div className="space-y-5" data-testid="modulos-page">
@@ -20,7 +27,9 @@ export default function Modulos() {
         <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1A2210] tracking-tight" style={{ fontFamily: "Outfit, sans-serif" }}>
           Módulos
         </h1>
-        <p className="text-sm text-[#556047] font-semibold">Trabajadores, parcelas y productos</p>
+        <p className="text-sm text-[#556047] font-semibold">
+          Trabajadores, parcelas y productos{isAdmin ? " · Gestión de mayordomos" : ""}
+        </p>
       </div>
 
       <div className="field-card p-1.5 flex gap-1.5 overflow-x-auto">
@@ -45,6 +54,7 @@ export default function Modulos() {
       {tab === "crews" && <CrewsTab />}
       {tab === "parcels" && <ParcelsTab />}
       {tab === "products" && <ProductsTab />}
+      {tab === "mayordomos" && isAdmin && <MayordomosTab />}
     </div>
   );
 }
