@@ -383,6 +383,20 @@ async def regenerate_qr(wid: str, user: CurrentUser):
     return doc_out(row)
 
 
+class ResolveQRIn(BaseModel):
+    code: str
+
+
+@api_router.post("/workers/resolve")
+async def resolve_worker_qr(data: ResolveQRIn, user: CurrentUser):
+    """Resolve a scanned QR to a worker, scoped to the current user.
+    Uses the SAME lookup as /attendance/scan so Check-in and Picking behave identically."""
+    worker = await _resolve_worker_by_code(data.code, user)
+    if not worker:
+        raise HTTPException(status_code=404, detail="QR no reconocido")
+    return doc_out(worker)
+
+
 # ---------------------------------------------------------------------------
 # Crews (Cuadrillas)
 # ---------------------------------------------------------------------------

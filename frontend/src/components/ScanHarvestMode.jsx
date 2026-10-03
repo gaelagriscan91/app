@@ -148,7 +148,7 @@ export default function ScanHarvestMode() {
     });
   };
 
-  const handleScan = (rawCode) => {
+  const handleScan = async (rawCode) => {
     const now = Date.now();
     if (lastRef.current.code === rawCode && now - lastRef.current.at < 1500) {
       return; // debounce duplicates
@@ -160,11 +160,25 @@ export default function ScanHarvestMode() {
 
     // Mode: scan workers (each scan = +1 unit for that worker)
     if (scanMode === "worker") {
-      const w = workersByQr[key];
+      let w = workersByQr[key];
+      // Fallback: ask backend (same engine used by Check-in attendance/scan)
       if (!w) {
-        const shown = (extracted || rawCode || "").toString().slice(0, 24);
-        toast.error(`QR no reconocido: "${shown}"`);
-        return;
+        try {
+          const { data } = await api.post("/workers/resolve", { code: rawCode });
+          w = data;
+          // Add to local list so subsequent scans are instant
+          setWorkers((prev) => prev.some((x) => x.id === data.id) ? prev : [...prev, data]);
+        } catch (_) {
+          const shown = (extracted || rawCode || "").toString().slice(0, 24);
+          toast.error(
+            `QR "${shown}" no está registrado. Imprime el QR actual del trabajador desde Módulos → Trabajadores.`,
+            {
+              duration: 6000,
+              action: { label: "Ver trabajadores", onClick: () => navigate("/modulos") },
+            }
+          );
+          return;
+        }
       }
       setTally((prev) => {
         const cur = prev[w.id] || { name: w.name, count: 0, pieces: [] };
@@ -178,7 +192,14 @@ export default function ScanHarvestMode() {
     // Mode: scan pieces (worker must be selected first; each scan is a piece ID)
     if (!activeWorkerId) {
       // If no active worker yet, try to interpret this scan as a worker to activate
-      const w = workersByQr[key];
+      let w = workersByQr[key];
+      if (!w) {
+        try {
+          const { data } = await api.post("/workers/resolve", { code: rawCode });
+          w = data;
+          setWorkers((prev) => prev.some((x) => x.id === data.id) ? prev : [...prev, data]);
+        } catch (_) {}
+      }
       if (w) {
         setActiveWorkerId(w.id);
         toast.success(`Trabajador activo: ${w.name}`, { duration: 1500 });
