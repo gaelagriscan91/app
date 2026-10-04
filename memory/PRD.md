@@ -1,59 +1,33 @@
 # AgriScan — PRD
 
-## Problem Statement
-Crea una app web para rastrear cosecha agrícola tipo PickTrace llamada "agri scan".
-Funciones: Registrar cosecha (Trabajador, Parcela, Producto, Kilos, Fecha, Foto, pago automático), Lista del día con totales, Reportes filtrables con export a Excel, Módulos CRUD (Trabajadores, Parcelas, Cosechas). Diseño simple, botones grandes, español, mobile-friendly.
+## Original problem statement
+Agricultural harvest tracking web app (PickTrace-style). Register harvest (Worker, Parcel, Product, Kilos, Date, Photo), auto-calc pay by price/kilo or price/unit, daily list with totals, Excel export, modules for Workers / Parcels / Harvests, offline/online sync, thermal printer. Spanish UI.
 
-## Architecture
-- **Backend**: FastAPI + MongoDB + bcrypt + PyJWT, openpyxl para Excel, Object Storage (emergentintegrations proxy) para fotos
-- **Frontend**: React 19 + React Router + TailwindCSS + Shadcn UI + Recharts + Sonner (toast) + Lucide icons
-- **Auth**: JWT básico con httpOnly cookies (access 24h, refresh 7d), SameSite=none Secure
+## Core architecture
+- React + Tailwind + Shadcn UI (frontend)
+- FastAPI + Motor + MongoDB (backend, multi-tenant via `owner_id` scope)
+- JWT auth; Admin creates Mayordomo sub-accounts
+- HTML5-QRCode for camera scanning; Web Bluetooth ESC/POS thermal printing
 
-## User Personas
-- **Supervisor/Administrador de campo** (desktop + móvil): da de alta trabajadores, parcelas y productos; revisa reportes; exporta a Excel.
-- **Capataz/Operador en campo** (móvil): registra cosechas durante el día; captura fotos; revisa totales del día.
+## Implemented
+- [2026-02] Hub PickTrace (Check In / Picking / Check Out)
+- [2026-02] Pre-session modal (Rancho / Mayordomo / Trabajo)
+- [2026-02] Picking modes: Por Pieza, Por Hora, Compartir pieza
+- [2026-02] QR anti-fraud cooldown + beep + camera auto-pause + scan history
+- [2026-02] Multi-tenancy (Admin oversees all, Mayordomos isolated)
+- [2026-02] Product price lock + override
+- [2026-02] End-Day modal (summary + session reset)
+- [2026-10-04] **Minimalist Cosechar screen**: Both Manual and Escanear tabs now only show Price + Scan/Manual + Save. Parcel/Product/Date resolved automatically (session → first available → auto-create "Rancho General" + "Cosecha"). Removed setup form, pay-mode toggle, share toggle, scan-mode toggle, photo + notes.
 
-## Core Requirements
-- 3 módulos CRUD: Trabajadores, Parcelas, Productos (con precio por kg Y por unidad)
-- Registro de cosechas con cálculo automático: `payment = kilos × $/Kg + unidades × $/unidad`
-- Vista "Día" con totales por trabajador y detalle de cosechas
-- Reportes con filtros: fecha_desde, fecha_hasta, trabajador, parcela, producto
-- Exportación a Excel (.xlsx) con totales
-- Mobile-first, botones ≥ 48px, todo en español
+## Backlog (P1/P2)
+- P1 — Export por trabajador (Nómina)
+- P2 — Generación de QR por pieza/canasta
+- P2 — Modo Revisión (bloqueo de jornadas auditadas)
+- P3 — Refactor backend/server.py (>1200 líneas → routers)
+- P3 — Refactor ScanHarvestMode (ya reducido con última simplificación)
 
-## Implemented (2026-02-11)
-- **Scanner UX mejorado (NUEVO)**:
-  - 🔔 Beep audible en cada escaneo exitoso (Web Audio API, 1200Hz 150ms, sin assets externos)
-  - 📷 Cámara en **modo pantalla completa** cuando se abre (overlay black con esquinas doradas)
-  - 🚪 Cámara **se cierra automáticamente** después de cada escaneo exitoso
-  - 🕐 **Historial de escaneos** debajo de la cosecha: nombre del trabajador + hora precisa + ícono (🧺 pieza / 👥 compartida). Limpiar historial con un botón.
-- **Anti-fraude cooldown de 2 min**: Cada código solo se puede escanear 1 vez cada 2 minutos.
-- **Pieza compartida**: Toggle + buffer + confirmar divide 1/N piezas.
-- **Precio editable**: El precio del producto se actualiza con cada guardado — se recuerda pero NO queda bloqueado.
-- **Multi-tenant por Mayordomo**:
-  - Admin ve todos los datos. Mayordomos ven solo lo suyo (`owner_id` scope).
-  - Registro público DESHABILITADO (403). Admin gestiona accesos en Módulos → Mayordomos.
-  - Backend `_resolve_worker_by_code` + `/workers/resolve` + `/attendance/scan` todos scope-aware.
+## Known fragile points
+- `AudioContext` beep may not play on iOS Safari without initial user tap (frontend only).
 
-## Implemented (2026-10-03)
-- JWT auth: register, login, logout, me (admin seed: gaelmartin158@gmail.com / agriscan2026)
-- CRUD completo /api/workers, /api/parcels, /api/products
-- /api/harvests con cálculo automático y precios snapshot/override
-- /api/harvests/daily (totales + resumen por trabajador)
-- /api/harvests/export → .xlsx con openpyxl
-- /api/dashboard (hoy, mes, equipo, gráfica semanal)
-- /api/upload + /api/files/{path} con object storage proxy
-- Frontend completo: Login, Register, Dashboard, Registrar, Lista del Día, Reportes, Módulos (3 tabs)
-- Seed demo: 3 trabajadores, 3 parcelas, 3 productos
-- Barra de navegación inferior fija (mobile-first)
-- Testing agent: 17/17 pytest backend ✅
-
-## Backlog (prioridad)
-- **P1 — Edición in-line de cosechas** (hoy solo DELETE desde Día; editar sólo via API)
-- **P1 — Visualización de fotos** en Lista del Día (hoy sólo se suben)
-- **P2 — Password reset flow** (forgot-password + reset-password endpoints + emails)
-- **P2 — Roles/permisos** (admin vs capataz) — hoy cualquier usuario autenticado puede modificar todo
-- **P2 — Dashboard: top parcelas, top trabajadores, promedio $/Kg**
-- **P3 — PWA / offline mode** para captura sin internet en campo
-- **P3 — Firma digital del trabajador** al cerrar el día
-- **P3 — Export por trabajador individual** (nómina)
+## Test credentials
+See `/app/memory/test_credentials.md`.
