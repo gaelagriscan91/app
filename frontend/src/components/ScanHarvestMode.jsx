@@ -266,6 +266,21 @@ export default function ScanHarvestMode() {
     return { name: row.name, count: row.count, payment };
   }, [lastWorker, tally, pricePerUnit]);
 
+  // Aggregate scanLog per worker (full day, saved + unsaved)
+  const scanLogByWorker = useMemo(() => {
+    const agg = {}; // id -> {name, count}
+    for (const e of scanLog) {
+      const key = e.workerId || e.name;
+      if (!agg[key]) agg[key] = { name: e.name, count: 0 };
+      agg[key].count += 1;
+    }
+    const price = parseFloat(pricePerUnit) || 0;
+    return Object.entries(agg)
+      .map(([id, v]) => ({ id, name: v.name, count: v.count, payment: v.count * price }))
+      .sort((a, b) => b.count - a.count);
+  }, [scanLog, pricePerUnit]);
+  const totalScanned = scanLog.length;
+
   const save = async () => {
     const entries = Object.entries(tally);
     if (entries.length === 0) {
@@ -589,53 +604,63 @@ export default function ScanHarvestMode() {
                 }`}
                 data-testid="scan-tab-conteo"
               >
-                Conteo ({totals.workers})
+                Conteo ({totalScanned})
               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 pb-3">
               {listTab === "conteo" ? (
-                Object.keys(tally).length === 0 ? (
-                  <p className="text-sm text-[#556047] font-semibold py-6 text-center">
-                    Aún no hay escaneos sin guardar.
+                scanLogByWorker.length === 0 ? (
+                  <p className="text-sm text-[#556047] font-semibold py-6 text-center" data-testid="scan-conteo-empty">
+                    Aún no hay piezas escaneadas hoy.
                   </p>
                 ) : (
-                  <div className="divide-y divide-[#E2DDD0]">
-                    {Object.entries(tally)
-                      .sort((a, b) => b[1].count - a[1].count)
-                      .map(([wid, v]) => {
-                        const payment = v.count * (parseFloat(pricePerUnit) || 0);
+                  <>
+                    <div className="text-[11px] text-[#556047] font-semibold py-2 flex items-center justify-between">
+                      <span>Total hoy: <b className="text-[#1A2210] font-mono-stat">{totalScanned}</b> piezas</span>
+                      <span>Mayor arriba</span>
+                    </div>
+                    <div className="divide-y divide-[#E2DDD0]">
+                      {scanLogByWorker.map((r) => {
+                        const pendingRow = tally[r.id];
                         return (
-                          <div key={wid} className="py-3 flex items-center justify-between gap-3" data-testid={`scan-tally-row-${wid}`}>
+                          <div key={r.id} className="py-3 flex items-center justify-between gap-3" data-testid={`scan-tally-row-${r.id}`}>
                             <div className="min-w-0 flex-1">
-                              <div className="font-bold text-[#1A2210] truncate">{v.name}</div>
+                              <div className="font-bold text-[#1A2210] truncate flex items-center gap-1.5">
+                                {r.name}
+                                {pendingRow && (
+                                  <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#E65100]/15 text-[#E65100]">
+                                    {formatNumber(pendingRow.count, pendingRow.count % 1 === 0 ? 0 : 2)} sin guardar
+                                  </span>
+                                )}
+                              </div>
                               <div className="text-xs text-[#556047] font-semibold">
-                                {formatNumber(v.count, v.count % 1 === 0 ? 0 : 2)} • <span className="text-[#15803D] font-bold">{formatCurrency(payment)}</span>
+                                {formatNumber(r.count, 0)} pieza{r.count !== 1 ? "s" : ""} • <span className="text-[#15803D] font-bold">{formatCurrency(r.payment)}</span>
                               </div>
                             </div>
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => bump(wid, -1)}
-                                className="w-9 h-9 rounded-xl bg-white border-2 border-[#E2DDD0] hover:bg-red-50 hover:border-red-200 text-red-600 flex items-center justify-center"
-                                data-testid={`scan-dec-${wid}`}
-                              >
-                                <Minus className="w-4 h-4" />
-                              </button>
-                              <div className="font-mono-stat text-lg text-[#1A2210] w-10 text-center">
-                                {v.count % 1 === 0 ? v.count : v.count.toFixed(2)}
+                            {pendingRow && (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => bump(r.id, -1)}
+                                  className="w-9 h-9 rounded-xl bg-white border-2 border-[#E2DDD0] hover:bg-red-50 hover:border-red-200 text-red-600 flex items-center justify-center"
+                                  data-testid={`scan-dec-${r.id}`}
+                                >
+                                  <Minus className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => bump(r.id, 1)}
+                                  className="w-9 h-9 rounded-xl bg-[#1E4620] hover:bg-[#153417] text-white flex items-center justify-center"
+                                  data-testid={`scan-inc-${r.id}`}
+                                >
+                                  <Plus className="w-4 h-4" />
+                                </button>
                               </div>
-                              <button
-                                onClick={() => bump(wid, 1)}
-                                className="w-9 h-9 rounded-xl bg-[#1E4620] hover:bg-[#153417] text-white flex items-center justify-center"
-                                data-testid={`scan-inc-${wid}`}
-                              >
-                                <Plus className="w-4 h-4" />
-                              </button>
-                            </div>
+                            )}
                           </div>
                         );
                       })}
-                  </div>
+                    </div>
+                  </>
                 )
               ) : (
                 /* REGISTRO TAB */
