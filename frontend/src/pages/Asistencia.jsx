@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import api, { formatApiErrorDetail, todayISO } from "@/lib/api";
+import api, { formatApiErrorDetail, formatCurrency, formatNumber, todayISO } from "@/lib/api";
 import QrScanner from "@/components/QrScanner";
 import QuickAddWorker from "@/components/QuickAddWorker";
 
@@ -197,6 +197,57 @@ export default function Asistencia() {
     setConfirmCheckout(true);
   };
 
+  // ============== End-of-day summary + reset ==============
+  const [endDayOpen, setEndDayOpen] = useState(false);
+  const [endDaySummary, setEndDaySummary] = useState(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [closingDay, setClosingDay] = useState(false);
+
+  const openEndDay = async () => {
+    setLoadingSummary(true);
+    setEndDayOpen(true);
+    try {
+      const [daily, att] = await Promise.all([
+        api.get("/harvests/daily", { params: { date } }),
+        api.get("/attendance", { params: { date } }),
+      ]);
+      const h = daily.data || {};
+      const a = att.data || {};
+      setEndDaySummary({
+        harvests: h.harvest_count || h.harvests_count || h.total_harvests || (h.rows || []).length || 0,
+        workers: h.worker_count || h.workers_count || new Set((h.rows || []).map((r) => r.worker_id)).size || 0,
+        kilos: h.total_kilos || 0,
+        units: h.total_units || 0,
+        payment: h.total_payment || h.payment_total || 0,
+        attendance: a.rows?.length || 0,
+        total_hours: a.total_hours || 0,
+      });
+    } catch (_) {
+      setEndDaySummary({ harvests: 0, workers: 0, payment: 0, attendance: 0, total_hours: 0 });
+    } finally {
+      setLoadingSummary(false);
+    }
+  };
+
+  const confirmEndDay = async () => {
+    setClosingDay(true);
+    try {
+      // Close any still-open attendance in bulk
+      const openRows = data.rows.filter((r) => !r.check_out_hhmm);
+      for (const r of openRows) {
+        try { await api.post("/attendance/scan", { code: r.worker_id, date }); } catch (_) {}
+      }
+      // Clear active session so next day starts fresh (session is per-date in localStorage)
+      try { localStorage.removeItem(SESSION_KEY(date)); } catch (_) {}
+      setSession({ parcelId: "", crewId: "", productId: "", mayordomo: "" });
+      toast.success("✅ Día cerrado. Los registros quedaron guardados. Mañana empiezas fresco.");
+      setEndDayOpen(false);
+      await load();
+    } finally {
+      setClosingDay(false);
+    }
+  };
+
   // ============== VIEWS ==============
   if (view === "summary") return (
     <SummaryView
@@ -327,6 +378,15 @@ export default function Asistencia() {
             badge={openCount > 0 ? openCount : null}
           />
         </div>
+
+        {/* End of day */}
+        <button
+          onClick={openEndDay}
+          className="mt-4 w-full h-12 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/20 text-white font-bold text-sm flex items-center justify-center gap-2"
+          data-testid="end-day-button"
+        >
+          🏁 Finalizar día · ver resumen y reiniciar
+        </button>
       </div>
 
       {/* White lower panel */}
@@ -384,6 +444,57 @@ export default function Asistencia() {
           </div>
         )}
       </div>
+
+      {/* End-of-day modal */}
+      {endDayOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => !closingDay && setEndDayOpen(false)}>
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl p-6 w-full sm:max-w-md shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()} data-testid="end-day-modal">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-[#1E4620]/10 text-[#1E4620] flex items-center justify-center text-2xl">🏁</div>
+            <h3 className="font-extrabold text-xl text-center mt-3" style={{ fontFamily: "Outfit, sans-serif" }}>Resumen del día</h3>
+            <p className="text-center text-sm text-[#556047] font-semibold mt-1">{prettyDate}</p>
+
+            {loadingSummary || !endDaySummary ? (
+              <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-[#1E4620]" /></div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-2 mt-4">
+                  <SummaryCell label="Trabajadores" value={endDaySummary.attendance} />
+                  <SummaryCell label="Cosechas" value={endDaySummary.harvests} />
+                  <SummaryCell label="Piezas" value={formatNumber(endDaySummary.units, 0)} />
+                  <SummaryCell label="Horas" value={formatNumber(endDaySummary.total_hours, 2)} />
+                </div>
+                <div className="mt-3 rounded-2xl bg-[#E65100] text-white p-4 flex items-center justify-between">
+                  <div className="text-sm font-bold">Pago total del día</div>
+                  <div className="font-mono-stat text-2xl">{formatCurrency(endDaySummary.payment)}</div>
+                </div>
+                <div className="mt-3 text-xs text-[#556047] font-semibold bg-[#F7F5EE] rounded-xl p-3">
+                  ✅ Todos los registros ya están guardados.<br />
+                  Al confirmar, se cerrarán las jornadas abiertas y se limpiará la sesión para que mañana empieces fresco con un nuevo Rancho/Mayordomo.
+                </div>
+              </>
+            )}
+
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setEndDayOpen(false)}
+                disabled={closingDay}
+                className="h-12 rounded-xl bg-white border-2 border-[#E2DDD0] text-[#556047] font-bold"
+                data-testid="end-day-cancel"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmEndDay}
+                disabled={closingDay || loadingSummary}
+                className="h-12 rounded-xl bg-[#1E4620] hover:bg-[#153417] text-white font-bold flex items-center justify-center gap-2 disabled:opacity-60"
+                data-testid="end-day-confirm"
+              >
+                {closingDay ? <Loader2 className="w-5 h-5 animate-spin" /> : <>🏁 Cerrar día</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Session modal */}
       {sessionModalOpen && (
@@ -467,6 +578,15 @@ function MiniStat({ label, value, color }) {
     <div className="bg-white rounded-xl border border-[#E2DDD0] px-3 py-2">
       <div className="text-[10px] font-bold uppercase tracking-wider text-[#889078]">{label}</div>
       <div className="font-mono-stat text-xl" style={{ color }}>{value}</div>
+    </div>
+  );
+}
+
+function SummaryCell({ label, value }) {
+  return (
+    <div className="bg-[#F7F5EE] border border-[#E2DDD0] rounded-xl px-3 py-2 text-center">
+      <div className="text-[10px] font-bold uppercase tracking-wider text-[#889078]">{label}</div>
+      <div className="font-mono-stat text-xl text-[#1A2210]">{value}</div>
     </div>
   );
 }
