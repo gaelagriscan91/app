@@ -15,9 +15,18 @@ export default function RegistrarCosecha() {
   const [parcels, setParcels] = useState([]);
   const [products, setProducts] = useState([]);
 
+  // Active session from Hub (localStorage, by date)
+  const todayKey = todayISO();
+  const session = (() => {
+    try { return JSON.parse(localStorage.getItem(`agriscan.session.${todayKey}`) || "{}"); }
+    catch { return {}; }
+  })();
+  const hasSession = Boolean(session.parcelId && session.productId);
+
+  const [workerName, setWorkerName] = useState("");
   const [workerId, setWorkerId] = useState("");
-  const [parcelId, setParcelId] = useState("");
-  const [productId, setProductId] = useState("");
+  const [parcelId, setParcelId] = useState(session.parcelId || "");
+  const [productId, setProductId] = useState(session.productId || "");
   const [kilos, setKilos] = useState("");
   const [units, setUnits] = useState("");
   const [pricePerKg, setPricePerKg] = useState("");
@@ -91,8 +100,31 @@ export default function RegistrarCosecha() {
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    if (!workerId || !parcelId || !productId) {
-      toast.error("Selecciona trabajador, parcela y producto");
+    // Resolve worker by typed name (or by selected id)
+    let wid = workerId;
+    if (!wid && workerName.trim()) {
+      const typed = workerName.trim().toLowerCase();
+      const found = workers.find((w) => w.name?.toLowerCase() === typed);
+      if (found) {
+        wid = found.id;
+      } else {
+        // Auto-create worker with this name
+        try {
+          const { data } = await api.post("/workers", { name: workerName.trim(), role: "Cosechador" });
+          wid = data.id;
+          setWorkers((prev) => [...prev, data]);
+        } catch (err) {
+          toast.error("No se pudo crear el trabajador");
+          return;
+        }
+      }
+    }
+    if (!wid) {
+      toast.error("Escribe o selecciona un trabajador");
+      return;
+    }
+    if (!parcelId || !productId) {
+      toast.error("Falta la sesión (rancho/producto). Vuelve a Check-in.");
       return;
     }
     if ((parseFloat(kilos) || 0) <= 0 && (parseFloat(units) || 0) <= 0) {
@@ -113,7 +145,7 @@ export default function RegistrarCosecha() {
         setUploading(false);
       }
       await api.post("/harvests", {
-        worker_id: workerId,
+        worker_id: wid,
         parcel_id: parcelId,
         product_id: productId,
         kilos: parseFloat(kilos) || 0,
@@ -173,35 +205,45 @@ export default function RegistrarCosecha() {
 
       {mode === "qr" ? <ScanHarvestMode /> : (
       <form onSubmit={onSubmit} className="space-y-5">
+        {hasSession && (
+          <div className="rounded-2xl bg-[#1E2746] text-white p-4" data-testid="manual-session-banner">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-white/60">Jornada activa (desde Check in)</div>
+            <div className="font-bold truncate mt-0.5">
+              {parcels.find((p) => p.id === parcelId)?.name || "—"} • {products.find((p) => p.id === productId)?.name || "—"}
+            </div>
+          </div>
+        )}
+
         <div className="field-card p-4 sm:p-5 space-y-4">
           <div>
             <label className="block text-sm font-bold text-[#1A2210] mb-1.5">Trabajador</label>
-            <div className="flex gap-2">
-              <select
-                value={workerId}
-                onChange={(e) => setWorkerId(e.target.value)}
-                className="field-input flex-1"
-                required
-                data-testid="worker-select"
-              >
-                <option value="">— Seleccionar —</option>
-                {workers.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => setQuickAddOpen(true)}
-                className="h-14 w-14 bg-[#1E4620] hover:bg-[#153417] text-white rounded-xl flex items-center justify-center shadow-sm"
-                title="Agregar nuevo trabajador"
-                data-testid="quick-add-worker-button"
-              >
-                <UserPlus className="w-5 h-5" />
-              </button>
-            </div>
+            <input
+              type="text"
+              value={workerName}
+              onChange={(e) => {
+                setWorkerName(e.target.value);
+                const found = workers.find((w) => w.name?.toLowerCase() === e.target.value.trim().toLowerCase());
+                setWorkerId(found?.id || "");
+              }}
+              list="worker-name-suggestions"
+              placeholder="Escribe el nombre del trabajador"
+              className="field-input w-full"
+              autoComplete="off"
+              required
+              data-testid="worker-name-input"
+            />
+            <datalist id="worker-name-suggestions">
+              {workers.map((w) => <option key={w.id} value={w.name} />)}
+            </datalist>
+            <p className="text-[11px] text-[#889078] mt-1 font-semibold">
+              Si no existe, se crea automáticamente al guardar.
+            </p>
           </div>
+        </div>
+
+        {!hasSession && (
+        <div className="field-card p-4 sm:p-5 space-y-4">
+          <p className="text-xs text-amber-700 font-bold">⚠ No hay jornada activa. Elige rancho, producto y fecha:</p>
 
           <div>
             <label className="block text-sm font-bold text-[#1A2210] mb-1.5">Parcela</label>
@@ -214,9 +256,7 @@ export default function RegistrarCosecha() {
             >
               <option value="">— Seleccionar —</option>
               {parcels.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} {p.crop_type ? `• ${p.crop_type}` : ""}
-                </option>
+                <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
           </div>
@@ -232,9 +272,7 @@ export default function RegistrarCosecha() {
             >
               <option value="">— Seleccionar —</option>
               {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
+                <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
           </div>
@@ -251,6 +289,7 @@ export default function RegistrarCosecha() {
             />
           </div>
         </div>
+        )}
 
         <div className="field-card p-4 sm:p-5 space-y-4">
           <h3 className="text-base font-bold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>

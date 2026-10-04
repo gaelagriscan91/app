@@ -3,11 +3,31 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Camera, CameraOff, ScanLine, Minus, Plus, Save, Loader2,
   Play, RotateCcw, UserCheck, Package, Users, Clock, DollarSign, Lock,
-  CheckCircle2, X,
+  CheckCircle2, X, History,
 } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatCurrency, formatNumber, formatApiErrorDetail, todayISO } from "@/lib/api";
 import QrScanner from "@/components/QrScanner";
+
+// Short "ding" via Web Audio API — plays on every successful scan
+let _audioCtx = null;
+function playBeep() {
+  try {
+    _audioCtx = _audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = _audioCtx;
+    if (ctx.state === "suspended") ctx.resume();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(1200, ctx.currentTime);
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.15);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.17);
+  } catch (_) {}
+}
 
 /**
  * Scan-per-unit mode:
@@ -46,6 +66,12 @@ export default function ScanHarvestMode() {
   // Share mode: when ON, scans accumulate into a buffer; "Confirmar pieza" distributes 1/N
   const [shareMode, setShareMode] = useState(false);
   const [shareBuffer, setShareBuffer] = useState([]); // [{id, name}]
+
+  // Scan history (bottom log): [{id, name, at (Date), action}]
+  const [scanHistory, setScanHistory] = useState([]);
+  const pushHistory = (name, action) => {
+    setScanHistory((prev) => [{ id: `${Date.now()}-${Math.random()}`, name, at: new Date(), action }, ...prev].slice(0, 50));
+  };
 
   useEffect(() => {
     (async () => {
@@ -235,12 +261,18 @@ export default function ScanHarvestMode() {
             return [...buf, { id: w.id, name: w.name }];
           });
           scannedCodesRef.current.set(key, now);
-          return prev; // don't change tally yet
+          playBeep();
+          pushHistory(w.name, "shared");
+          setScannerOn(false);
+          return prev;
         }
         const cur = prev[w.id] || { name: w.name, count: 0, pieces: [] };
         const next = { ...prev, [w.id]: { name: w.name, count: cur.count + 1, pieces: cur.pieces } };
         toast.success(`+1 ${w.name} (${(cur.count + 1).toFixed(2)} u.)`, { duration: 1200 });
         scannedCodesRef.current.set(key, now);
+        playBeep();
+        pushHistory(w.name, "piece");
+        setScannerOn(false);
         return next;
       });
       return;
@@ -298,12 +330,16 @@ export default function ScanHarvestMode() {
         toast.success(`+ ${w.name} comparte esta pieza (${buf.length + 1})`, { duration: 1200 });
         return [...buf, { id: w.id, name: w.name }];
       });
+      playBeep();
+      pushHistory(w.name, "shared");
       return;
     }
     setTally((prev) => {
       const cur = prev[w.id] || { name: w.name, count: 0, pieces: [] };
       return { ...prev, [w.id]: { name: w.name, count: cur.count + 1, pieces: cur.pieces } };
     });
+    playBeep();
+    pushHistory(w.name, "piece");
   };
 
   const confirmSharedPiece = () => {
@@ -769,7 +805,7 @@ export default function ScanHarvestMode() {
             }`}
             data-testid="scan-toggle-camera-compact"
           >
-            {scannerOn ? <><CameraOff className="w-5 h-5" /> Pausar cámara</> : <><Camera className="w-5 h-5" /> Reanudar cámara</>}
+            {scannerOn ? <><CameraOff className="w-5 h-5" /> Cerrar cámara</> : <><Camera className="w-5 h-5" /> Abrir cámara</>}
           </button>
           <button
             onClick={() => {
@@ -784,16 +820,18 @@ export default function ScanHarvestMode() {
         </div>
       )}
 
-      {/* Scanner — only in piece mode */}
+      {/* Scanner card — compact (fullscreen is rendered separately) */}
       {started && payMode === "piece" && (
         <div className="field-card p-4 sm:p-5">
-          {scannerOn ? (
-            <QrScanner active={scannerOn} onScan={handleScan} />
-          ) : (
-            <div className="rounded-2xl bg-[#F0EDE1] border-2 border-dashed border-[#D4CEB8] py-10 text-center">
-              <Camera className="w-10 h-10 mx-auto text-[#889078] mb-2" />
-              <p className="text-sm font-semibold text-[#556047]">Cámara pausada</p>
-            </div>
+          {!scannerOn && (
+            <button
+              onClick={() => setScannerOn(true)}
+              className="w-full h-14 rounded-2xl bg-[#1E4620] hover:bg-[#153417] text-white font-extrabold text-base flex items-center justify-center gap-2 shadow-md"
+              data-testid="open-scanner-fullscreen"
+              style={{ fontFamily: "Outfit, sans-serif" }}
+            >
+              <Camera className="w-5 h-5" /> Abrir cámara para escanear
+            </button>
           )}
 
           {/* Manual add fallback */}

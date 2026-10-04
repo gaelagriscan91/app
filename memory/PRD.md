@@ -22,9 +22,14 @@ Funciones: Registrar cosecha (Trabajador, Parcela, Producto, Kilos, Fecha, Foto,
 - Mobile-first, botones ≥ 48px, todo en español
 
 ## Implemented (2026-02-11)
-- **Anti-fraude cooldown de 2 minutos**: Cada código QR solo puede escanearse una vez cada 2 minutos en Picking. Si se intenta re-escanear antes, muestra "⏱️ Código ya escaneado. Espera Xm Ys antes de volver a usarlo". Previene doble y triple escaneo.
-- **Pieza compartida**: Toggle "Compartir pieza" → buffer con chips → "Confirmar pieza compartida" divide 1 pieza entre N trabajadores (0.50 c/u si son 2, etc.). Soporte de units fraccionales en backend. Verificado por testing_agent 100%.
-- **Price lock-in por producto**: Primer harvest con precio > 0 bloquea el precio. Subsiguientes usan el bloqueado (snapshot override).
+- **Scanner UX mejorado (NUEVO)**:
+  - 🔔 Beep audible en cada escaneo exitoso (Web Audio API, 1200Hz 150ms, sin assets externos)
+  - 📷 Cámara en **modo pantalla completa** cuando se abre (overlay black con esquinas doradas)
+  - 🚪 Cámara **se cierra automáticamente** después de cada escaneo exitoso
+  - 🕐 **Historial de escaneos** debajo de la cosecha: nombre del trabajador + hora precisa + ícono (🧺 pieza / 👥 compartida). Limpiar historial con un botón.
+- **Anti-fraude cooldown de 2 min**: Cada código solo se puede escanear 1 vez cada 2 minutos.
+- **Pieza compartida**: Toggle + buffer + confirmar divide 1/N piezas.
+- **Precio editable**: El precio del producto se actualiza con cada guardado — se recuerda pero NO queda bloqueado.
 - **Multi-tenant por Mayordomo**:
   - Admin ve todos los datos. Mayordomos ven solo lo suyo (`owner_id` scope).
   - Registro público DESHABILITADO (403). Admin gestiona accesos en Módulos → Mayordomos.
