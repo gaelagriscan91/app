@@ -5,7 +5,7 @@
 export default function LogoHandCherry({ size = 32, className = "" }) {
   return (
     <img
-      src="/assets/logo.jpg"
+      src="/assets/logo.png"
       alt="AgriScan"
       width={size}
       height={size}
