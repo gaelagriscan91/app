@@ -150,16 +150,31 @@ export default function ScanHarvestMode() {
 
   const bump = (workerId, delta) => {
     setTally((prev) => {
-      const w = workersByQr[workerId];
-      if (!w) return prev;
-      const cur = prev[w.id] || { name: w.name, count: 0 };
+      const existing = prev[workerId];
+      const name = existing?.name || workers.find((x) => x.id === workerId)?.name || "—";
+      const cur = existing || { name, count: 0, pieces: [] };
       const next = Math.max(0, cur.count + delta);
       if (next === 0) {
         const copy = { ...prev };
-        delete copy[w.id];
+        delete copy[workerId];
         return copy;
       }
-      return { ...prev, [w.id]: { name: w.name, count: next } };
+      return { ...prev, [workerId]: { name, count: next, pieces: cur.pieces || [] } };
+    });
+  };
+
+  const setCountDirect = (workerId, raw) => {
+    const parsed = parseFloat(raw);
+    const value = isNaN(parsed) || parsed < 0 ? 0 : parsed;
+    setTally((prev) => {
+      const existing = prev[workerId];
+      const name = existing?.name || workers.find((x) => x.id === workerId)?.name || "—";
+      if (value === 0) {
+        const copy = { ...prev };
+        delete copy[workerId];
+        return copy;
+      }
+      return { ...prev, [workerId]: { name, count: value, pieces: existing?.pieces || [] } };
     });
   };
 
@@ -596,7 +611,7 @@ export default function ScanHarvestMode() {
                 <span>Precio por pieza ($)</span>
                 {pieceLocked && (
                   <span className="flex items-center gap-1 text-emerald-700 normal-case tracking-normal" data-testid="price-locked-piece">
-                    <Lock className="w-3 h-3" /> Guardado para este producto
+                    <Lock className="w-3 h-3" /> Último precio — puedes cambiarlo
                   </span>
                 )}
               </label>
@@ -614,11 +629,11 @@ export default function ScanHarvestMode() {
                   data-testid="paymode-piece-price"
                 />
               </div>
-              {!pieceLocked && (
-                <p className="text-[11px] text-[#889078] font-semibold mt-1">
-                  Pon el precio UNA vez. Se guardará para todos los trabajadores de este rancho.
-                </p>
-              )}
+              <p className="text-[11px] text-[#889078] font-semibold mt-1">
+                {pieceLocked
+                  ? "El precio actual es el último guardado. Puedes cambiarlo cuando quieras."
+                  : "Pon el precio UNA vez. Se guardará para todos los trabajadores de este rancho."}
+              </p>
             </div>
           ) : (
             <div>
@@ -626,7 +641,7 @@ export default function ScanHarvestMode() {
                 <span>Precio por hora ($)</span>
                 {hourLocked && (
                   <span className="flex items-center gap-1 text-emerald-700 normal-case tracking-normal" data-testid="price-locked-hour">
-                    <Lock className="w-3 h-3" /> Guardado para este producto
+                    <Lock className="w-3 h-3" /> Último precio — puedes cambiarlo
                   </span>
                 )}
               </label>
@@ -644,11 +659,11 @@ export default function ScanHarvestMode() {
                   data-testid="paymode-hour-price"
                 />
               </div>
-              {!hourLocked && (
-                <p className="text-[11px] text-[#889078] font-semibold mt-1">
-                  Pon el precio UNA vez. Se guardará para todos los trabajadores de este rancho.
-                </p>
-              )}
+              <p className="text-[11px] text-[#889078] font-semibold mt-1">
+                {hourLocked
+                  ? "El precio actual es el último guardado. Puedes cambiarlo cuando quieras."
+                  : "Pon el precio UNA vez. Se guardará para todos los trabajadores de este rancho."}
+              </p>
             </div>
           )}
 
@@ -934,9 +949,18 @@ export default function ScanHarvestMode() {
                           >
                             <Minus className="w-4 h-4" />
                           </button>
-                          <div className="font-mono-stat text-xl text-[#1A2210] w-12 text-center" data-testid={`scan-count-${wid}`}>
-                            {v.count % 1 === 0 ? v.count : v.count.toFixed(2)}
-                          </div>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            step="0.01"
+                            min="0"
+                            value={v.count % 1 === 0 ? String(v.count) : v.count.toFixed(2)}
+                            onChange={(e) => setCountDirect(wid, e.target.value)}
+                            onFocus={(e) => e.target.select()}
+                            className="font-mono-stat text-xl text-[#1A2210] w-16 text-center bg-[#F7F5EE] border-2 border-[#E2DDD0] focus:border-[#1E4620] rounded-xl h-10 outline-none px-1"
+                            data-testid={`scan-count-${wid}`}
+                            aria-label="Cantidad editable"
+                          />
                           <button
                             onClick={() => bump(wid, 1)}
                             className="w-10 h-10 rounded-xl bg-[#1E4620] hover:bg-[#153417] text-white flex items-center justify-center"

@@ -41,9 +41,7 @@ export default function Login() {
 
       <div className="relative w-full max-w-md">
         <div className="flex flex-col items-center mb-6">
-          <div className="w-20 h-20 rounded-3xl bg-white flex items-center justify-center shadow-lg mb-3 border-2 border-[#E2DDD0]">
-            <LogoHandCherry size={56} />
-          </div>
+          <LogoHandCherry size={110} className="mb-2 drop-shadow-md" />
           <h1 className="text-3xl sm:text-4xl font-extrabold text-[#1A2210] tracking-tight" style={{ fontFamily: "Outfit, sans-serif" }}>
             AgriScan
           </h1>

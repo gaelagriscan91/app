@@ -27,9 +27,7 @@ export default function AppLayout() {
       <header className="bg-[#1E4620] text-white sticky top-0 z-40 shadow-md">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm">
-              <LogoHandCherry size={30} />
-            </div>
+            <LogoHandCherry size={42} className="flex-shrink-0" />
             <div>
               <div className="font-extrabold text-lg leading-tight tracking-tight" style={{ fontFamily: "Outfit, sans-serif" }}>
                 AgriScan
