@@ -125,7 +125,7 @@ export default function RegistrarCosecha() {
       setWorkerName("");
       setWorkerId("");
       setUnits("");
-      navigate("/dia");
+      // Stay on the manual form so you can register the next worker
     } catch (err) {
       toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Error al guardar");
     } finally {

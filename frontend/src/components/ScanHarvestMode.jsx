@@ -55,6 +55,28 @@ export default function ScanHarvestMode() {
   const [showList, setShowList] = useState(false); // detailed per-worker tally sheet
   const [showManual, setShowManual] = useState(false);
   const [editPrice, setEditPrice] = useState(false);
+  const [listTab, setListTab] = useState("registro"); // "conteo" | "registro"
+
+  // Audit scan log — one entry per scan event (QR + manual). Persisted by date.
+  const scanLogKey = `agriscan.scanlog.${todayKey}`;
+  const [scanLog, setScanLog] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(scanLogKey) || "[]"); }
+    catch { return []; }
+  });
+  const logScan = (w, source) => {
+    const entry = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      workerId: w.id,
+      name: w.name,
+      at: new Date().toISOString(),
+      source, // "qr" | "manual"
+    };
+    setScanLog((prev) => {
+      const next = [entry, ...prev].slice(0, 1000);
+      try { localStorage.setItem(scanLogKey, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
 
   const lastRef = useRef({ code: "", at: 0 });
   const scannedCodesRef = useRef(new Map());
@@ -191,6 +213,7 @@ export default function ScanHarvestMode() {
       const cur = prev[w.id] || { name: w.name, count: 0 };
       return { ...prev, [w.id]: { name: w.name, count: cur.count + 1 } };
     });
+    logScan(w, "qr");
   };
 
   const addManual = (workerId) => {
@@ -202,6 +225,7 @@ export default function ScanHarvestMode() {
       const cur = prev[w.id] || { name: w.name, count: 0 };
       return { ...prev, [w.id]: { name: w.name, count: cur.count + 1 } };
     });
+    logScan(w, "manual");
     setShowManual(false);
   };
 
@@ -272,11 +296,12 @@ export default function ScanHarvestMode() {
           })
         )
       );
-      toast.success(`Jornada guardada: ${entries.length} trabajador(es)`);
+      toast.success(`Guardado: ${entries.length} trabajador(es) · ${formatCurrency(totals.payment)}`, { duration: 2500 });
       setTally({});
       setLastWorker(null);
-      setScannerOn(false);
-      navigate("/dia");
+      scannedCodesRef.current.clear();
+      // Keep camera ON so the user keeps scanning the next batch
+      setScannerOn(true);
     } catch (e) {
       toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Error al guardar");
     } finally {
@@ -525,13 +550,13 @@ export default function ScanHarvestMode() {
         </div>
       )}
 
-      {/* List sheet */}
+      {/* List sheet — tabs: Conteo + Registro */}
       {showList && (
         <div className="fixed inset-0 z-[70] bg-black/70 flex items-end sm:items-center justify-center" onClick={() => setShowList(false)}>
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()} data-testid="scan-list-modal">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[85vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()} data-testid="scan-list-modal">
             <div className="flex items-center justify-between px-4 h-14 border-b border-[#E2DDD0]">
               <h3 className="text-lg font-extrabold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>
-                Conteo ({totals.workers})
+                Jornada
               </h3>
               <button
                 onClick={() => setShowList(false)}
@@ -541,65 +566,139 @@ export default function ScanHarvestMode() {
                 <X className="w-5 h-5 text-[#556047]" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto px-4 py-3">
-              {Object.keys(tally).length === 0 ? (
-                <p className="text-sm text-[#556047] font-semibold py-6 text-center">
-                  Aún no hay escaneos.
-                </p>
-              ) : (
-                <div className="divide-y divide-[#E2DDD0]">
-                  {Object.entries(tally)
-                    .sort((a, b) => b[1].count - a[1].count)
-                    .map(([wid, v]) => {
-                      const payment = v.count * (parseFloat(pricePerUnit) || 0);
-                      return (
-                        <div key={wid} className="py-3 flex items-center justify-between gap-3" data-testid={`scan-tally-row-${wid}`}>
-                          <div className="min-w-0 flex-1">
-                            <div className="font-bold text-[#1A2210] truncate">{v.name}</div>
-                            <div className="text-xs text-[#556047] font-semibold">
-                              {formatNumber(v.count, v.count % 1 === 0 ? 0 : 2)} • <span className="text-[#15803D] font-bold">{formatCurrency(payment)}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => bump(wid, -1)}
-                              className="w-9 h-9 rounded-xl bg-white border-2 border-[#E2DDD0] hover:bg-red-50 hover:border-red-200 text-red-600 flex items-center justify-center"
-                              data-testid={`scan-dec-${wid}`}
-                            >
-                              <Minus className="w-4 h-4" />
-                            </button>
-                            <div className="font-mono-stat text-lg text-[#1A2210] w-10 text-center">
-                              {v.count % 1 === 0 ? v.count : v.count.toFixed(2)}
-                            </div>
-                            <button
-                              onClick={() => bump(wid, 1)}
-                              className="w-9 h-9 rounded-xl bg-[#1E4620] hover:bg-[#153417] text-white flex items-center justify-center"
-                              data-testid={`scan-inc-${wid}`}
-                            >
-                              <Plus className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-              )}
-            </div>
-            <div className="px-4 py-3 border-t border-[#E2DDD0] bg-[#F7F5EE] flex items-center justify-between">
-              <div>
-                <div className="text-[10px] font-bold uppercase tracking-wider text-[#556047]">Total jornada</div>
-                <div className="font-mono-stat text-xl text-[#1A2210]">{formatCurrency(totals.payment)}</div>
-              </div>
+
+            {/* Tabs */}
+            <div className="px-3 pt-3 pb-2 flex gap-2">
               <button
-                onClick={() => { setShowList(false); save(); }}
-                disabled={saving || Object.keys(tally).length === 0}
-                className="h-12 px-4 rounded-xl bg-[#E65100] hover:bg-[#C63D00] text-white font-extrabold flex items-center gap-1.5 disabled:opacity-50"
-                data-testid="scan-list-save"
-                style={{ fontFamily: "Outfit, sans-serif" }}
+                onClick={() => setListTab("registro")}
+                className={`flex-1 h-11 rounded-xl font-bold text-sm transition-colors ${
+                  listTab === "registro"
+                    ? "bg-[#2B55D1] text-white shadow-md"
+                    : "bg-[#F0EDE1] text-[#556047] hover:bg-[#E2DDD0]"
+                }`}
+                data-testid="scan-tab-registro"
               >
-                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Save className="w-5 h-5" /> Guardar</>}
+                Registro ({scanLog.length})
+              </button>
+              <button
+                onClick={() => setListTab("conteo")}
+                className={`flex-1 h-11 rounded-xl font-bold text-sm transition-colors ${
+                  listTab === "conteo"
+                    ? "bg-[#2B55D1] text-white shadow-md"
+                    : "bg-[#F0EDE1] text-[#556047] hover:bg-[#E2DDD0]"
+                }`}
+                data-testid="scan-tab-conteo"
+              >
+                Conteo ({totals.workers})
               </button>
             </div>
+
+            <div className="flex-1 overflow-y-auto px-4 pb-3">
+              {listTab === "conteo" ? (
+                Object.keys(tally).length === 0 ? (
+                  <p className="text-sm text-[#556047] font-semibold py-6 text-center">
+                    Aún no hay escaneos sin guardar.
+                  </p>
+                ) : (
+                  <div className="divide-y divide-[#E2DDD0]">
+                    {Object.entries(tally)
+                      .sort((a, b) => b[1].count - a[1].count)
+                      .map(([wid, v]) => {
+                        const payment = v.count * (parseFloat(pricePerUnit) || 0);
+                        return (
+                          <div key={wid} className="py-3 flex items-center justify-between gap-3" data-testid={`scan-tally-row-${wid}`}>
+                            <div className="min-w-0 flex-1">
+                              <div className="font-bold text-[#1A2210] truncate">{v.name}</div>
+                              <div className="text-xs text-[#556047] font-semibold">
+                                {formatNumber(v.count, v.count % 1 === 0 ? 0 : 2)} • <span className="text-[#15803D] font-bold">{formatCurrency(payment)}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => bump(wid, -1)}
+                                className="w-9 h-9 rounded-xl bg-white border-2 border-[#E2DDD0] hover:bg-red-50 hover:border-red-200 text-red-600 flex items-center justify-center"
+                                data-testid={`scan-dec-${wid}`}
+                              >
+                                <Minus className="w-4 h-4" />
+                              </button>
+                              <div className="font-mono-stat text-lg text-[#1A2210] w-10 text-center">
+                                {v.count % 1 === 0 ? v.count : v.count.toFixed(2)}
+                              </div>
+                              <button
+                                onClick={() => bump(wid, 1)}
+                                className="w-9 h-9 rounded-xl bg-[#1E4620] hover:bg-[#153417] text-white flex items-center justify-center"
+                                data-testid={`scan-inc-${wid}`}
+                              >
+                                <Plus className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )
+              ) : (
+                /* REGISTRO TAB */
+                scanLog.length === 0 ? (
+                  <p className="text-sm text-[#556047] font-semibold py-6 text-center" data-testid="scan-registro-empty">
+                    Aún no se ha escaneado a nadie hoy.
+                  </p>
+                ) : (
+                  <>
+                    <div className="text-[11px] text-[#556047] font-semibold py-2 flex items-center justify-between">
+                      <span>Fecha: <b className="text-[#1A2210]">{new Date(todayKey + "T00:00:00").toLocaleDateString()}</b></span>
+                      <span>Más reciente arriba</span>
+                    </div>
+                    <ul className="divide-y divide-[#E2DDD0]" data-testid="scan-registro-list">
+                      {scanLog.map((e) => {
+                        const d = new Date(e.at);
+                        const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+                        const date = d.toLocaleDateString();
+                        return (
+                          <li key={e.id} className="py-2.5 flex items-center justify-between gap-3" data-testid={`scan-registro-row-${e.id}`}>
+                            <div className="min-w-0 flex-1">
+                              <div className="font-bold text-[#1A2210] truncate flex items-center gap-1.5">
+                                {e.name}
+                                <span
+                                  className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                                    e.source === "manual"
+                                      ? "bg-[#E65100]/15 text-[#E65100]"
+                                      : "bg-[#1E4620]/15 text-[#1E4620]"
+                                  }`}
+                                >
+                                  {e.source === "manual" ? "Manual" : "QR"}
+                                </span>
+                              </div>
+                              <div className="text-[11px] text-[#556047] font-semibold font-mono-stat">
+                                {date} · {time}
+                              </div>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </>
+                )
+              )}
+            </div>
+
+            {listTab === "conteo" && (
+              <div className="px-4 py-3 border-t border-[#E2DDD0] bg-[#F7F5EE] flex items-center justify-between">
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[#556047]">Total jornada</div>
+                  <div className="font-mono-stat text-xl text-[#1A2210]">{formatCurrency(totals.payment)}</div>
+                </div>
+                <button
+                  onClick={() => { setShowList(false); save(); }}
+                  disabled={saving || Object.keys(tally).length === 0}
+                  className="h-12 px-4 rounded-xl bg-[#E65100] hover:bg-[#C63D00] text-white font-extrabold flex items-center gap-1.5 disabled:opacity-50"
+                  data-testid="scan-list-save"
+                  style={{ fontFamily: "Outfit, sans-serif" }}
+                >
+                  {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Save className="w-5 h-5" /> Guardar</>}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
