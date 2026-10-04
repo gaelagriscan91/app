@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Html5Qrcode } from "html5-qrcode";
 import {
-  Camera, CameraOff, Minus, Plus, Save, Loader2,
-  RotateCcw, UserCheck, DollarSign, History,
+  Camera, CameraOff, Minus, Plus, Save, Loader2, RotateCcw,
+  DollarSign, X, UserPlus, ListChecks,
 } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatCurrency, formatNumber, formatApiErrorDetail, todayISO } from "@/lib/api";
-import QrScanner from "@/components/QrScanner";
 
-// Short "ding" via Web Audio API — plays on every successful scan
+// Short "ding" via Web Audio API
 let _audioCtx = null;
 function playBeep() {
   try {
@@ -29,10 +29,11 @@ function playBeep() {
 }
 
 /**
- * Minimalist Picking mode:
- * Only: price input + camera (scan) + manual add + save.
- * Parcela/producto/fecha are resolved automatically from session (Check-in)
- * or from the first available defaults (auto-created if none).
+ * FieldClock-style immersive picking screen:
+ *  - Full-screen camera viewfinder
+ *  - Floating price card (top-left)
+ *  - Blue bottom bar: last worker + big piece/payment totals
+ *  - Side actions: Manual add, Pause camera, Save
  */
 export default function ScanHarvestMode() {
   const navigate = useNavigate();
@@ -42,75 +43,22 @@ export default function ScanHarvestMode() {
   const [parcelId, setParcelId] = useState("");
   const [productId, setProductId] = useState("");
   const [parcelName, setParcelName] = useState("");
-  const [productName, setProductName] = useState("");
-  const [unitLabel, setUnitLabel] = useState("unidad");
+  const [unitLabel, setUnitLabel] = useState("pieza");
   const [pricePerUnit, setPricePerUnit] = useState("");
   const [ready, setReady] = useState(false);
 
-  const [scannerOn, setScannerOn] = useState(false);
+  const [scannerOn, setScannerOn] = useState(true);
   const [tally, setTally] = useState({}); // { worker_id: {name, count} }
+  const [lastWorker, setLastWorker] = useState(null); // {id, name}
   const [saving, setSaving] = useState(false);
+
+  const [showList, setShowList] = useState(false); // detailed per-worker tally sheet
+  const [showManual, setShowManual] = useState(false);
+  const [editPrice, setEditPrice] = useState(false);
 
   const lastRef = useRef({ code: "", at: 0 });
   const scannedCodesRef = useRef(new Map());
   const SCAN_COOLDOWN_MS = 2 * 60 * 1000;
-
-  // Scan history (bottom log)
-  const [scanHistory, setScanHistory] = useState([]);
-  const pushHistory = (name) => {
-    setScanHistory((prev) =>
-      [{ id: `${Date.now()}-${Math.random()}`, name, at: new Date() }, ...prev].slice(0, 50)
-    );
-  };
-
-  // Resolve session: localStorage (from Check-in) → first parcel/product → auto-create defaults
-  useEffect(() => {
-    (async () => {
-      try {
-        let session = {};
-        try { session = JSON.parse(localStorage.getItem(`agriscan.session.${todayKey}`) || "{}"); }
-        catch { session = {}; }
-
-        const [wRes, pRes, prRes] = await Promise.all([
-          api.get("/workers"),
-          api.get("/parcels"),
-          api.get("/products"),
-        ]);
-        setWorkers((wRes.data || []).filter((x) => x.active !== false));
-        let parcels = (pRes.data || []).filter((x) => x.active !== false);
-        let products = (prRes.data || []).filter((x) => x.active !== false);
-
-        // Auto-create defaults if none exist
-        if (parcels.length === 0) {
-          const { data } = await api.post("/parcels", { name: "Rancho General", active: true });
-          parcels = [data];
-        }
-        if (products.length === 0) {
-          const { data } = await api.post("/products", { name: "Cosecha", unit_label: "pieza", pricing_mode: "unit", active: true });
-          products = [data];
-        }
-
-        const parcel = parcels.find((p) => p.id === session.parcelId) || parcels[0];
-        const product = products.find((p) => p.id === session.productId) || products[0];
-
-        setParcelId(parcel.id);
-        setParcelName(parcel.name || "");
-        setProductId(product.id);
-        setProductName(product.name || "");
-        setUnitLabel(product.unit_label || "unidad");
-
-        // Preload price (admin can override)
-        const pu = Number(product.price_per_unit) || 0;
-        if (pu > 0) setPricePerUnit(String(pu));
-
-        setReady(true);
-        setScannerOn(true);
-      } catch (_) {
-        toast.error("No se pudo preparar la jornada");
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const normalizeCode = (s) => (s || "").toString().trim().toUpperCase();
   const extractCode = (raw) => {
@@ -119,6 +67,46 @@ export default function ScanHarvestMode() {
     if (s.includes(":")) return s.split(":").pop();
     return s;
   };
+
+  // Resolve defaults (session → first → auto-create)
+  useEffect(() => {
+    (async () => {
+      try {
+        let session = {};
+        try { session = JSON.parse(localStorage.getItem(`agriscan.session.${todayKey}`) || "{}"); }
+        catch { session = {}; }
+        const [wRes, pRes, prRes] = await Promise.all([
+          api.get("/workers"),
+          api.get("/parcels"),
+          api.get("/products"),
+        ]);
+        setWorkers((wRes.data || []).filter((x) => x.active !== false));
+        let parcels = (pRes.data || []).filter((x) => x.active !== false);
+        let products = (prRes.data || []).filter((x) => x.active !== false);
+        if (parcels.length === 0) {
+          const { data } = await api.post("/parcels", { name: "Rancho General", active: true });
+          parcels = [data];
+        }
+        if (products.length === 0) {
+          const { data } = await api.post("/products", { name: "Cosecha", unit_label: "pieza", pricing_mode: "unit", active: true });
+          products = [data];
+        }
+        const parcel = parcels.find((p) => p.id === session.parcelId) || parcels[0];
+        const product = products.find((p) => p.id === session.productId) || products[0];
+        setParcelId(parcel.id);
+        setParcelName(parcel.name || "");
+        setProductId(product.id);
+        setUnitLabel(product.unit_label || "pieza");
+        const pu = Number(product.price_per_unit) || 0;
+        if (pu > 0) setPricePerUnit(String(pu));
+        setReady(true);
+      } catch (_) {
+        toast.error("No se pudo preparar la jornada");
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const workersByQr = useMemo(() => {
     const map = {};
     workers.forEach((w) => {
@@ -128,6 +116,94 @@ export default function ScanHarvestMode() {
     });
     return map;
   }, [workers]);
+
+  // === Camera lifecycle ===
+  const containerId = "qr-reader-fullscreen";
+  const qrRef = useRef(null);
+  const stopCamera = async () => {
+    const s = qrRef.current;
+    if (!s) return;
+    try {
+      if (s.getState && s.getState() === 2) await s.stop();
+      await s.clear();
+    } catch (_) {}
+    qrRef.current = null;
+  };
+  const startCamera = async () => {
+    try {
+      if (qrRef.current) await stopCamera();
+      const s = new Html5Qrcode(containerId, { verbose: false });
+      qrRef.current = s;
+      await s.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 260, height: 260 }, aspectRatio: 1.0 },
+        (text) => handleScan(text),
+        () => {}
+      );
+    } catch (e) {
+      toast.error("No se pudo abrir la cámara. Revisa permisos.");
+      setScannerOn(false);
+    }
+  };
+  useEffect(() => {
+    if (!ready) return;
+    if (scannerOn) startCamera();
+    else stopCamera();
+    return () => { stopCamera(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, scannerOn]);
+
+  const handleScan = async (rawCode) => {
+    const now = Date.now();
+    if (lastRef.current.code === rawCode && now - lastRef.current.at < 1500) return;
+    lastRef.current = { code: rawCode, at: now };
+
+    const extracted = extractCode(rawCode);
+    const key = normalizeCode(extracted);
+
+    const lastAt = scannedCodesRef.current.get(key) || 0;
+    const elapsed = now - lastAt;
+    if (lastAt > 0 && elapsed < SCAN_COOLDOWN_MS) {
+      const remaining = Math.ceil((SCAN_COOLDOWN_MS - elapsed) / 1000);
+      const mins = Math.floor(remaining / 60);
+      const secs = remaining % 60;
+      const label = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+      toast.error(`⏱️ Espera ${label} antes de volver a escanear.`, { duration: 2200 });
+      return;
+    }
+
+    let w = workersByQr[key];
+    if (!w) {
+      try {
+        const { data } = await api.post("/workers/resolve", { code: rawCode });
+        w = data;
+        setWorkers((prev) => (prev.some((x) => x.id === data.id) ? prev : [...prev, data]));
+      } catch (_) {
+        toast.error(`QR no registrado.`, { duration: 2500 });
+        return;
+      }
+    }
+
+    scannedCodesRef.current.set(key, now);
+    playBeep();
+    setLastWorker({ id: w.id, name: w.name });
+    setTally((prev) => {
+      const cur = prev[w.id] || { name: w.name, count: 0 };
+      return { ...prev, [w.id]: { name: w.name, count: cur.count + 1 } };
+    });
+  };
+
+  const addManual = (workerId) => {
+    const w = workers.find((x) => x.id === workerId);
+    if (!w) return;
+    playBeep();
+    setLastWorker({ id: w.id, name: w.name });
+    setTally((prev) => {
+      const cur = prev[w.id] || { name: w.name, count: 0 };
+      return { ...prev, [w.id]: { name: w.name, count: cur.count + 1 } };
+    });
+    setShowManual(false);
+  };
 
   const bump = (workerId, delta) => {
     setTally((prev) => {
@@ -144,74 +220,11 @@ export default function ScanHarvestMode() {
     });
   };
 
-  const setCountDirect = (workerId, raw) => {
-    const parsed = parseFloat(raw);
-    const value = isNaN(parsed) || parsed < 0 ? 0 : parsed;
-    setTally((prev) => {
-      const existing = prev[workerId];
-      const name = existing?.name || workers.find((x) => x.id === workerId)?.name || "—";
-      if (value === 0) {
-        const copy = { ...prev };
-        delete copy[workerId];
-        return copy;
-      }
-      return { ...prev, [workerId]: { name, count: value } };
-    });
-  };
-
-  const handleScan = async (rawCode) => {
-    const now = Date.now();
-    if (lastRef.current.code === rawCode && now - lastRef.current.at < 1500) return;
-    lastRef.current = { code: rawCode, at: now };
-
-    const extracted = extractCode(rawCode);
-    const key = normalizeCode(extracted);
-
-    // Anti-fraud cooldown
-    const lastAt = scannedCodesRef.current.get(key) || 0;
-    const elapsed = now - lastAt;
-    if (lastAt > 0 && elapsed < SCAN_COOLDOWN_MS) {
-      const remaining = Math.ceil((SCAN_COOLDOWN_MS - elapsed) / 1000);
-      const mins = Math.floor(remaining / 60);
-      const secs = remaining % 60;
-      const label = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
-      toast.error(`⏱️ Código ya escaneado. Espera ${label}.`, { duration: 2500 });
-      return;
-    }
-
-    let w = workersByQr[key];
-    if (!w) {
-      try {
-        const { data } = await api.post("/workers/resolve", { code: rawCode });
-        w = data;
-        setWorkers((prev) => (prev.some((x) => x.id === data.id) ? prev : [...prev, data]));
-      } catch (_) {
-        toast.error(`QR no registrado. Añade al trabajador en Módulos.`, { duration: 4000 });
-        return;
-      }
-    }
-
-    setTally((prev) => {
-      const cur = prev[w.id] || { name: w.name, count: 0 };
-      const next = { ...prev, [w.id]: { name: w.name, count: cur.count + 1 } };
-      toast.success(`+1 ${w.name}`, { duration: 1200 });
-      scannedCodesRef.current.set(key, now);
-      playBeep();
-      pushHistory(w.name);
-      setScannerOn(false);
-      return next;
-    });
-  };
-
-  const addManual = (workerId) => {
-    const w = workers.find((x) => x.id === workerId);
-    if (!w) return;
-    setTally((prev) => {
-      const cur = prev[w.id] || { name: w.name, count: 0 };
-      return { ...prev, [w.id]: { name: w.name, count: cur.count + 1 } };
-    });
-    playBeep();
-    pushHistory(w.name);
+  const resetTally = () => {
+    if (Object.keys(tally).length === 0) return;
+    if (!window.confirm("¿Reiniciar conteos?")) return;
+    setTally({});
+    setLastWorker(null);
   };
 
   const totals = useMemo(() => {
@@ -221,10 +234,13 @@ export default function ScanHarvestMode() {
     return { units, payment, workers: entries.length };
   }, [tally, pricePerUnit]);
 
-  const resetTally = () => {
-    if (Object.keys(tally).length > 0 && !window.confirm("¿Reiniciar conteos?")) return;
-    setTally({});
-  };
+  const lastWorkerStats = useMemo(() => {
+    if (!lastWorker) return null;
+    const row = tally[lastWorker.id];
+    if (!row) return { name: lastWorker.name, count: 0, payment: 0 };
+    const payment = row.count * (parseFloat(pricePerUnit) || 0);
+    return { name: row.name, count: row.count, payment };
+  }, [lastWorker, tally, pricePerUnit]);
 
   const save = async () => {
     const entries = Object.entries(tally);
@@ -258,6 +274,7 @@ export default function ScanHarvestMode() {
       );
       toast.success(`Jornada guardada: ${entries.length} trabajador(es)`);
       setTally({});
+      setLastWorker(null);
       setScannerOn(false);
       navigate("/dia");
     } catch (e) {
@@ -276,193 +293,315 @@ export default function ScanHarvestMode() {
   }
 
   return (
-    <div className="space-y-5" data-testid="scan-harvest-mode">
-      {/* Price card */}
-      <div className="field-card p-4 sm:p-5 space-y-3" data-testid="price-card">
-        <label className="block text-xs font-bold text-[#1A2210] uppercase tracking-wider">
-          Precio por {unitLabel} ($)
-        </label>
-        <div className="relative">
-          <DollarSign className="w-5 h-5 text-[#889078] absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="number"
-            inputMode="decimal"
-            step="0.01"
-            min="0.01"
-            value={pricePerUnit}
-            onChange={(e) => setPricePerUnit(e.target.value)}
-            placeholder="0.00"
-            className="field-input !h-14 !text-xl font-mono-stat w-full !pl-10"
-            data-testid="paymode-piece-price"
-          />
+    <div className="fixed inset-0 z-50 bg-black flex flex-col select-none" data-testid="scan-harvest-mode">
+      {/* Blue top bar */}
+      <div className="bg-[#2B55D1] text-white pt-[env(safe-area-inset-top)]">
+        <div className="flex items-center justify-between px-3 h-14">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] font-bold uppercase tracking-wider opacity-80 flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-300" />
+              Cosechando · {parcelName || "—"}
+            </div>
+          </div>
+          <button
+            onClick={() => navigate("/registrar")}
+            className="w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center"
+            data-testid="scan-close-fullscreen"
+            aria-label="Cerrar"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="flex items-center justify-between px-3 pb-2">
+          <button
+            onClick={() => setShowList(true)}
+            className="h-10 px-3 rounded-xl bg-white/10 hover:bg-white/20 font-bold text-sm flex items-center gap-1.5"
+            data-testid="scan-open-list"
+          >
+            <ListChecks className="w-4 h-4" /> Lista
+          </button>
+          <div className="text-base font-extrabold" style={{ fontFamily: "Outfit, sans-serif" }}>
+            Cosechar
+          </div>
+          <div className="w-[88px]" />
         </div>
       </div>
 
-      {/* Scanner + Manual add */}
-      <div className="field-card p-4 sm:p-5 space-y-3">
-        {scannerOn ? (
-          <QrScanner onDecode={handleScan} onError={() => {}} />
-        ) : (
+      {/* Camera body */}
+      <div className="relative flex-1 overflow-hidden bg-black">
+        <div id={containerId} className="absolute inset-0" />
+
+        {/* QR targeting frame */}
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="relative w-[72%] max-w-sm aspect-square border-2 border-red-500/80 rounded-xl">
+            <span className="absolute -top-0.5 -left-0.5 w-10 h-10 border-t-4 border-l-4 border-red-500 rounded-tl-xl" />
+            <span className="absolute -top-0.5 -right-0.5 w-10 h-10 border-t-4 border-r-4 border-red-500 rounded-tr-xl" />
+            <span className="absolute -bottom-0.5 -left-0.5 w-10 h-10 border-b-4 border-l-4 border-red-500 rounded-bl-xl" />
+            <span className="absolute -bottom-0.5 -right-0.5 w-10 h-10 border-b-4 border-r-4 border-red-500 rounded-br-xl" />
+          </div>
+        </div>
+
+        {/* Floating PRICE card (top-left) */}
+        <button
+          onClick={() => setEditPrice(true)}
+          className="absolute top-4 left-3 bg-white rounded-xl shadow-xl px-3 py-2 text-left border border-black/5 active:scale-[0.98]"
+          data-testid="scan-price-chip"
+        >
+          <div className="text-[10px] font-bold uppercase tracking-wider text-[#556047] leading-none">Precio</div>
+          <div className="font-mono-stat text-2xl text-[#1A2210] leading-tight mt-0.5">
+            {pricePerUnit ? `$${pricePerUnit}` : <span className="text-red-500">—</span>}
+          </div>
+          <div className="text-[10px] font-bold text-[#889078] leading-none">
+            / {unitLabel}
+          </div>
+        </button>
+
+        {/* Pause/Resume floating button (top-right) */}
+        <button
+          onClick={() => setScannerOn((v) => !v)}
+          className={`absolute top-4 right-3 w-11 h-11 rounded-full flex items-center justify-center shadow-xl ${
+            scannerOn ? "bg-white text-[#1A2210]" : "bg-red-500 text-white"
+          }`}
+          data-testid="scan-toggle-camera"
+          aria-label={scannerOn ? "Pausar" : "Reanudar"}
+        >
+          {scannerOn ? <CameraOff className="w-5 h-5" /> : <Camera className="w-5 h-5" />}
+        </button>
+
+        {/* Side action: Manual add */}
+        <button
+          onClick={() => setShowManual(true)}
+          className="absolute right-3 bottom-[180px] w-12 h-12 rounded-full bg-[#E65100] hover:bg-[#C63D00] text-white flex items-center justify-center shadow-xl"
+          data-testid="scan-manual-fab"
+          aria-label="Agregar manual"
+        >
+          <UserPlus className="w-5 h-5" />
+        </button>
+
+        {/* Reset FAB (only if tally has data) */}
+        {Object.keys(tally).length > 0 && (
           <button
-            onClick={() => setScannerOn(true)}
-            className="w-full h-14 rounded-2xl bg-[#1E4620] hover:bg-[#153417] text-white font-extrabold text-base flex items-center justify-center gap-2 shadow-md"
-            data-testid="open-scanner-fullscreen"
+            onClick={resetTally}
+            className="absolute right-3 bottom-[120px] w-12 h-12 rounded-full bg-white hover:bg-red-50 text-red-600 border border-red-200 flex items-center justify-center shadow-xl"
+            data-testid="scan-reset-fab"
+            aria-label="Reiniciar"
+          >
+            <RotateCcw className="w-5 h-5" />
+          </button>
+        )}
+      </div>
+
+      {/* Blue bottom bar — last worker + totals */}
+      <div className="bg-[#2B55D1] text-white pb-[env(safe-area-inset-bottom)]" data-testid="scan-bottom-bar">
+        {lastWorkerStats ? (
+          <div className="px-4 pt-3 pb-2">
+            <div className="text-sm font-bold opacity-90 truncate" data-testid="scan-last-worker-name">
+              {lastWorkerStats.name}
+            </div>
+            <div className="flex items-end gap-3 mt-1">
+              <div className="font-mono-stat text-5xl leading-none" data-testid="scan-last-worker-count">
+                {formatNumber(lastWorkerStats.count, lastWorkerStats.count % 1 === 0 ? 0 : 2)}
+              </div>
+              <div className="pb-1">
+                <div className="text-sm font-bold leading-tight">
+                  {unitLabel}{lastWorkerStats.count !== 1 ? "s" : ""}
+                </div>
+                <div className="text-xs opacity-85 leading-tight">
+                  {formatCurrency(lastWorkerStats.payment)}
+                </div>
+              </div>
+              <div className="ml-auto flex items-center gap-1">
+                <button
+                  onClick={() => bump(lastWorker.id, -1)}
+                  className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center"
+                  data-testid="scan-last-dec"
+                  aria-label="Restar"
+                >
+                  <Minus className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => bump(lastWorker.id, 1)}
+                  className="w-10 h-10 rounded-full bg-white text-[#2B55D1] hover:bg-white/90 flex items-center justify-center"
+                  data-testid="scan-last-inc"
+                  aria-label="Sumar"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="px-4 py-5 text-center text-sm font-bold opacity-85" data-testid="scan-bottom-empty">
+            Enfoca el QR del trabajador…
+          </div>
+        )}
+
+        {/* Totals strip + Save */}
+        <div className="px-3 pb-3 flex items-center gap-2">
+          <div className="flex-1 bg-black/20 rounded-xl px-3 py-2">
+            <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">Jornada</div>
+            <div className="flex items-center gap-3 mt-0.5">
+              <div className="font-mono-stat text-lg leading-none">
+                {totals.workers}👤
+              </div>
+              <div className="font-mono-stat text-lg leading-none">
+                {formatNumber(totals.units, totals.units % 1 === 0 ? 0 : 2)}🧺
+              </div>
+              <div className="font-mono-stat text-lg leading-none ml-auto">
+                {formatCurrency(totals.payment)}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={save}
+            disabled={saving || Object.keys(tally).length === 0}
+            className="h-[52px] px-4 rounded-xl bg-[#E65100] hover:bg-[#C63D00] active:scale-[0.98] text-white font-extrabold flex items-center gap-1.5 shadow-md disabled:opacity-50"
+            data-testid="scan-save-button"
             style={{ fontFamily: "Outfit, sans-serif" }}
           >
-            <Camera className="w-5 h-5" /> Escanear
+            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Save className="w-5 h-5" /> Guardar</>}
           </button>
-        )}
-
-        {scannerOn && (
-          <button
-            onClick={() => setScannerOn(false)}
-            className="w-full h-11 rounded-xl bg-red-50 text-red-700 border-2 border-red-200 hover:bg-red-100 font-bold flex items-center justify-center gap-2"
-            data-testid="scan-toggle-camera"
-          >
-            <CameraOff className="w-5 h-5" /> Pausar cámara
-          </button>
-        )}
-
-        {/* Manual add */}
-        <div className="pt-3 border-t border-[#E2DDD0]">
-          <label className="block text-xs font-bold text-[#1A2210] uppercase tracking-wider mb-2">
-            Manual
-          </label>
-          <select
-            defaultValue=""
-            onChange={(e) => { if (e.target.value) { addManual(e.target.value); e.target.value = ""; } }}
-            className="field-input !h-12 !text-base w-full"
-            data-testid="scan-manual-add"
-          >
-            <option value="">— Trabajador —</option>
-            {workers.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-          </select>
         </div>
       </div>
 
-      {/* Totals */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-2xl bg-[#1E4620] text-white p-4 border-2 border-[#153417] shadow-sm" data-testid="scan-total-workers">
-          <div className="text-[11px] font-bold uppercase tracking-wider opacity-90 flex items-center gap-1"><UserCheck className="w-3.5 h-3.5" /> Trabajadores</div>
-          <div className="font-mono-stat text-2xl sm:text-3xl mt-1">{totals.workers}</div>
-        </div>
-        <div className="rounded-2xl bg-white border-2 border-[#E2DDD0] text-[#1A2210] p-4 shadow-sm" data-testid="scan-total-units">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-[#556047]">Piezas</div>
-          <div className="font-mono-stat text-2xl sm:text-3xl mt-1">{formatNumber(totals.units, totals.units % 1 === 0 ? 0 : 2)}</div>
-        </div>
-        <div className="rounded-2xl bg-[#E65100] text-white p-4 border-2 border-[#C63D00] shadow-sm" data-testid="scan-total-payment">
-          <div className="text-[11px] font-bold uppercase tracking-wider opacity-90">Pago</div>
-          <div className="font-mono-stat text-xl sm:text-2xl mt-1">{formatCurrency(totals.payment)}</div>
-        </div>
-      </div>
-
-      {/* Tally list */}
-      {Object.keys(tally).length > 0 && (
-        <div className="field-card p-4 sm:p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-bold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>
-              Conteo
+      {/* Edit price modal */}
+      {editPrice && (
+        <div className="fixed inset-0 z-[70] bg-black/70 flex items-end sm:items-center justify-center p-3" onClick={() => setEditPrice(false)}>
+          <div className="bg-white rounded-2xl p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()} data-testid="scan-edit-price-modal">
+            <h3 className="text-lg font-extrabold text-[#1A2210] mb-3" style={{ fontFamily: "Outfit, sans-serif" }}>
+              Precio por {unitLabel}
             </h3>
+            <div className="relative">
+              <DollarSign className="w-5 h-5 text-[#889078] absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                min="0.01"
+                value={pricePerUnit}
+                onChange={(e) => setPricePerUnit(e.target.value)}
+                autoFocus
+                placeholder="0.00"
+                className="field-input !h-14 !text-2xl font-mono-stat w-full !pl-10"
+                data-testid="scan-edit-price-input"
+              />
+            </div>
             <button
-              onClick={resetTally}
-              className="h-9 px-3 bg-white border-2 border-[#E2DDD0] hover:bg-[#F7F5EE] text-[#556047] font-bold rounded-xl text-xs flex items-center gap-1.5"
-              data-testid="scan-reset-button"
+              onClick={() => setEditPrice(false)}
+              className="w-full h-12 rounded-xl bg-[#1E4620] hover:bg-[#153417] text-white font-extrabold mt-4"
+              data-testid="scan-edit-price-done"
             >
-              <RotateCcw className="w-3.5 h-3.5" /> Reiniciar
+              Listo
             </button>
           </div>
-          <div className="divide-y divide-[#E2DDD0]">
-            {Object.entries(tally)
-              .sort((a, b) => b[1].count - a[1].count)
-              .map(([wid, v]) => {
-                const payment = v.count * (parseFloat(pricePerUnit) || 0);
-                return (
-                  <div key={wid} className="py-3 flex items-center justify-between gap-3" data-testid={`scan-tally-row-${wid}`}>
-                    <div className="min-w-0 flex-1">
-                      <div className="font-bold text-[#1A2210] truncate">{v.name}</div>
-                      <div className="text-xs text-[#556047] font-semibold">
-                        {formatNumber(v.count, v.count % 1 === 0 ? 0 : 2)} pieza{v.count !== 1 ? "s" : ""} • <span className="text-[#15803D] font-bold">{formatCurrency(payment)}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => bump(wid, -1)}
-                        className="w-10 h-10 rounded-xl bg-white border-2 border-[#E2DDD0] hover:bg-red-50 hover:border-red-200 text-red-600 flex items-center justify-center font-bold"
-                        data-testid={`scan-dec-${wid}`}
-                      >
-                        <Minus className="w-4 h-4" />
-                      </button>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        step="0.01"
-                        min="0"
-                        value={v.count % 1 === 0 ? String(v.count) : v.count.toFixed(2)}
-                        onChange={(e) => setCountDirect(wid, e.target.value)}
-                        onFocus={(e) => e.target.select()}
-                        className="font-mono-stat text-xl text-[#1A2210] w-16 text-center bg-[#F7F5EE] border-2 border-[#E2DDD0] focus:border-[#1E4620] rounded-xl h-10 outline-none px-1"
-                        data-testid={`scan-count-${wid}`}
-                        aria-label="Cantidad editable"
-                      />
-                      <button
-                        onClick={() => bump(wid, 1)}
-                        className="w-10 h-10 rounded-xl bg-[#1E4620] hover:bg-[#153417] text-white flex items-center justify-center"
-                        data-testid={`scan-inc-${wid}`}
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+        </div>
+      )}
+
+      {/* Manual add modal */}
+      {showManual && (
+        <div className="fixed inset-0 z-[70] bg-black/70 flex items-end sm:items-center justify-center p-3" onClick={() => setShowManual(false)}>
+          <div className="bg-white rounded-2xl p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()} data-testid="scan-manual-modal">
+            <h3 className="text-lg font-extrabold text-[#1A2210] mb-3" style={{ fontFamily: "Outfit, sans-serif" }}>
+              Agregar +1 manual
+            </h3>
+            <select
+              defaultValue=""
+              onChange={(e) => { if (e.target.value) addManual(e.target.value); }}
+              className="field-input !h-14 !text-base w-full"
+              data-testid="scan-manual-select"
+              autoFocus
+            >
+              <option value="">— Elegir trabajador —</option>
+              {workers.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+            </select>
+            <button
+              onClick={() => setShowManual(false)}
+              className="w-full h-11 rounded-xl bg-[#F0EDE1] hover:bg-[#E2DDD0] text-[#556047] font-bold mt-4"
+              data-testid="scan-manual-cancel"
+            >
+              Cancelar
+            </button>
           </div>
         </div>
       )}
 
-      {/* Scan history */}
-      {scanHistory.length > 0 && (
-        <div className="field-card p-4 sm:p-5" data-testid="scan-history-card">
-          <h3 className="text-sm font-bold text-[#1A2210] mb-2 flex items-center gap-1.5" style={{ fontFamily: "Outfit, sans-serif" }}>
-            <History className="w-4 h-4" /> Historial
-          </h3>
-          <ul className="text-xs text-[#556047] font-semibold space-y-1 max-h-32 overflow-y-auto">
-            {scanHistory.map((h) => (
-              <li key={h.id} className="flex items-center justify-between">
-                <span className="truncate">{h.name}</span>
-                <span className="opacity-70 text-[10px]">{h.at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Sticky save bar */}
-      {Object.keys(tally).length > 0 && (
-        <>
-          <div className="h-24" aria-hidden />
-          <div className="fixed left-0 right-0 bottom-[72px] z-40 px-3 pointer-events-none" data-testid="quick-save-bar">
-            <div className="max-w-5xl mx-auto pointer-events-auto">
+      {/* List sheet */}
+      {showList && (
+        <div className="fixed inset-0 z-[70] bg-black/70 flex items-end sm:items-center justify-center" onClick={() => setShowList(false)}>
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()} data-testid="scan-list-modal">
+            <div className="flex items-center justify-between px-4 h-14 border-b border-[#E2DDD0]">
+              <h3 className="text-lg font-extrabold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>
+                Conteo ({totals.workers})
+              </h3>
               <button
-                onClick={save}
-                disabled={saving}
-                className="w-full h-14 rounded-2xl bg-[#E65100] hover:bg-[#C63D00] active:scale-[0.99] text-white font-extrabold text-base shadow-2xl flex items-center justify-between px-5 disabled:opacity-70 border-2 border-[#C63D00]"
-                data-testid="quick-save-button"
+                onClick={() => setShowList(false)}
+                className="w-9 h-9 rounded-full bg-[#F0EDE1] hover:bg-[#E2DDD0] flex items-center justify-center"
+                data-testid="scan-list-close"
+              >
+                <X className="w-5 h-5 text-[#556047]" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 py-3">
+              {Object.keys(tally).length === 0 ? (
+                <p className="text-sm text-[#556047] font-semibold py-6 text-center">
+                  Aún no hay escaneos.
+                </p>
+              ) : (
+                <div className="divide-y divide-[#E2DDD0]">
+                  {Object.entries(tally)
+                    .sort((a, b) => b[1].count - a[1].count)
+                    .map(([wid, v]) => {
+                      const payment = v.count * (parseFloat(pricePerUnit) || 0);
+                      return (
+                        <div key={wid} className="py-3 flex items-center justify-between gap-3" data-testid={`scan-tally-row-${wid}`}>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-bold text-[#1A2210] truncate">{v.name}</div>
+                            <div className="text-xs text-[#556047] font-semibold">
+                              {formatNumber(v.count, v.count % 1 === 0 ? 0 : 2)} • <span className="text-[#15803D] font-bold">{formatCurrency(payment)}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => bump(wid, -1)}
+                              className="w-9 h-9 rounded-xl bg-white border-2 border-[#E2DDD0] hover:bg-red-50 hover:border-red-200 text-red-600 flex items-center justify-center"
+                              data-testid={`scan-dec-${wid}`}
+                            >
+                              <Minus className="w-4 h-4" />
+                            </button>
+                            <div className="font-mono-stat text-lg text-[#1A2210] w-10 text-center">
+                              {v.count % 1 === 0 ? v.count : v.count.toFixed(2)}
+                            </div>
+                            <button
+                              onClick={() => bump(wid, 1)}
+                              className="w-9 h-9 rounded-xl bg-[#1E4620] hover:bg-[#153417] text-white flex items-center justify-center"
+                              data-testid={`scan-inc-${wid}`}
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+            <div className="px-4 py-3 border-t border-[#E2DDD0] bg-[#F7F5EE] flex items-center justify-between">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-[#556047]">Total jornada</div>
+                <div className="font-mono-stat text-xl text-[#1A2210]">{formatCurrency(totals.payment)}</div>
+              </div>
+              <button
+                onClick={() => { setShowList(false); save(); }}
+                disabled={saving || Object.keys(tally).length === 0}
+                className="h-12 px-4 rounded-xl bg-[#E65100] hover:bg-[#C63D00] text-white font-extrabold flex items-center gap-1.5 disabled:opacity-50"
+                data-testid="scan-list-save"
                 style={{ fontFamily: "Outfit, sans-serif" }}
               >
-                <span className="flex items-center gap-2">
-                  {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                  Guardar
-                </span>
-                <span className="flex items-center gap-3">
-                  <span className="text-[11px] font-bold uppercase tracking-wider opacity-85">
-                    {totals.workers}👤 · {formatNumber(totals.units, totals.units % 1 === 0 ? 0 : 2)}🧺
-                  </span>
-                  <span className="font-mono-stat text-lg">{formatCurrency(totals.payment)}</span>
-                </span>
+                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Save className="w-5 h-5" /> Guardar</>}
               </button>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
