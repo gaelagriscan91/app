@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Camera, CameraOff, Keyboard, Users, Loader2, Trash2, X, ArrowLeft, UserPlus,
-  Search, CheckCircle2, Sun, Moon, ShoppingBasket, CloudCheck, ChevronRight, MapPin, UserCircle2,
+  Search, CheckCircle2, Sun, Moon, ShoppingBasket, CloudCheck, ChevronRight, MapPin, UserCircle2, Share2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -28,6 +28,7 @@ export default function Asistencia() {
   const [parcels, setParcels] = useState([]);
   const [products, setProducts] = useState([]);
   const [crews, setCrews] = useState([]);
+  const [harvestsToday, setHarvestsToday] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
 
@@ -54,18 +55,20 @@ export default function Asistencia() {
   const load = async () => {
     setLoading(true);
     try {
-      const [a, w, p, pr, c] = await Promise.all([
+      const [a, w, p, pr, c, h] = await Promise.all([
         api.get("/attendance", { params: { date } }),
         api.get("/workers"),
         api.get("/parcels"),
         api.get("/products"),
         api.get("/crews"),
+        api.get("/harvests", { params: { date_from: date, date_to: date } }),
       ]);
       setData(a.data);
       setWorkers(w.data);
       setParcels(p.data);
       setProducts(pr.data);
       setCrews(c.data);
+      setHarvestsToday(h.data || []);
     } catch (_) {
       toast.error("No se pudo cargar la asistencia");
     } finally {
@@ -253,6 +256,8 @@ export default function Asistencia() {
     <SummaryView
       data={data}
       selectedParcel={selectedParcel}
+      harvestsToday={harvestsToday}
+      date={date}
       onClose={() => setView("checkin")}
     />
   );
@@ -994,14 +999,67 @@ function CheckInView(props) {
 }
 
 /* ========================= Summary Sub-View (Blue) ========================= */
-function SummaryView({ data, selectedParcel, onClose }) {
+function SummaryView({ data, selectedParcel, harvestsToday = [], date, onClose }) {
+  // Aggregate pieces/kilos/payment per worker from today's harvests
+  const byWorker = {};
+  harvestsToday.forEach((h) => {
+    const id = h.worker_id;
+    if (!byWorker[id]) byWorker[id] = { pieces: 0, kilos: 0, payment: 0 };
+    byWorker[id].pieces += Number(h.units || 0);
+    byWorker[id].kilos += Number(h.kilos || 0);
+    byWorker[id].payment += Number(h.payment || 0);
+  });
+
   const groupedByLocation = {};
   data.rows.forEach((r) => {
     const key = selectedParcel?.name || "Sin ubicación";
     if (!groupedByLocation[key]) groupedByLocation[key] = [];
-    groupedByLocation[key].push(r);
+    groupedByLocation[key].push({ ...r, _agg: byWorker[r.worker_id] || { pieces: 0, kilos: 0, payment: 0 } });
   });
   const totalWorkers = data.rows.length;
+  const totalPieces = Object.values(byWorker).reduce((a, b) => a + b.pieces, 0);
+  const totalKilos = Object.values(byWorker).reduce((a, b) => a + b.kilos, 0);
+  const totalPayment = Object.values(byWorker).reduce((a, b) => a + b.payment, 0);
+  const totalHoursAll = data.rows.reduce((a, b) => a + (Number(b.hours) || 0), 0);
+
+  const formatHours = (h) => {
+    if (!h) return "0min";
+    const hh = Math.floor(h);
+    const mm = Math.round((h % 1) * 60);
+    return hh > 0 ? `${hh}h ${mm}min` : `${mm}min`;
+  };
+  const fmtMoney = (n) => Number(n || 0).toLocaleString("es-MX", { style: "currency", currency: "MXN" });
+
+  const [sharing, setSharing] = useState(false);
+  const shareSummary = async () => {
+    if (data.rows.length === 0) { toast.error("Sin trabajadores para compartir"); return; }
+    setSharing(true);
+    try {
+      const header = [
+        "📋 AgriScan — Resumen de jornada",
+        `${date} · ${selectedParcel?.name || "Sin ubicación"}`,
+        `👥 ${totalWorkers} trabajadores · ⏱  ${formatHours(totalHoursAll)}`,
+        `🧺 ${totalPieces.toFixed(2)} piezas · ⚖️ ${totalKilos.toFixed(2)}Kg`,
+        `💵 Total: ${fmtMoney(totalPayment)}`,
+        "",
+        "— Por trabajador —",
+      ].join("\n");
+      const lines = data.rows.map((r) => {
+        const agg = byWorker[r.worker_id] || { pieces: 0, kilos: 0, payment: 0 };
+        return `• ${r.worker_name} · ${formatHours(r.hours)} · ${agg.pieces.toFixed(agg.pieces % 1 === 0 ? 0 : 2)}u · ${fmtMoney(agg.payment)}`;
+      }).join("\n");
+      const text = header + "\n" + lines;
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: "Resumen de jornada", text });
+          toast.success("Resumen compartido");
+          return;
+        } catch (err) { if (err?.name === "AbortError") return; }
+      }
+      try { await navigator.clipboard.writeText(text); toast.success("Resumen copiado"); }
+      catch (_) { toast.error("No se pudo compartir"); }
+    } finally { setSharing(false); }
+  };
 
   return (
     <div className="min-h-[calc(100vh-5rem)] -mx-4 -my-5 sm:-mx-0 sm:-my-0" data-testid="crew-summary-view">
@@ -1011,31 +1069,31 @@ function SummaryView({ data, selectedParcel, onClose }) {
             <X className="w-6 h-6" />
           </button>
           <h2 className="text-xl font-extrabold flex-1 pl-2" style={{ fontFamily: "Outfit, sans-serif" }}>
-            Crew Summary
+            Resumen
           </h2>
           <div className="flex items-center gap-2">
-            <button className="bg-white text-[#1e40af] px-4 h-9 rounded-full text-sm font-bold flex items-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4 bg-gray-500 text-white rounded-full p-0.5" /> Review
-            </button>
-            <button className="w-9 h-9 bg-white rounded-full flex items-center justify-center text-[#1e40af]">
-              <Search className="w-4 h-4" />
+            <button
+              onClick={shareSummary}
+              disabled={sharing}
+              className="bg-white text-[#1e40af] px-4 h-9 rounded-full text-sm font-bold flex items-center gap-1.5 disabled:opacity-60"
+              data-testid="summary-share-button"
+            >
+              {sharing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />} Compartir
             </button>
           </div>
         </div>
       </div>
 
       <div className="px-4 pt-5">
-        <div className="grid grid-cols-4 gap-4 pb-5 border-b border-[#E2DDD0]">
-          <Stat label="Workers" value={totalWorkers} />
-          <Stat label="Bins" value={0} />
-          <Stat label="Cases" value={0} />
-          <Stat label="Clamshells" value={0} />
+        <div className="grid grid-cols-4 gap-3 pb-5 border-b border-[#E2DDD0]">
+          <Stat label="Trabajadores" value={totalWorkers} />
+          <Stat label="Horas" value={formatHours(totalHoursAll)} smallValue />
+          <Stat label="Piezas" value={totalPieces % 1 === 0 ? totalPieces : totalPieces.toFixed(2)} />
+          <Stat label="Pago" value={fmtMoney(totalPayment)} smallValue />
         </div>
 
         <div className="py-3 text-sm text-[#556047] font-semibold">
-          Employee group by: <span className="text-[#1e40af] font-bold border-b-2 border-[#1e40af]">Location</span>
-          <span className="mx-2 text-[#889078]">|</span>
-          <span className="text-[#556047]">Job</span>
+          Agrupado por: <span className="text-[#1e40af] font-bold border-b-2 border-[#1e40af]">Ubicación</span>
         </div>
 
         {Object.entries(groupedByLocation).map(([loc, rows]) => (
@@ -1047,22 +1105,38 @@ function SummaryView({ data, selectedParcel, onClose }) {
               {rows.map((r) => (
                 <div
                   key={r.id}
-                  className="bg-white border border-[#E2DDD0] rounded-xl p-4 flex items-stretch border-l-4 border-l-[#2563EB]"
+                  className="bg-white border border-[#E2DDD0] rounded-xl p-4 border-l-4 border-l-[#2563EB]"
                   data-testid={`summary-row-${r.id}`}
                 >
-                  <div className="flex-1">
-                    <div className="text-xs text-[#889078] font-semibold uppercase tracking-wider">Name</div>
-                    <div className="font-bold text-[#1A2210] text-base">{r.worker_name}</div>
-                  </div>
-                  <div className="text-right pr-6 border-r border-[#E2DDD0]">
-                    <div className="text-xs text-[#889078] font-semibold uppercase tracking-wider">Hours</div>
-                    <div className="font-mono-stat text-base text-[#1A2210]">
-                      {r.hours ? `${Math.floor(r.hours)}h ${Math.round((r.hours % 1) * 60)}min` : "0min"}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Nombre</div>
+                      <div className="font-bold text-[#1A2210] text-base truncate">{r.worker_name}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Pago</div>
+                      <div className="font-mono-stat text-base font-extrabold text-[#1D4ED8]">
+                        {fmtMoney(r._agg.payment)}
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right pl-6">
-                    <div className="text-xs text-[#889078] font-semibold uppercase tracking-wider">Pieces</div>
-                    <div className="font-mono-stat text-base text-[#1A2210]">0</div>
+                  <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-[#F0EDE1]">
+                    <div>
+                      <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Horas</div>
+                      <div className="font-mono-stat text-sm text-[#1A2210] mt-0.5">{formatHours(r.hours)}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Piezas</div>
+                      <div className="font-mono-stat text-sm text-[#1A2210] mt-0.5">
+                        {r._agg.pieces % 1 === 0 ? r._agg.pieces : r._agg.pieces.toFixed(2)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Kg</div>
+                      <div className="font-mono-stat text-sm text-[#1A2210] mt-0.5">
+                        {r._agg.kilos ? r._agg.kilos.toFixed(2) : "—"}
+                      </div>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1078,11 +1152,11 @@ function SummaryView({ data, selectedParcel, onClose }) {
   );
 }
 
-function Stat({ label, value }) {
+function Stat({ label, value, smallValue = false }) {
   return (
     <div>
-      <div className="text-xs text-[#556047] font-semibold">{label}</div>
-      <div className="font-mono-stat text-3xl text-[#1A2210] mt-1">{value}</div>
+      <div className="text-[10px] text-[#556047] font-semibold uppercase tracking-wider">{label}</div>
+      <div className={`font-mono-stat text-[#1A2210] mt-1 ${smallValue ? "text-base font-extrabold" : "text-2xl"}`}>{value}</div>
     </div>
   );
 }
