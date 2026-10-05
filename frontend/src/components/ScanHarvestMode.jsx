@@ -57,6 +57,19 @@ export default function ScanHarvestMode() {
   const [editPrice, setEditPrice] = useState(false);
   const [listTab, setListTab] = useState("registro"); // "conteo" | "registro"
 
+  // Workers who have check-in today — only they can be scanned/added
+  const [checkedInIds, setCheckedInIds] = useState(new Set());
+  const refreshCheckedIn = async () => {
+    try {
+      const { data } = await api.get("/attendance", { params: { date: todayKey } });
+      const ids = new Set((data.rows || []).filter((r) => r.check_in).map((r) => r.worker_id));
+      setCheckedInIds(ids);
+      return ids;
+    } catch (_) {
+      return new Set();
+    }
+  };
+
   // Shared-basket mode: multiple workers split pieces until Save is pressed
   const [shareMode, setShareMode] = useState(false);
   const [shareBuffer, setShareBuffer] = useState([]); // [{id, name}] unique sharers
@@ -130,6 +143,12 @@ export default function ScanHarvestMode() {
         const pu = Number(product.price_per_unit) || 0;
         if (pu > 0) setPricePerUnit(String(pu));
         setReady(true);
+        // Load today's attendance so we can gate scans by check-in
+        try {
+          const { data: att } = await api.get("/attendance", { params: { date: todayKey } });
+          const ids = new Set((att.rows || []).filter((r) => r.check_in).map((r) => r.worker_id));
+          setCheckedInIds(ids);
+        } catch (_) {}
       } catch (_) {
         toast.error("No se pudo preparar la jornada");
       }
@@ -233,6 +252,12 @@ export default function ScanHarvestMode() {
       }
     }
 
+    // Gate: worker must have Check-in today
+    if (!checkedInIds.has(w.id)) {
+      toast.error(`⛔ ${w.name} no tiene Check-in hoy. Regístrale entrada primero.`, { duration: 3500 });
+      return;
+    }
+
     scannedCodesRef.current.set(key, now);
     playBeep();
     setLastWorker({ id: w.id, name: w.name });
@@ -248,6 +273,12 @@ export default function ScanHarvestMode() {
   const addManual = (workerId) => {
     const w = workers.find((x) => x.id === workerId);
     if (!w) return;
+    // Gate: worker must have Check-in today
+    if (!checkedInIds.has(w.id)) {
+      toast.error(`⛔ ${w.name} no tiene Check-in hoy. Regístrale entrada primero.`, { duration: 3500 });
+      setShowManual(false);
+      return;
+    }
     playBeep();
     setLastWorker({ id: w.id, name: w.name });
     if (shareMode) {
