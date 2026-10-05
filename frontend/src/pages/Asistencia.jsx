@@ -199,11 +199,12 @@ export default function Asistencia() {
   };
 
   const onCheckOut = () => {
-    if (openCount === 0) {
-      toast.info("No hay trabajadores con jornada abierta");
+    // Go to the attendance list where each worker has an individual "Salida" button
+    if (presentCount === 0) {
+      toast.info("Aún no hay trabajadores con entrada");
       return;
     }
-    setConfirmCheckout(true);
+    setView("checkin");
   };
 
   // ============== End-of-day summary + reset ==============
@@ -1082,7 +1083,8 @@ function SummaryView({ data, selectedParcel, harvestsToday = [], date, onClose }
       ].join("\n");
       const lines = data.rows.map((r) => {
         const agg = byWorker[r.worker_id] || { pieces: 0, kilos: 0, payment: 0 };
-        return `• ${r.worker_name} · ${formatHours(r.hours)} · ${agg.pieces.toFixed(agg.pieces % 1 === 0 ? 0 : 2)}u · ${fmtMoney(agg.payment)}`;
+        const timeRange = `${r.check_in_hhmm || "—"}${r.check_out_hhmm ? `→${r.check_out_hhmm}` : "→en campo"}`;
+        return `• ${r.worker_name} · ${timeRange} · ${formatHours(r.hours)} · ${agg.pieces.toFixed(agg.pieces % 1 === 0 ? 0 : 2)}u · ${fmtMoney(agg.payment)}`;
       }).join("\n");
       const text = header + "\n" + lines;
 
@@ -1181,6 +1183,9 @@ function SummaryView({ data, selectedParcel, harvestsToday = [], date, onClose }
                     <div className="min-w-0 flex-1">
                       <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Nombre</div>
                       <div className="font-bold text-[#1A2210] text-base truncate">{r.worker_name}</div>
+                      <div className="text-[11px] text-[#556047] font-semibold font-mono-stat mt-0.5">
+                        {r.check_in_hhmm || "—"}{r.check_out_hhmm ? ` → ${r.check_out_hhmm}` : " → en campo"}
+                      </div>
                     </div>
                     <div className="text-right">
                       <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Pago</div>
