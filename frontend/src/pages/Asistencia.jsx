@@ -1084,7 +1084,7 @@ function SummaryView({ data, selectedParcel, harvestsToday = [], date, onClose }
       let blob = null;
       try {
         const resp = await api.get("/receipts/export", {
-          params: { date_from: date, date_to: date },
+          params: { date_from: date, date_to: date, tz_offset: -new Date().getTimezoneOffset() },
           responseType: "blob",
         });
         blob = resp.data;

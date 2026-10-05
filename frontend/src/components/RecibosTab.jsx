@@ -230,6 +230,7 @@ export default function RecibosTab() {
           date_from: r.date_from || dateFrom,
           date_to: r.date_to || dateTo,
           worker_id: r.worker_id,
+          tz_offset: -new Date().getTimezoneOffset(),
         },
         responseType: "blob",
       })).data;
@@ -258,6 +259,7 @@ export default function RecibosTab() {
           date_to: dateTo,
           worker_id: workerId || undefined,
           crew_id: crewId || undefined,
+          tz_offset: -new Date().getTimezoneOffset(),
         },
         responseType: "blob",
       })).data;

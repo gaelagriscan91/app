@@ -974,6 +974,13 @@ async def receipts(
         ):
             continue
 
+        # Raw ISO times for export use (earliest check_in, latest check_out)
+        ci_isos = [a.get("check_in") for a in w_attendance if a.get("check_in")]
+        co_isos = [a.get("check_out") for a in w_attendance if a.get("check_out")]
+        min_ci_iso = min(ci_isos) if ci_isos else None
+        max_co_iso = max(co_isos) if co_isos else None
+        still_working = any(a.get("check_in") and not a.get("check_out") for a in w_attendance)
+
         result.append({
             "worker_id": wid,
             "worker_name": w.get("name"),
@@ -981,6 +988,9 @@ async def receipts(
             "role": w.get("role", ""),
             "date_from": date_from,
             "date_to": date_to,
+            "min_check_in_iso": min_ci_iso,
+            "max_check_out_iso": max_co_iso,
+            "still_working": still_working,
             "total_kilos": total_kilos,
             "total_units": total_units,
             "total_payment": total_payment,
@@ -993,6 +1003,20 @@ async def receipts(
     return result
 
 
+def _hhmm_local(iso_ts: Optional[str], tz_offset_minutes: int = 0) -> str:
+    """Format an ISO timestamp as HH:MM shifted by tz_offset_minutes (minutes east of UTC)."""
+    if not iso_ts:
+        return ""
+    try:
+        dt = datetime.fromisoformat(iso_ts)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        local = dt.astimezone(timezone.utc) + timedelta(minutes=tz_offset_minutes)
+        return local.strftime("%H:%M")
+    except Exception:
+        return ""
+
+
 # ---------------------------------------------------------------------------
 # Receipts Export — aggregated per worker (one row per trabajador)
 # ---------------------------------------------------------------------------
@@ -1003,10 +1027,12 @@ async def receipts_export(
     date_to: str,
     worker_id: Optional[str] = None,
     crew_id: Optional[str] = None,
+    tz_offset: int = 0,
 ):
-    """Returns an Excel with one aggregated row per worker:
-    Trabajador • Total piezas • Total kilos • Precio • Total pago."""
+    """Returns an Excel with one aggregated row per worker.
+    `tz_offset` is minutes east of UTC (JS: -new Date().getTimezoneOffset())."""
     rows = await receipts(user=user, date_from=date_from, date_to=date_to, worker_id=worker_id, crew_id=crew_id)
+    now_iso = datetime.now(timezone.utc).isoformat()
 
     wb = Workbook()
     ws = wb.active
@@ -1032,12 +1058,19 @@ async def receipts_export(
         total_units = float(r.get("total_units", 0))
         total_payment = float(r.get("total_payment", 0))
         price_per_unit = round(total_payment / total_units, 2) if total_units > 0 else 0.0
+        desde = _hhmm_local(r.get("min_check_in_iso"), tz_offset)
+        if r.get("max_check_out_iso") and not r.get("still_working"):
+            hasta = _hhmm_local(r.get("max_check_out_iso"), tz_offset)
+        elif r.get("min_check_in_iso"):
+            hasta = _hhmm_local(now_iso, tz_offset)
+        else:
+            hasta = ""
         ws.append([
             r.get("worker_name", ""),
             r.get("document_id", ""),
             r.get("role", ""),
-            r.get("date_from", ""),
-            r.get("date_to", ""),
+            desde,
+            hasta,
             _fmt_hours(r.get("total_hours", 0)),
             int(r.get("days_worked", 0)),
             float(r.get("total_kilos", 0)),
