@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Printer, Loader2, Calendar, Users, Clock, DollarSign, FileText, PrinterIcon, Bluetooth, BluetoothSearching, Receipt, FileCheck } from "lucide-react";
+import { Printer, Loader2, Calendar, Users, Clock, DollarSign, FileText, PrinterIcon, Bluetooth, BluetoothSearching, Receipt, FileCheck, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatCurrency, formatNumber } from "@/lib/api";
 import { thermalPrinter, buildReceiptLines, receiptTicketHtml } from "@/lib/thermalPrinter";
@@ -166,6 +166,92 @@ export default function RecibosTab() {
   const [btConnected, setBtConnected] = useState(false);
   const [btName, setBtName] = useState("");
   const [btPrinting, setBtPrinting] = useState("");
+  const [sharing, setSharing] = useState("");
+
+  const fmtMoney = (n) => Number(n || 0).toLocaleString("es-MX", { style: "currency", currency: "MXN" });
+
+  const buildReceiptText = (r) => {
+    const lines = [];
+    lines.push(`🧾 AgriScan — Recibo de pago`);
+    lines.push(`${r.worker_name}${r.document_id ? ` (${r.document_id})` : ""}`);
+    lines.push(`Periodo: ${r.date_from || "—"} → ${r.date_to || "—"}`);
+    lines.push("");
+    lines.push(`⏱  Horas: ${(r.total_hours || 0).toFixed(2)}`);
+    lines.push(`📅 Días: ${r.days_worked || 0}`);
+    if (r.total_kilos) lines.push(`⚖️  Kilos: ${(r.total_kilos || 0).toFixed(2)}`);
+    if (r.total_units) lines.push(`📦 Unidades: ${Math.round(r.total_units || 0)}`);
+    lines.push(`💵 Total a pagar: ${fmtMoney(r.total_payment)}`);
+    if ((r.harvests || []).length) {
+      lines.push("");
+      lines.push("— Cosechas —");
+      r.harvests.slice(0, 15).forEach((h) => {
+        const qty = h.kilos ? `${h.kilos.toFixed(2)}Kg` : h.units ? `${Math.round(h.units)}u` : "—";
+        lines.push(`• ${h.date} ${h.product_name} · ${qty} · ${fmtMoney(h.payment)}`);
+      });
+      if (r.harvests.length > 15) lines.push(`…y ${r.harvests.length - 15} más`);
+    }
+    return lines.join("\n");
+  };
+
+  const shareReceipt = async (r) => {
+    setSharing(r.worker_id);
+    try {
+      const text = buildReceiptText(r);
+      const title = `Recibo — ${r.worker_name}`;
+      if (navigator.share) {
+        try {
+          await navigator.share({ title, text });
+          toast.success("Recibo compartido");
+          return;
+        } catch (err) {
+          if (err?.name === "AbortError") return;
+        }
+      }
+      try {
+        await navigator.clipboard.writeText(text);
+        toast.success("Recibo copiado al portapapeles");
+      } catch (_) {
+        toast.error("Tu navegador no permite compartir. Usa Imprimir.");
+      }
+    } finally {
+      setSharing("");
+    }
+  };
+
+  const shareAll = async () => {
+    if (rows.length === 0) {
+      toast.error("Sin recibos para compartir");
+      return;
+    }
+    setSharing("__all__");
+    try {
+      const header = [
+        "📋 AgriScan — Recibos del periodo",
+        `${dateFrom || "—"} → ${dateTo || "—"}`,
+        `${rows.length} trabajador${rows.length !== 1 ? "es" : ""} • Nómina total: ${fmtMoney(totals.payment)}`,
+        "",
+      ].join("\n");
+      const body = rows.map((r) => buildReceiptText(r)).join("\n\n─────────────────\n\n");
+      const text = header + body;
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: "Recibos AgriScan", text });
+          toast.success("Recibos compartidos");
+          return;
+        } catch (err) {
+          if (err?.name === "AbortError") return;
+        }
+      }
+      try {
+        await navigator.clipboard.writeText(text);
+        toast.success("Recibos copiados al portapapeles");
+      } catch (_) {
+        toast.error("Tu navegador no permite compartir");
+      }
+    } finally {
+      setSharing("");
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -400,6 +486,18 @@ export default function RecibosTab() {
             </button>
           )}
         </div>
+        <button
+          onClick={shareAll}
+          disabled={sharing === "__all__" || rows.length === 0}
+          className="w-full h-12 rounded-xl bg-[#1E2746] hover:bg-[#172038] active:scale-[0.99] text-white font-extrabold flex items-center justify-center gap-2 shadow-md disabled:opacity-60 border-2 border-[#111A2E]"
+          data-testid="recibos-share-all"
+          style={{ fontFamily: "Outfit, sans-serif" }}
+        >
+          {sharing === "__all__" ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Share2 className="w-5 h-5" /> Compartir todos ({rows.length})</>}
+        </button>
+        <p className="text-[11px] text-[#889078] font-semibold text-center -mt-1">
+          Envía por WhatsApp, Mensajes, Gmail, Correo, Telegram…
+        </p>
       </div>
 
       {/* Totals */}
@@ -448,6 +546,15 @@ export default function RecibosTab() {
                   data-testid={`recibo-print-${r.worker_id}`}
                 >
                   <Printer className="w-4 h-4" /> {format === "ticket" ? "Ticket" : "Imprimir"}
+                </button>
+                <button
+                  onClick={() => shareReceipt(r)}
+                  disabled={sharing === r.worker_id}
+                  className="h-10 px-3 bg-[#1E2746] hover:bg-[#172038] text-white font-bold rounded-xl flex items-center gap-1.5 shadow-sm disabled:opacity-60"
+                  data-testid={`recibo-share-${r.worker_id}`}
+                  title="Compartir por WhatsApp, Gmail, Mensajes…"
+                >
+                  {sharing === r.worker_id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
                 </button>
                 {btConnected && (
                   <button

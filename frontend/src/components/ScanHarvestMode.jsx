@@ -139,9 +139,10 @@ export default function ScanHarvestMode() {
     return map;
   }, [workers]);
 
-  // === Camera lifecycle ===
+  // === Camera lifecycle — stream kept alive; pause/resume avoids re-prompt ===
   const containerId = "qr-reader-fullscreen";
   const qrRef = useRef(null);
+  const cameraStartedRef = useRef(false);
   const stopCamera = async () => {
     const s = qrRef.current;
     if (!s) return;
@@ -150,9 +151,15 @@ export default function ScanHarvestMode() {
       await s.clear();
     } catch (_) {}
     qrRef.current = null;
+    cameraStartedRef.current = false;
   };
   const startCamera = async () => {
     try {
+      // Already running? Just resume decoding.
+      if (qrRef.current && cameraStartedRef.current) {
+        try { qrRef.current.resume(); } catch (_) {}
+        return;
+      }
       if (qrRef.current) await stopCamera();
       const s = new Html5Qrcode(containerId, { verbose: false });
       qrRef.current = s;
@@ -162,18 +169,29 @@ export default function ScanHarvestMode() {
         (text) => handleScan(text),
         () => {}
       );
+      cameraStartedRef.current = true;
     } catch (e) {
       toast.error("No se pudo abrir la cámara. Revisa permisos.");
       setScannerOn(false);
     }
   };
+  const pauseCamera = () => {
+    const s = qrRef.current;
+    if (!s) return;
+    try { s.pause(true); } catch (_) {}
+  };
   useEffect(() => {
     if (!ready) return;
     if (scannerOn) startCamera();
-    else stopCamera();
-    return () => { stopCamera(); };
+    else pauseCamera();
+    return () => {};
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, scannerOn]);
+  // Release camera only on real unmount (navigate away)
+  useEffect(() => {
+    return () => { stopCamera(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleScan = async (rawCode) => {
     const now = Date.now();
