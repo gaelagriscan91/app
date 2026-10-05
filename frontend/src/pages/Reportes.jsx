@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Download, Filter, Loader2, Wheat, DollarSign, FileText, FileSpreadsheet, Share2 } from "lucide-react";
+import { Download, Filter, Loader2, Wheat, DollarSign, FileText, FileSpreadsheet, Share2, Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import api, { API, formatCurrency, formatNumber } from "@/lib/api";
 import RecibosTab from "@/components/RecibosTab";
@@ -28,6 +28,10 @@ export default function Reportes() {
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [showReset, setShowReset] = useState(false);
+  const [resetConfirm, setResetConfirm] = useState("");
+  const [resetIncludeAttendance, setResetIncludeAttendance] = useState(true);
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -200,6 +204,36 @@ export default function Reportes() {
     }
   };
 
+  const resetAll = async () => {
+    if (resetConfirm.trim().toUpperCase() !== "BORRAR") {
+      toast.error('Escribe "BORRAR" para confirmar');
+      return;
+    }
+    setResetting(true);
+    try {
+      const { data } = await api.post("/harvests/reset", null, {
+        params: { include_attendance: resetIncludeAttendance },
+      });
+      // Clear local scan logs for all days
+      try {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const k = localStorage.key(i);
+          if (k && (k.startsWith("agriscan.scanlog.") || k.startsWith("agriscan.session."))) {
+            localStorage.removeItem(k);
+          }
+        }
+      } catch (_) {}
+      toast.success(`Historial borrado: ${data.harvests_deleted} cosechas${resetIncludeAttendance ? ` y ${data.attendance_deleted} asistencias` : ""}`);
+      setShowReset(false);
+      setResetConfirm("");
+      setRows([]);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "No se pudo borrar el historial");
+    } finally {
+      setResetting(false);
+    }
+  };
+
   return (
     <div className="space-y-5" data-testid="reportes-page">
       <div>
@@ -239,6 +273,30 @@ export default function Reportes() {
 
       {tab === "recibos" ? <RecibosTab /> : (
       <>
+      {/* Danger zone — reset history (admin only) */}
+      <div className="field-card p-4 border-2 border-red-200 bg-red-50/60">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-red-500 text-white flex items-center justify-center shrink-0">
+            <AlertTriangle className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-extrabold text-red-900 text-sm" style={{ fontFamily: "Outfit, sans-serif" }}>
+              Empezar temporada nueva
+            </h3>
+            <p className="text-xs text-red-800/80 font-semibold mt-0.5">
+              Borra TODO el historial (cosechas y asistencias) para volver a usar la app desde cero.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowReset(true)}
+            className="h-10 px-3 bg-red-600 hover:bg-red-700 text-white font-extrabold rounded-xl flex items-center gap-1.5 shadow-sm"
+            data-testid="open-reset-modal"
+          >
+            <Trash2 className="w-4 h-4" /> Borrar todo
+          </button>
+        </div>
+      </div>
+
       {/* Filters */}
       <div className="field-card p-4 sm:p-5 space-y-4">
         <div className="flex items-center gap-2">
@@ -376,6 +434,67 @@ export default function Reportes() {
         </div>
       </div>
       </>
+      )}
+
+      {/* Reset confirmation modal */}
+      {showReset && (
+        <div className="fixed inset-0 z-[80] bg-black/70 flex items-end sm:items-center justify-center p-3" onClick={() => !resetting && setShowReset(false)}>
+          <div className="bg-white rounded-2xl p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()} data-testid="reset-modal">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-red-500 text-white flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <h3 className="text-lg font-extrabold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>
+                Borrar todo el historial
+              </h3>
+            </div>
+            <p className="text-sm text-[#556047] font-semibold mb-3">
+              Esta acción es <b className="text-red-700">irreversible</b>. Se eliminarán todas las cosechas
+              {resetIncludeAttendance ? " y las asistencias" : ""} de tu cuenta.
+              Los trabajadores, parcelas y productos NO se tocan.
+            </p>
+            <label className="flex items-center gap-2 text-sm font-semibold text-[#1A2210] mb-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={resetIncludeAttendance}
+                onChange={(e) => setResetIncludeAttendance(e.target.checked)}
+                className="w-4 h-4 accent-red-600"
+                data-testid="reset-include-attendance"
+              />
+              Borrar también asistencias (Check-in/Check-out)
+            </label>
+            <label className="block text-xs font-bold text-[#1A2210] uppercase tracking-wider mb-1">
+              Escribe <span className="text-red-600 font-mono">BORRAR</span> para confirmar
+            </label>
+            <input
+              type="text"
+              value={resetConfirm}
+              onChange={(e) => setResetConfirm(e.target.value)}
+              placeholder="BORRAR"
+              className="field-input !h-12 !text-base w-full mb-4 uppercase"
+              data-testid="reset-confirm-input"
+              autoFocus
+              autoComplete="off"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => { if (!resetting) { setShowReset(false); setResetConfirm(""); } }}
+                className="flex-1 h-12 rounded-xl bg-[#F0EDE1] hover:bg-[#E2DDD0] text-[#556047] font-bold"
+                data-testid="reset-cancel"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={resetAll}
+                disabled={resetting || resetConfirm.trim().toUpperCase() !== "BORRAR"}
+                className="flex-1 h-12 rounded-xl bg-red-600 hover:bg-red-700 text-white font-extrabold disabled:opacity-50 flex items-center justify-center gap-1.5"
+                data-testid="reset-confirm-btn"
+              >
+                {resetting ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Trash2 className="w-5 h-5" /> Borrar todo</>}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

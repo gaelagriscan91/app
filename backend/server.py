@@ -705,6 +705,21 @@ async def delete_harvest(hid: str, user: CurrentUser):
     return {"ok": True}
 
 
+@api_router.post("/harvests/reset")
+async def reset_all_harvests(user: CurrentUser, include_attendance: bool = True):
+    """Danger: deletes ALL harvests (and optionally attendance) for the current tenant.
+    Admin-only. Used to start the season fresh."""
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administrador puede borrar todo")
+    scope = scope_filter(user)
+    h_del = await db.harvests.delete_many(scope)
+    a_del = {"deleted_count": 0}
+    if include_attendance:
+        a_res = await db.attendance.delete_many(scope)
+        a_del = {"deleted_count": a_res.deleted_count}
+    return {"ok": True, "harvests_deleted": h_del.deleted_count, "attendance_deleted": a_del["deleted_count"]}
+
+
 # ---------------------------------------------------------------------------
 # Daily summary & Dashboard
 # ---------------------------------------------------------------------------
