@@ -1049,14 +1049,47 @@ function SummaryView({ data, selectedParcel, harvestsToday = [], date, onClose }
         return `• ${r.worker_name} · ${formatHours(r.hours)} · ${agg.pieces.toFixed(agg.pieces % 1 === 0 ? 0 : 2)}u · ${fmtMoney(agg.payment)}`;
       }).join("\n");
       const text = header + "\n" + lines;
+
+      // Try to attach the Excel file (same format as Recibos share)
+      let blob = null;
+      try {
+        const resp = await api.get("/receipts/export", {
+          params: { date_from: date, date_to: date },
+          responseType: "blob",
+        });
+        blob = resp.data;
+      } catch (_) {}
+
+      const filename = `resumen_${date}.xlsx`;
+      if (blob && navigator.canShare) {
+        const file = new File([blob], filename, {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+        if (navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({ title: "Resumen de jornada", text, files: [file] });
+            toast.success("Resumen compartido");
+            return;
+          } catch (err) { if (err?.name === "AbortError") return; }
+        }
+      }
+      // Fallback: share only text
       if (navigator.share) {
         try {
           await navigator.share({ title: "Resumen de jornada", text });
-          toast.success("Resumen compartido");
+          toast.success("Resumen compartido (texto). Descarga el Excel para adjuntarlo también.");
           return;
         } catch (err) { if (err?.name === "AbortError") return; }
       }
-      try { await navigator.clipboard.writeText(text); toast.success("Resumen copiado"); }
+      // Last fallback: download the file + copy text
+      if (blob) {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); a.remove();
+        window.URL.revokeObjectURL(url);
+      }
+      try { await navigator.clipboard.writeText(text); toast.success("Excel descargado y resumen copiado"); }
       catch (_) { toast.error("No se pudo compartir"); }
     } finally { setSharing(false); }
   };
