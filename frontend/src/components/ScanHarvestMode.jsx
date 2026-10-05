@@ -57,9 +57,10 @@ export default function ScanHarvestMode() {
   const [editPrice, setEditPrice] = useState(false);
   const [listTab, setListTab] = useState("registro"); // "conteo" | "registro"
 
-  // Shared-basket mode: multiple workers split 1 piece until basket is closed
+  // Shared-basket mode: multiple workers split pieces until Save is pressed
   const [shareMode, setShareMode] = useState(false);
-  const [shareBuffer, setShareBuffer] = useState([]); // [{id, name}] unique
+  const [shareBuffer, setShareBuffer] = useState([]); // [{id, name}] unique sharers
+  const [shareBaskets, setShareBaskets] = useState(0); // # of baskets shared by this group
 
   // Audit scan log — one entry per scan event (QR + manual). Persisted by date.
   const scanLogKey = `agriscan.scanlog.${todayKey}`;
@@ -232,9 +233,9 @@ export default function ScanHarvestMode() {
     playBeep();
     setLastWorker({ id: w.id, name: w.name });
     if (shareMode) {
-      // Shared basket: add worker to buffer (dedupe); piece is split on close
+      // Shared basket: add worker to the sharing group (dedupe)
       setShareBuffer((prev) => (prev.some((x) => x.id === w.id) ? prev : [...prev, { id: w.id, name: w.name }]));
-      toast.success(`Canasta compartida: +${w.name}`, { duration: 1200 });
+      setShareBaskets((n) => (n < 1 ? 1 : n)); // first scan opens 1 basket
       logScan(w, "qr");
       return;
     }
@@ -252,7 +253,7 @@ export default function ScanHarvestMode() {
     setLastWorker({ id: w.id, name: w.name });
     if (shareMode) {
       setShareBuffer((prev) => (prev.some((x) => x.id === w.id) ? prev : [...prev, { id: w.id, name: w.name }]));
-      toast.success(`Canasta compartida: +${w.name}`, { duration: 1200 });
+      setShareBaskets((n) => (n < 1 ? 1 : n));
       logScan(w, "manual");
       setShowManual(false);
       return;
@@ -265,10 +266,10 @@ export default function ScanHarvestMode() {
     setShowManual(false);
   };
 
-  // Close a shared basket: distribute 1 piece / N across the buffer, clear buffer
-  const closeSharedBasket = () => {
-    if (shareBuffer.length === 0) return 0;
-    const share = 1 / shareBuffer.length;
+  // Commit shared basket on save: distribute (shareBaskets / N) to each sharer
+  const commitSharedBasket = () => {
+    if (shareBuffer.length === 0 || shareBaskets <= 0) return 0;
+    const share = shareBaskets / shareBuffer.length;
     setTally((prev) => {
       const next = { ...prev };
       shareBuffer.forEach((w) => {
@@ -279,7 +280,8 @@ export default function ScanHarvestMode() {
     });
     const n = shareBuffer.length;
     setShareBuffer([]);
-    toast.success(`Canasta cerrada · ${n} trabajadores · ${(share).toFixed(2)} c/u`, { duration: 1800 });
+    setShareBaskets(0);
+    setShareMode(false);
     return n;
   };
 
@@ -336,10 +338,9 @@ export default function ScanHarvestMode() {
   const totalScanned = scanLog.length;
 
   const save = async () => {
-    // Auto-close any pending shared basket before saving
-    if (shareBuffer.length > 0) {
-      closeSharedBasket();
-      // Allow state to flush
+    // Commit pending shared basket into tally before saving
+    if (shareBuffer.length > 0 && shareBaskets > 0) {
+      commitSharedBasket();
       await new Promise((r) => setTimeout(r, 50));
     }
     const entries = Object.entries(tally);
@@ -472,8 +473,9 @@ export default function ScanHarvestMode() {
         <button
           onClick={() => {
             if (shareMode && shareBuffer.length > 0) {
-              if (!window.confirm("Hay una canasta sin cerrar. ¿Descartar?")) return;
+              if (!window.confirm("Hay una canasta compartida sin guardar. ¿Descartar?")) return;
               setShareBuffer([]);
+              setShareBaskets(0);
             }
             setShareMode((v) => !v);
           }}
@@ -486,30 +488,6 @@ export default function ScanHarvestMode() {
           <Users className="w-4 h-4" />
           {shareMode ? "Compartir ON" : "Compartir"}
         </button>
-
-        {/* Shared-basket buffer card (shows while filling a shared basket) */}
-        {shareMode && shareBuffer.length > 0 && (
-          <div className="absolute top-[132px] left-3 right-3 bg-[#E65100] text-white rounded-xl shadow-2xl px-3 py-2.5 flex items-center gap-3 border-2 border-[#C63D00]" data-testid="scan-share-buffer">
-            <div className="flex-1 min-w-0">
-              <div className="text-[10px] font-bold uppercase tracking-wider opacity-90 leading-none">
-                Canasta compartida · {shareBuffer.length} trabajador{shareBuffer.length !== 1 ? "es" : ""}
-              </div>
-              <div className="text-sm font-bold truncate mt-0.5">
-                {shareBuffer.map((w) => w.name).join(" · ")}
-              </div>
-              <div className="text-[11px] opacity-85 mt-0.5">
-                → {(1 / shareBuffer.length).toFixed(2)} pieza c/u · {formatCurrency((parseFloat(pricePerUnit) || 0) / shareBuffer.length)} c/u
-              </div>
-            </div>
-            <button
-              onClick={closeSharedBasket}
-              className="h-10 px-3 bg-white text-[#E65100] font-extrabold rounded-xl flex items-center gap-1.5 shadow-sm"
-              data-testid="scan-share-close"
-            >
-              <Check className="w-4 h-4" /> Cerrar
-            </button>
-          </div>
-        )}
 
         {/* Side action: Manual add */}
         <button
@@ -534,9 +512,46 @@ export default function ScanHarvestMode() {
         )}
       </div>
 
-      {/* Blue bottom bar — last worker + totals */}
+      {/* Blue bottom bar — last worker + totals (or shared-basket panel when active) */}
       <div className="bg-[#2B55D1] text-white pb-[env(safe-area-inset-bottom)]" data-testid="scan-bottom-bar">
-        {lastWorkerStats ? (
+        {shareMode && shareBuffer.length > 0 ? (
+          <div className="px-4 pt-3 pb-2" data-testid="scan-share-panel">
+            <div className="text-sm font-bold opacity-95 truncate" data-testid="scan-share-names">
+              {shareBuffer.map((w) => w.name).join(", ")}
+            </div>
+            <div className="flex items-end gap-3 mt-1">
+              <div className="font-mono-stat text-5xl leading-none" data-testid="scan-share-baskets">
+                {shareBaskets}
+              </div>
+              <div className="pb-1">
+                <div className="text-sm font-bold leading-tight">
+                  canasta{shareBaskets !== 1 ? "s" : ""}
+                </div>
+                <div className="text-xs opacity-85 leading-tight">
+                  compartida{shareBaskets !== 1 ? "s" : ""}
+                </div>
+              </div>
+              <div className="ml-auto flex items-center gap-1">
+                <button
+                  onClick={() => setShareBaskets((n) => Math.max(0, n - 1))}
+                  className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center"
+                  data-testid="scan-share-dec"
+                  aria-label="Restar canasta"
+                >
+                  <Minus className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => setShareBaskets((n) => n + 1)}
+                  className="w-10 h-10 rounded-full bg-white text-[#2B55D1] hover:bg-white/90 flex items-center justify-center"
+                  data-testid="scan-share-inc"
+                  aria-label="Sumar canasta"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : lastWorkerStats ? (
           <div className="px-4 pt-3 pb-2">
             <div className="text-sm font-bold opacity-90 truncate" data-testid="scan-last-worker-name">
               {lastWorkerStats.name}
@@ -575,29 +590,48 @@ export default function ScanHarvestMode() {
           </div>
         ) : (
           <div className="px-4 py-5 text-center text-sm font-bold opacity-85" data-testid="scan-bottom-empty">
-            Enfoca el QR del trabajador…
+            {shareMode ? "Escanea trabajadores para compartir la canasta…" : "Enfoca el QR del trabajador…"}
           </div>
         )}
 
         {/* Totals strip + Save */}
         <div className="px-3 pb-3 flex items-center gap-2">
           <div className="flex-1 bg-black/20 rounded-xl px-3 py-2">
-            <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">Jornada</div>
-            <div className="flex items-center gap-3 mt-0.5">
-              <div className="font-mono-stat text-lg leading-none">
-                {totals.workers}👤
-              </div>
-              <div className="font-mono-stat text-lg leading-none">
-                {formatNumber(totals.units, totals.units % 1 === 0 ? 0 : 2)}🧺
-              </div>
-              <div className="font-mono-stat text-lg leading-none ml-auto">
-                {formatCurrency(totals.payment)}
-              </div>
-            </div>
+            {shareMode && shareBuffer.length > 0 ? (
+              <>
+                <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">Pago por trabajador</div>
+                <div className="flex items-center gap-3 mt-0.5">
+                  <div className="font-mono-stat text-lg leading-none">
+                    {shareBuffer.length}👤
+                  </div>
+                  <div className="font-mono-stat text-lg leading-none">
+                    {shareBaskets}🧺
+                  </div>
+                  <div className="font-mono-stat text-lg leading-none ml-auto">
+                    {formatCurrency(shareBuffer.length > 0 ? (shareBaskets * (parseFloat(pricePerUnit) || 0)) / shareBuffer.length : 0)} c/u
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">Jornada</div>
+                <div className="flex items-center gap-3 mt-0.5">
+                  <div className="font-mono-stat text-lg leading-none">
+                    {totals.workers}👤
+                  </div>
+                  <div className="font-mono-stat text-lg leading-none">
+                    {formatNumber(totals.units, totals.units % 1 === 0 ? 0 : 2)}🧺
+                  </div>
+                  <div className="font-mono-stat text-lg leading-none ml-auto">
+                    {formatCurrency(totals.payment)}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
           <button
             onClick={save}
-            disabled={saving || Object.keys(tally).length === 0}
+            disabled={saving || (Object.keys(tally).length === 0 && !(shareMode && shareBuffer.length > 0 && shareBaskets > 0))}
             className="h-[52px] px-4 rounded-xl bg-[#E65100] hover:bg-[#C63D00] active:scale-[0.98] text-white font-extrabold flex items-center gap-1.5 shadow-md disabled:opacity-50"
             data-testid="scan-save-button"
             style={{ fontFamily: "Outfit, sans-serif" }}
