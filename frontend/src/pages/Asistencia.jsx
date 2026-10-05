@@ -31,6 +31,12 @@ export default function Asistencia() {
   const [harvestsToday, setHarvestsToday] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [nowTick, setNowTick] = useState(Date.now());
+  // Live clock — refresh elapsed time every 30s
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), 30000);
+    return () => clearInterval(id);
+  }, []);
 
   // Session (persisted in localStorage per-date)
   const [session, setSession] = useState(() => loadSession(todayISO()));
@@ -423,6 +429,21 @@ export default function Asistencia() {
             {data.rows.map((r) => {
               const w = workers.find((x) => x.id === r.worker_id);
               const shortId = (w?.id_document || w?.id || "").toString().slice(-3) || "—";
+              // Live elapsed time since check-in (or final duration if checked out)
+              let elapsedLabel = "—";
+              const open = !r.check_out_hhmm && r.check_in;
+              if (r.check_out && r.check_in) {
+                const h = Number(r.hours) || 0;
+                const hh = Math.floor(h);
+                const mm = Math.round((h % 1) * 60);
+                elapsedLabel = hh > 0 ? `${hh}h ${mm}m` : `${mm}m`;
+              } else if (open) {
+                const ms = nowTick - new Date(r.check_in).getTime();
+                const mins = Math.max(0, Math.floor(ms / 60000));
+                const hh = Math.floor(mins / 60);
+                const mm = mins % 60;
+                elapsedLabel = hh > 0 ? `${hh}h ${mm}m` : `${mm}m`;
+              }
               return (
                 <div
                   key={r.id}
@@ -433,16 +454,31 @@ export default function Asistencia() {
                     {shortId}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-[11px] text-[#889078] font-bold uppercase tracking-wider">Name</div>
                     <div className="font-bold text-[#1A2210] truncate">{r.worker_name}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-[11px] text-[#889078] font-bold uppercase tracking-wider">Hora</div>
-                    <div className="font-mono-stat text-sm text-[#1A2210]">
-                      {r.check_in_hhmm}{r.check_out_hhmm ? ` → ${r.check_out_hhmm}` : ""}
+                    <div className="text-[11px] text-[#889078] font-semibold font-mono-stat">
+                      {r.check_in_hhmm}{r.check_out_hhmm ? ` → ${r.check_out_hhmm}` : " →"}
                     </div>
                   </div>
-                  <span className={`w-2.5 h-2.5 rounded-full ${r.check_out_hhmm ? "bg-[#5A4A98]" : "bg-[#2563EB]"}`} />
+                  <div className="text-right">
+                    <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider leading-none">
+                      {open ? "En campo" : "Jornada"}
+                    </div>
+                    <div className={`font-mono-stat text-base font-extrabold mt-0.5 ${open ? "text-[#1D4ED8]" : "text-[#5A4A98]"}`}>
+                      {elapsedLabel}
+                    </div>
+                  </div>
+                  {open ? (
+                    <button
+                      onClick={() => submitCode(w?.qr_code || w?.id || r.worker_id)}
+                      disabled={processing}
+                      className="h-10 px-3 bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold rounded-xl text-xs flex items-center gap-1 shrink-0 disabled:opacity-60"
+                      data-testid={`hub-checkout-${r.id}`}
+                    >
+                      Salida
+                    </button>
+                  ) : (
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#5A4A98] shrink-0" />
+                  )}
                 </div>
               );
             })}

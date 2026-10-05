@@ -964,8 +964,14 @@ async def receipts(
                 "hours": _duration_hours(a.get("check_in"), a.get("check_out")),
             })
 
-        # Skip workers with no activity at all
-        if total_payment == 0 and total_hours == 0 and total_kilos == 0 and total_units == 0:
+        # Skip workers with no activity at all (no attendance AND no harvests)
+        if (
+            total_payment == 0
+            and total_hours == 0
+            and total_kilos == 0
+            and total_units == 0
+            and len(w_attendance) == 0
+        ):
             continue
 
         result.append({
