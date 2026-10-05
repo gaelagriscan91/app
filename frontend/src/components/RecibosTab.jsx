@@ -225,11 +225,14 @@ export default function RecibosTab() {
   const shareReceipt = async (r) => {
     setSharing(r.worker_id);
     try {
-      const blob = await fetchHarvestsBlob({
-        date_from: r.date_from || dateFrom || undefined,
-        date_to: r.date_to || dateTo || undefined,
-        worker_id: r.worker_id,
-      });
+      const blob = await (await api.get("/receipts/export", {
+        params: {
+          date_from: r.date_from || dateFrom,
+          date_to: r.date_to || dateTo,
+          worker_id: r.worker_id,
+        },
+        responseType: "blob",
+      })).data;
       const filename = `recibo_${(r.worker_name || "trabajador").replace(/\s+/g, "_")}_${r.date_to || todayISO()}.xlsx`;
       const text = buildReceiptText(r);
       const result = await shareOrDownloadBlob(blob, filename, text);
@@ -249,12 +252,15 @@ export default function RecibosTab() {
     }
     setSharing("__all__");
     try {
-      const blob = await fetchHarvestsBlob({
-        date_from: dateFrom || undefined,
-        date_to: dateTo || undefined,
-        worker_id: workerId || undefined,
-        crew_id: crewId || undefined,
-      });
+      const blob = await (await api.get("/receipts/export", {
+        params: {
+          date_from: dateFrom,
+          date_to: dateTo,
+          worker_id: workerId || undefined,
+          crew_id: crewId || undefined,
+        },
+        responseType: "blob",
+      })).data;
       const filename = `recibos_${dateFrom || "inicio"}_a_${dateTo || todayISO()}.xlsx`;
       const text = [
         "📋 AgriScan — Recibos del periodo",

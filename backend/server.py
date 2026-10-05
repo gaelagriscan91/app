@@ -858,9 +858,6 @@ async def export_excel(
     )
 
 
-# ---------------------------------------------------------------------------
-# Receipts (Recibos de pago)
-# ---------------------------------------------------------------------------
 @api_router.get("/receipts")
 async def receipts(
     user: CurrentUser,
@@ -967,6 +964,83 @@ async def receipts(
             "attendance": attendance_lines,
         })
     return result
+
+
+# ---------------------------------------------------------------------------
+# Receipts Export — aggregated per worker (one row per trabajador)
+# ---------------------------------------------------------------------------
+@api_router.get("/receipts/export")
+async def receipts_export(
+    user: CurrentUser,
+    date_from: str,
+    date_to: str,
+    worker_id: Optional[str] = None,
+    crew_id: Optional[str] = None,
+):
+    """Returns an Excel with one aggregated row per worker:
+    Trabajador • Total piezas • Total kilos • Precio • Total pago."""
+    rows = await receipts(user=user, date_from=date_from, date_to=date_to, worker_id=worker_id, crew_id=crew_id)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Recibos"
+    ws.append([
+        "Trabajador", "ID", "Rol",
+        "Periodo desde", "Periodo hasta",
+        "Horas", "Días",
+        "Total kilos", "Total piezas",
+        "Precio/pieza", "Total a pagar ($)",
+    ])
+    grand_hours = 0.0
+    grand_kilos = 0.0
+    grand_units = 0.0
+    grand_payment = 0.0
+    for r in rows:
+        total_units = float(r.get("total_units", 0))
+        total_payment = float(r.get("total_payment", 0))
+        price_per_unit = round(total_payment / total_units, 2) if total_units > 0 else 0.0
+        ws.append([
+            r.get("worker_name", ""),
+            r.get("document_id", ""),
+            r.get("role", ""),
+            r.get("date_from", ""),
+            r.get("date_to", ""),
+            float(r.get("total_hours", 0)),
+            int(r.get("days_worked", 0)),
+            float(r.get("total_kilos", 0)),
+            total_units,
+            price_per_unit,
+            total_payment,
+        ])
+        grand_hours += float(r.get("total_hours", 0))
+        grand_kilos += float(r.get("total_kilos", 0))
+        grand_units += total_units
+        grand_payment += total_payment
+
+    ws.append([])
+    ws.append([
+        "TOTALES", "", "", "", "",
+        round(grand_hours, 2),
+        "",
+        round(grand_kilos, 2),
+        round(grand_units, 2),
+        "",
+        round(grand_payment, 2),
+    ])
+
+    for col in ws.columns:
+        length = max((len(str(c.value)) for c in col if c.value is not None), default=10)
+        ws.column_dimensions[col[0].column_letter].width = min(length + 2, 30)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    filename = f"recibos_{date_from}_a_{date_to}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # ---------------------------------------------------------------------------
