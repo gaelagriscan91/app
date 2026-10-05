@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AgriScan</string>
+    <string name="title_activity_main">AgriScan</string>
+    <string name="package_name">com.agriscan.app</string>
+    <string name="custom_url_scheme">com.agriscan.app</string>
+</resources>
