@@ -193,26 +193,50 @@ export default function RecibosTab() {
     return lines.join("\n");
   };
 
+  // Fetch the harvests Excel blob with filters and share/download it
+  const fetchHarvestsBlob = async (params) => {
+    const resp = await api.get("/harvests/export", { params, responseType: "blob" });
+    return resp.data;
+  };
+
+  const shareOrDownloadBlob = async (blob, filename, text) => {
+    const file = new File([blob], filename, {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    // 1) Native share with file
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ title: filename, text, files: [file] });
+        return "shared";
+      } catch (err) {
+        if (err?.name === "AbortError") return "cancelled";
+      }
+    }
+    // 2) Fallback: download the file + copy text summary
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    window.URL.revokeObjectURL(url);
+    try { await navigator.clipboard.writeText(text); } catch (_) {}
+    return "downloaded";
+  };
+
   const shareReceipt = async (r) => {
     setSharing(r.worker_id);
     try {
+      const blob = await fetchHarvestsBlob({
+        date_from: r.date_from || dateFrom || undefined,
+        date_to: r.date_to || dateTo || undefined,
+        worker_id: r.worker_id,
+      });
+      const filename = `recibo_${(r.worker_name || "trabajador").replace(/\s+/g, "_")}_${r.date_to || todayISO()}.xlsx`;
       const text = buildReceiptText(r);
-      const title = `Recibo — ${r.worker_name}`;
-      if (navigator.share) {
-        try {
-          await navigator.share({ title, text });
-          toast.success("Recibo compartido");
-          return;
-        } catch (err) {
-          if (err?.name === "AbortError") return;
-        }
-      }
-      try {
-        await navigator.clipboard.writeText(text);
-        toast.success("Recibo copiado al portapapeles");
-      } catch (_) {
-        toast.error("Tu navegador no permite compartir. Usa Imprimir.");
-      }
+      const result = await shareOrDownloadBlob(blob, filename, text);
+      if (result === "shared") toast.success("Recibo compartido");
+      else if (result === "downloaded") toast.success("Excel descargado — adjúntalo al mensaje");
+    } catch (e) {
+      toast.error("No se pudo compartir el recibo");
     } finally {
       setSharing("");
     }
@@ -225,29 +249,23 @@ export default function RecibosTab() {
     }
     setSharing("__all__");
     try {
-      const header = [
+      const blob = await fetchHarvestsBlob({
+        date_from: dateFrom || undefined,
+        date_to: dateTo || undefined,
+        worker_id: workerId || undefined,
+        crew_id: crewId || undefined,
+      });
+      const filename = `recibos_${dateFrom || "inicio"}_a_${dateTo || todayISO()}.xlsx`;
+      const text = [
         "📋 AgriScan — Recibos del periodo",
         `${dateFrom || "—"} → ${dateTo || "—"}`,
-        `${rows.length} trabajador${rows.length !== 1 ? "es" : ""} • Nómina total: ${fmtMoney(totals.payment)}`,
-        "",
+        `${rows.length} trabajador${rows.length !== 1 ? "es" : ""} • Nómina: ${fmtMoney(totals.payment)}`,
       ].join("\n");
-      const body = rows.map((r) => buildReceiptText(r)).join("\n\n─────────────────\n\n");
-      const text = header + body;
-      if (navigator.share) {
-        try {
-          await navigator.share({ title: "Recibos AgriScan", text });
-          toast.success("Recibos compartidos");
-          return;
-        } catch (err) {
-          if (err?.name === "AbortError") return;
-        }
-      }
-      try {
-        await navigator.clipboard.writeText(text);
-        toast.success("Recibos copiados al portapapeles");
-      } catch (_) {
-        toast.error("Tu navegador no permite compartir");
-      }
+      const result = await shareOrDownloadBlob(blob, filename, text);
+      if (result === "shared") toast.success("Recibos compartidos");
+      else if (result === "downloaded") toast.success("Excel descargado — adjúntalo al mensaje");
+    } catch (e) {
+      toast.error("No se pudo compartir los recibos");
     } finally {
       setSharing("");
     }
