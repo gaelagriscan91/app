@@ -24,7 +24,7 @@ export default function AppLayout() {
   return (
     <div className="min-h-screen bg-[#F7F5EE] pb-24">
       {/* Header */}
-      <header className="bg-[#1E4620] text-white sticky top-0 z-40 shadow-md">
+      <header className="bg-[#1D4ED8] text-white sticky top-0 z-40 shadow-md">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <LogoHandCherry size={42} className="flex-shrink-0" />
@@ -32,7 +32,7 @@ export default function AppLayout() {
               <div className="font-extrabold text-lg leading-tight tracking-tight" style={{ fontFamily: "Outfit, sans-serif" }}>
                 AgriScan
               </div>
-              <div className="text-[11px] text-emerald-100 leading-tight">
+              <div className="text-[11px] text-blue-100 leading-tight">
                 Control de cosechas
               </div>
             </div>
@@ -42,21 +42,21 @@ export default function AppLayout() {
               <div className="text-sm font-semibold leading-tight flex items-center gap-1.5 justify-end" data-testid="header-user-name">
                 {user?.name}
                 {user?.role === "admin" && (
-                  <span className="bg-[#E89C3F] text-white px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider" data-testid="admin-badge">
+                  <span className="bg-[#2563EB] text-white px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider" data-testid="admin-badge">
                     Admin
                   </span>
                 )}
               </div>
-              <div className="text-[11px] text-emerald-200 leading-tight">{user?.email}</div>
+              <div className="text-[11px] text-blue-200 leading-tight">{user?.email}</div>
             </div>
             {user?.role === "admin" && (
-              <span className="sm:hidden bg-[#E89C3F] text-white px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider" data-testid="admin-badge-mobile">
+              <span className="sm:hidden bg-[#2563EB] text-white px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider" data-testid="admin-badge-mobile">
                 Admin
               </span>
             )}
             <button
               onClick={handleLogout}
-              className="h-10 px-3 rounded-lg bg-[#153417] hover:bg-[#0e2410] text-white text-sm font-semibold flex items-center gap-1.5 transition-colors border border-emerald-800"
+              className="h-10 px-3 rounded-lg bg-[#1E3A8A] hover:bg-[#0e2410] text-white text-sm font-semibold flex items-center gap-1.5 transition-colors border border-blue-800"
               data-testid="logout-button"
               aria-label="Cerrar sesión"
             >
@@ -84,14 +84,14 @@ export default function AppLayout() {
               className={({ isActive }) =>
                 `flex flex-col items-center justify-center py-2.5 gap-0.5 transition-colors ${
                   isActive
-                    ? "text-[#1E4620]"
-                    : "text-[#889078] hover:text-[#1E4620]"
+                    ? "text-[#1D4ED8]"
+                    : "text-[#889078] hover:text-[#1D4ED8]"
                 }`
               }
             >
               {({ isActive }) => (
                 <>
-                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all ${isActive ? "bg-[#1E4620] text-white shadow-md scale-105" : "bg-transparent"}`}>
+                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all ${isActive ? "bg-[#1D4ED8] text-white shadow-md scale-105" : "bg-transparent"}`}>
                     <Icon className="w-5 h-5" strokeWidth={2.3} />
                   </div>
                   <span className="text-[11px] font-semibold leading-tight">{label}</span>

@@ -59,14 +59,14 @@ export default function ListaDia() {
 
       {/* Totals */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-        <div className="rounded-2xl bg-[#1E4620] text-white p-4 border-2 border-[#153417] shadow-sm" data-testid="daily-total-kilos">
+        <div className="rounded-2xl bg-[#1D4ED8] text-white p-4 border-2 border-[#1E3A8A] shadow-sm" data-testid="daily-total-kilos">
           <div className="flex items-center justify-between">
             <div className="text-[11px] font-bold uppercase tracking-wider opacity-90">Total kilos</div>
             <Wheat className="w-5 h-5 opacity-85" />
           </div>
           <div className="font-mono-stat text-2xl sm:text-3xl mt-1">{formatNumber(data?.total_kilos || 0, 2)} <span className="text-base">Kg</span></div>
         </div>
-        <div className="rounded-2xl bg-[#E65100] text-white p-4 border-2 border-[#C63D00] shadow-sm" data-testid="daily-total-payment">
+        <div className="rounded-2xl bg-[#DC2626] text-white p-4 border-2 border-[#B91C1C] shadow-sm" data-testid="daily-total-payment">
           <div className="flex items-center justify-between">
             <div className="text-[11px] font-bold uppercase tracking-wider opacity-90">Total a pagar</div>
             <DollarSign className="w-5 h-5 opacity-85" />
@@ -83,7 +83,7 @@ export default function ListaDia() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-10 text-[#1E4620]">
+        <div className="flex items-center justify-center py-10 text-[#1D4ED8]">
           <Loader2 className="w-6 h-6 animate-spin" />
         </div>
       ) : (
@@ -91,7 +91,7 @@ export default function ListaDia() {
           {/* By worker */}
           <div className="field-card p-4 sm:p-5">
             <div className="flex items-center gap-2 mb-3">
-              <Users className="w-5 h-5 text-[#1E4620]" />
+              <Users className="w-5 h-5 text-[#1D4ED8]" />
               <h3 className="text-lg font-bold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>
                 Resumen por trabajador
               </h3>
@@ -114,7 +114,7 @@ export default function ListaDia() {
                         {formatNumber(w.kilos, 2)} Kg • {formatNumber(w.units, 0)} u. • {w.count} registros
                       </div>
                     </div>
-                    <div className="font-mono-stat text-lg text-[#15803D]">{formatCurrency(w.payment)}</div>
+                    <div className="font-mono-stat text-lg text-[#1D4ED8]">{formatCurrency(w.payment)}</div>
                   </div>
                 ))}
               </div>
@@ -150,7 +150,7 @@ export default function ListaDia() {
                       ) : null}
                     </div>
                     <div className="flex flex-col items-end gap-2">
-                      <div className="font-mono-stat text-base text-[#15803D]">{formatCurrency(h.payment)}</div>
+                      <div className="font-mono-stat text-base text-[#1D4ED8]">{formatCurrency(h.payment)}</div>
                       <button
                         onClick={() => onDelete(h.id)}
                         className="text-red-600 hover:bg-red-50 w-8 h-8 rounded-lg flex items-center justify-center"

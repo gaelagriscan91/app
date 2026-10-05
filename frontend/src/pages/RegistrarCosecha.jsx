@@ -149,7 +149,7 @@ export default function RegistrarCosecha() {
           data-testid="mode-manual-button"
           className={`flex-1 flex items-center justify-center gap-2 h-12 px-4 rounded-xl font-bold text-sm transition-all ${
             mode === "manual"
-              ? "bg-[#1E4620] text-white shadow-md"
+              ? "bg-[#1D4ED8] text-white shadow-md"
               : "text-[#556047] hover:bg-[#F0EDE1]"
           }`}
         >
@@ -160,7 +160,7 @@ export default function RegistrarCosecha() {
           data-testid="mode-qr-button"
           className={`flex-1 flex items-center justify-center gap-2 h-12 px-4 rounded-xl font-bold text-sm transition-all ${
             mode === "qr"
-              ? "bg-[#1E4620] text-white shadow-md"
+              ? "bg-[#1D4ED8] text-white shadow-md"
               : "text-[#556047] hover:bg-[#F0EDE1]"
           }`}
         >
@@ -237,7 +237,7 @@ export default function RegistrarCosecha() {
           </div>
 
           {/* Payment preview */}
-          <div className="rounded-2xl bg-[#E65100] text-white p-4 flex items-center justify-between" data-testid="calculated-payment-display">
+          <div className="rounded-2xl bg-[#DC2626] text-white p-4 flex items-center justify-between" data-testid="calculated-payment-display">
             <div className="text-[11px] font-bold uppercase tracking-wider opacity-90">Pago</div>
             <div className="font-mono-stat text-2xl sm:text-3xl">{formatCurrency(payment)}</div>
           </div>

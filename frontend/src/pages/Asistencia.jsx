@@ -323,9 +323,9 @@ export default function Asistencia() {
           data-testid="hub-greeting"
         >
           {nowGreeting()}, hoy trabajas en{" "}
-          <span className="text-[#F4B860]">{selectedParcel?.name || "—"}</span>
+          <span className="text-[#2563EB]">{selectedParcel?.name || "—"}</span>
           {" "}y{" "}
-          <span className="text-[#F4B860]">{selectedProduct?.name || "—"}</span> picking.
+          <span className="text-[#2563EB]">{selectedProduct?.name || "—"}</span> picking.
         </h1>
 
         {/* Rancho / Mayordomo chip-row */}
@@ -355,8 +355,8 @@ export default function Asistencia() {
             testid="tile-check-in"
             label="Check in"
             onClick={onCheckIn}
-            colorFrom="#F6C27A"
-            colorTo="#E89C3F"
+            colorFrom="#60A5FA"
+            colorTo="#2563EB"
             icon={<Sun className="w-9 h-9" strokeWidth={2.3} />}
             badge={presentCount > 0 ? presentCount : null}
           />
@@ -401,13 +401,13 @@ export default function Asistencia() {
 
         {/* Status strip */}
         <div className="grid grid-cols-3 gap-2 mb-4">
-          <MiniStat label="Entrada" value={presentCount} color="#E89C3F" />
-          <MiniStat label="En campo" value={openCount} color="#1E4620" />
-          <MiniStat label="Salida" value={presentCount - openCount} color="#5A4A98" />
+          <MiniStat label="Entrada" value={presentCount} color="#2563EB" />
+          <MiniStat label="En campo" value={openCount} color="#1D4ED8" />
+          <MiniStat label="Salida" value={presentCount - openCount} color="#DC2626" />
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-8 text-[#1E4620]"><Loader2 className="w-6 h-6 animate-spin" /></div>
+          <div className="flex justify-center py-8 text-[#1D4ED8]"><Loader2 className="w-6 h-6 animate-spin" /></div>
         ) : data.rows.length === 0 ? (
           <div className="bg-white rounded-2xl border border-[#E2DDD0] py-10 text-center" data-testid="hub-empty">
             <p className="text-[#889078] font-semibold">No piece work today.</p>
@@ -437,7 +437,7 @@ export default function Asistencia() {
                       {r.check_in_hhmm}{r.check_out_hhmm ? ` → ${r.check_out_hhmm}` : ""}
                     </div>
                   </div>
-                  <span className={`w-2.5 h-2.5 rounded-full ${r.check_out_hhmm ? "bg-[#5A4A98]" : "bg-emerald-500"}`} />
+                  <span className={`w-2.5 h-2.5 rounded-full ${r.check_out_hhmm ? "bg-[#5A4A98]" : "bg-[#2563EB]"}`} />
                 </div>
               );
             })}
@@ -449,12 +449,12 @@ export default function Asistencia() {
       {endDayOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => !closingDay && setEndDayOpen(false)}>
           <div className="bg-white rounded-t-3xl sm:rounded-3xl p-6 w-full sm:max-w-md shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()} data-testid="end-day-modal">
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-[#1E4620]/10 text-[#1E4620] flex items-center justify-center text-2xl">🏁</div>
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-[#1D4ED8]/10 text-[#1D4ED8] flex items-center justify-center text-2xl">🏁</div>
             <h3 className="font-extrabold text-xl text-center mt-3" style={{ fontFamily: "Outfit, sans-serif" }}>Resumen del día</h3>
             <p className="text-center text-sm text-[#556047] font-semibold mt-1">{prettyDate}</p>
 
             {loadingSummary || !endDaySummary ? (
-              <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-[#1E4620]" /></div>
+              <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-[#1D4ED8]" /></div>
             ) : (
               <>
                 <div className="grid grid-cols-2 gap-2 mt-4">
@@ -463,7 +463,7 @@ export default function Asistencia() {
                   <SummaryCell label="Piezas" value={formatNumber(endDaySummary.units, 0)} />
                   <SummaryCell label="Horas" value={formatNumber(endDaySummary.total_hours, 2)} />
                 </div>
-                <div className="mt-3 rounded-2xl bg-[#E65100] text-white p-4 flex items-center justify-between">
+                <div className="mt-3 rounded-2xl bg-[#DC2626] text-white p-4 flex items-center justify-between">
                   <div className="text-sm font-bold">Pago total del día</div>
                   <div className="font-mono-stat text-2xl">{formatCurrency(endDaySummary.payment)}</div>
                 </div>
@@ -486,7 +486,7 @@ export default function Asistencia() {
               <button
                 onClick={confirmEndDay}
                 disabled={closingDay || loadingSummary}
-                className="h-12 rounded-xl bg-[#1E4620] hover:bg-[#153417] text-white font-bold flex items-center justify-center gap-2 disabled:opacity-60"
+                className="h-12 rounded-xl bg-[#1D4ED8] hover:bg-[#1E3A8A] text-white font-bold flex items-center justify-center gap-2 disabled:opacity-60"
                 data-testid="end-day-confirm"
               >
                 {closingDay ? <Loader2 className="w-5 h-5 animate-spin" /> : <>🏁 Cerrar día</>}
@@ -667,7 +667,7 @@ function SessionModal({ session, saveSession, parcels, products, crews, setParce
         <div className="space-y-4">
           <div>
             <label className="flex items-center gap-1.5 text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">
-              <MapPin className="w-4 h-4 text-[#E89C3F]" /> Rancho
+              <MapPin className="w-4 h-4 text-[#2563EB]" /> Rancho
             </label>
             <input
               type="text"
@@ -701,7 +701,7 @@ function SessionModal({ session, saveSession, parcels, products, crews, setParce
 
           <div>
             <label className="flex items-center gap-1.5 text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">
-              <UserCircle2 className="w-4 h-4 text-[#E89C3F]" /> Mayordomo / Cuadrilla
+              <UserCircle2 className="w-4 h-4 text-[#2563EB]" /> Mayordomo / Cuadrilla
             </label>
             <input
               type="text"
@@ -737,7 +737,7 @@ function SessionModal({ session, saveSession, parcels, products, crews, setParce
 
           <div>
             <label className="flex items-center gap-1.5 text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">
-              <ShoppingBasket className="w-4 h-4 text-[#E89C3F]" /> Trabajo / Producto
+              <ShoppingBasket className="w-4 h-4 text-[#2563EB]" /> Trabajo / Producto
             </label>
             <input
               type="text"
@@ -782,7 +782,7 @@ function SessionModal({ session, saveSession, parcels, products, crews, setParce
           <button
             onClick={confirm}
             disabled={!canSave || saving}
-            className="h-12 rounded-xl bg-[#1E4620] hover:bg-[#153417] text-white font-bold disabled:opacity-50 flex items-center justify-center gap-2"
+            className="h-12 rounded-xl bg-[#1D4ED8] hover:bg-[#1E3A8A] text-white font-bold disabled:opacity-50 flex items-center justify-center gap-2"
             data-testid="session-save-button"
           >
             {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : "Guardar"}
@@ -807,7 +807,7 @@ function CheckInView(props) {
   return (
     <div className="-mx-4 -my-5 sm:-mx-0 sm:-my-0" data-testid="asistencia-checkin">
       {/* Orange header card */}
-      <div className="bg-[#F4B860] px-5 pt-4 pb-5 rounded-b-2xl">
+      <div className="bg-[#2563EB] px-5 pt-4 pb-5 rounded-b-2xl">
         <div className="flex items-center justify-between text-[#1A2210] mb-3">
           <button onClick={goBack} className="flex items-center gap-1 font-semibold" data-testid="checkin-back-button">
             <ArrowLeft className="w-5 h-5" /> Atrás
@@ -852,11 +852,11 @@ function CheckInView(props) {
 
         {/* Session summary chips */}
         <div className="bg-white rounded-xl p-3 grid grid-cols-2 gap-2">
-          <div className="bg-[#FDF6EC] rounded-lg px-3 py-2">
+          <div className="bg-[#EFF6FF] rounded-lg px-3 py-2">
             <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Rancho</div>
             <div className="font-bold text-[#1A2210] text-sm truncate">{selectedParcel?.name || "—"}</div>
           </div>
-          <div className="bg-[#FDF6EC] rounded-lg px-3 py-2">
+          <div className="bg-[#EFF6FF] rounded-lg px-3 py-2">
             <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Trabajo</div>
             <div className="font-bold text-[#1A2210] text-sm truncate">{selectedProduct?.name || "—"} — Picking</div>
           </div>
@@ -877,7 +877,7 @@ function CheckInView(props) {
       {/* Attendance list */}
       <div className="px-4 mt-4 space-y-2 pb-6">
         {loading ? (
-          <div className="flex justify-center py-6 text-[#1E4620]"><Loader2 className="w-6 h-6 animate-spin" /></div>
+          <div className="flex justify-center py-6 text-[#1D4ED8]"><Loader2 className="w-6 h-6 animate-spin" /></div>
         ) : data.rows.length === 0 ? (
           <p className="text-center text-[#556047] font-semibold py-6" data-testid="attendance-empty">
             Aún no hay trabajadores registrados hoy
@@ -893,7 +893,7 @@ function CheckInView(props) {
                 <div className="text-xs text-[#889078] font-semibold uppercase tracking-wider">Hora</div>
                 <div className="font-bold text-[#1A2210] text-base">{r.check_in_hhmm}</div>
                 {r.check_out_hhmm && (
-                  <div className="text-xs text-orange-700 font-bold mt-0.5">↓ {r.check_out_hhmm}</div>
+                  <div className="text-xs text-red-700 font-bold mt-0.5">↓ {r.check_out_hhmm}</div>
                 )}
               </div>
               <div className="min-w-0 flex-1 border-l border-[#E2DDD0] pl-3">
@@ -935,7 +935,7 @@ function CheckInView(props) {
             <div className="flex gap-2 mb-3">
               <button
                 onClick={() => setQuickAddOpen(true)}
-                className="flex-1 h-11 bg-white border-2 border-[#1E4620] text-[#1E4620] font-bold rounded-xl flex items-center justify-center gap-1.5"
+                className="flex-1 h-11 bg-white border-2 border-[#1D4ED8] text-[#1D4ED8] font-bold rounded-xl flex items-center justify-center gap-1.5"
                 data-testid="asist-quick-add-button"
               >
                 <UserPlus className="w-4 h-4" /> Nuevo
@@ -943,7 +943,7 @@ function CheckInView(props) {
               <button
                 onClick={async () => { await submitCode(manualCode); setManualCode(""); setManualOpen2(false); }}
                 disabled={!manualCode || processing}
-                className="flex-1 h-11 bg-[#1E4620] hover:bg-[#153417] text-white font-bold rounded-xl disabled:opacity-50"
+                className="flex-1 h-11 bg-[#1D4ED8] hover:bg-[#1E3A8A] text-white font-bold rounded-xl disabled:opacity-50"
                 data-testid="manual-submit-button"
               >
                 Marcar
@@ -967,7 +967,7 @@ function CheckInView(props) {
                 <button
                   key={c.id}
                   onClick={() => moveCrew(c)}
-                  className="w-full text-left bg-[#F7F5EE] border-2 border-[#E2DDD0] hover:border-[#1E4620] rounded-xl p-3"
+                  className="w-full text-left bg-[#F7F5EE] border-2 border-[#E2DDD0] hover:border-[#1D4ED8] rounded-xl p-3"
                   data-testid={`move-crew-${c.id}`}
                 >
                   <div className="font-bold text-[#1A2210]">{c.name}</div>
@@ -1047,7 +1047,7 @@ function SummaryView({ data, selectedParcel, onClose }) {
               {rows.map((r) => (
                 <div
                   key={r.id}
-                  className="bg-white border border-[#E2DDD0] rounded-xl p-4 flex items-stretch border-l-4 border-l-emerald-500"
+                  className="bg-white border border-[#E2DDD0] rounded-xl p-4 flex items-stretch border-l-4 border-l-[#2563EB]"
                   data-testid={`summary-row-${r.id}`}
                 >
                   <div className="flex-1">

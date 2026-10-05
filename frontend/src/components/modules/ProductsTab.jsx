@@ -96,7 +96,7 @@ export default function ProductsTab() {
                 data-testid="mode-unit"
                 className={`h-11 rounded-xl font-bold text-sm flex items-center justify-center gap-1 border-2 ${
                   form.pricing_mode === "unit"
-                    ? "bg-[#1E4620] text-white border-[#1E4620]"
+                    ? "bg-[#1D4ED8] text-white border-[#1D4ED8]"
                     : "bg-white text-[#556047] border-[#E2DDD0] hover:bg-[#F7F5EE]"
                 }`}
               >
@@ -108,7 +108,7 @@ export default function ProductsTab() {
                 data-testid="mode-weight"
                 className={`h-11 rounded-xl font-bold text-sm flex items-center justify-center gap-1 border-2 ${
                   form.pricing_mode === "weight"
-                    ? "bg-[#1E4620] text-white border-[#1E4620]"
+                    ? "bg-[#1D4ED8] text-white border-[#1D4ED8]"
                     : "bg-white text-[#556047] border-[#E2DDD0] hover:bg-[#F7F5EE]"
                 }`}
               >
@@ -120,7 +120,7 @@ export default function ProductsTab() {
                 data-testid="mode-both"
                 className={`h-11 rounded-xl font-bold text-sm flex items-center justify-center gap-1 border-2 ${
                   form.pricing_mode === "both"
-                    ? "bg-[#1E4620] text-white border-[#1E4620]"
+                    ? "bg-[#1D4ED8] text-white border-[#1D4ED8]"
                     : "bg-white text-[#556047] border-[#E2DDD0] hover:bg-[#F7F5EE]"
                 }`}
               >
@@ -140,7 +140,7 @@ export default function ProductsTab() {
                   data-testid="weight-kg"
                   className={`h-11 rounded-xl font-bold text-sm border-2 ${
                     form.weight_unit === "kg"
-                      ? "bg-[#E65100] text-white border-[#E65100]"
+                      ? "bg-[#DC2626] text-white border-[#DC2626]"
                       : "bg-white text-[#556047] border-[#E2DDD0] hover:bg-[#F7F5EE]"
                   }`}
                 >
@@ -152,7 +152,7 @@ export default function ProductsTab() {
                   data-testid="weight-lb"
                   className={`h-11 rounded-xl font-bold text-sm border-2 ${
                     form.weight_unit === "lb"
-                      ? "bg-[#E65100] text-white border-[#E65100]"
+                      ? "bg-[#DC2626] text-white border-[#DC2626]"
                       : "bg-white text-[#556047] border-[#E2DDD0] hover:bg-[#F7F5EE]"
                   }`}
                 >
@@ -185,7 +185,7 @@ export default function ProductsTab() {
           </div>
 
           <label className="flex items-center gap-2 font-semibold text-[#1A2210]">
-            <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} className="w-5 h-5 accent-[#1E4620]" />
+            <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} className="w-5 h-5 accent-[#1D4ED8]" />
             Activo
           </label>
 
@@ -197,7 +197,7 @@ export default function ProductsTab() {
 
       <div className="field-card divide-y divide-[#E2DDD0]">
         {loading ? (
-          <div className="p-6 flex justify-center text-[#1E4620]"><Loader2 className="w-6 h-6 animate-spin" /></div>
+          <div className="p-6 flex justify-center text-[#1D4ED8]"><Loader2 className="w-6 h-6 animate-spin" /></div>
         ) : rows.length === 0 ? (
           <div className="p-6 text-center text-[#556047] font-semibold">Sin productos</div>
         ) : (
@@ -220,7 +220,7 @@ export default function ProductsTab() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <button onClick={() => startEdit(r)} className="w-9 h-9 rounded-lg hover:bg-[#F0EDE1] text-[#1E4620]" data-testid={`product-edit-${r.id}`}><Pencil className="w-4 h-4 mx-auto" /></button>
+                  <button onClick={() => startEdit(r)} className="w-9 h-9 rounded-lg hover:bg-[#F0EDE1] text-[#1D4ED8]" data-testid={`product-edit-${r.id}`}><Pencil className="w-4 h-4 mx-auto" /></button>
                   <button onClick={() => remove(r.id)} className="w-9 h-9 rounded-lg hover:bg-red-50 text-red-600" data-testid={`product-delete-${r.id}`}><Trash2 className="w-4 h-4 mx-auto" /></button>
                 </div>
               </div>

@@ -60,7 +60,7 @@ export default function ParcelsTab() {
             <input className="field-input !h-12 !text-base" placeholder="Ubicación" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} data-testid="parcel-location-input" />
           </div>
           <label className="flex items-center gap-2 font-semibold text-[#1A2210]">
-            <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} className="w-5 h-5 accent-[#1E4620]" />
+            <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} className="w-5 h-5 accent-[#1D4ED8]" />
             Activa
           </label>
           <button onClick={save} disabled={saving} className="field-btn-primary disabled:opacity-60" data-testid="parcel-save-button">
@@ -71,7 +71,7 @@ export default function ParcelsTab() {
 
       <div className="field-card divide-y divide-[#E2DDD0]">
         {loading ? (
-          <div className="p-6 flex justify-center text-[#1E4620]"><Loader2 className="w-6 h-6 animate-spin" /></div>
+          <div className="p-6 flex justify-center text-[#1D4ED8]"><Loader2 className="w-6 h-6 animate-spin" /></div>
         ) : rows.length === 0 ? (
           <div className="p-6 text-center text-[#556047] font-semibold">Sin parcelas</div>
         ) : (
@@ -84,7 +84,7 @@ export default function ParcelsTab() {
                 </div>
               </div>
               <div className="flex items-center gap-1.5">
-                <button onClick={() => startEdit(r)} className="w-9 h-9 rounded-lg hover:bg-[#F0EDE1] text-[#1E4620]" data-testid={`parcel-edit-${r.id}`}><Pencil className="w-4 h-4 mx-auto" /></button>
+                <button onClick={() => startEdit(r)} className="w-9 h-9 rounded-lg hover:bg-[#F0EDE1] text-[#1D4ED8]" data-testid={`parcel-edit-${r.id}`}><Pencil className="w-4 h-4 mx-auto" /></button>
                 <button onClick={() => remove(r.id)} className="w-9 h-9 rounded-lg hover:bg-red-50 text-red-600" data-testid={`parcel-delete-${r.id}`}><Trash2 className="w-4 h-4 mx-auto" /></button>
               </div>
             </div>

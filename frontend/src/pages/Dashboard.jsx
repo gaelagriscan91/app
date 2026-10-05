@@ -7,9 +7,9 @@ function StatCard({ label, value, sub, Icon, variant = "light", testid }) {
   const base = "rounded-2xl p-4 sm:p-5 border-2 shadow-sm transition-transform hover:-translate-y-0.5";
   const styles =
     variant === "dark"
-      ? "bg-[#1E4620] border-[#153417] text-white"
+      ? "bg-[#1D4ED8] border-[#1E3A8A] text-white"
       : variant === "accent"
-      ? "bg-[#E65100] border-[#C63D00] text-white"
+      ? "bg-[#DC2626] border-[#B91C1C] text-white"
       : "bg-white border-[#E2DDD0] text-[#1A2210]";
   return (
     <div className={`${base} ${styles}`} data-testid={testid}>
@@ -21,7 +21,7 @@ function StatCard({ label, value, sub, Icon, variant = "light", testid }) {
           <div className="font-mono-stat text-2xl sm:text-3xl mt-1 leading-none">{value}</div>
           {sub ? <div className={`text-xs mt-1.5 font-semibold ${variant === "light" ? "text-[#556047]" : "opacity-85"}`}>{sub}</div> : null}
         </div>
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${variant === "light" ? "bg-[#F0EDE1] text-[#1E4620]" : "bg-white/15 text-white"}`}>
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${variant === "light" ? "bg-[#F0EDE1] text-[#1D4ED8]" : "bg-white/15 text-white"}`}>
           <Icon className="w-5 h-5" strokeWidth={2.4} />
         </div>
       </div>
@@ -49,7 +49,7 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 text-[#1E4620]">
+      <div className="flex items-center justify-center py-20 text-[#1D4ED8]">
         <Loader2 className="w-6 h-6 animate-spin" />
       </div>
     );
@@ -133,9 +133,9 @@ export default function Dashboard() {
             <div className="font-mono-stat text-2xl sm:text-3xl mt-1 text-[#1A2210]">
               {formatNumber(data?.month_kilos, 0)} <span className="text-base">Kg</span>
             </div>
-            <div className="text-sm font-bold text-[#15803D] mt-0.5">{formatCurrency(data?.month_payment)}</div>
+            <div className="text-sm font-bold text-[#1D4ED8] mt-0.5">{formatCurrency(data?.month_payment)}</div>
           </div>
-          <div className="hidden sm:flex items-center justify-center w-14 h-14 rounded-2xl bg-[#F0EDE1] text-[#1E4620]">
+          <div className="hidden sm:flex items-center justify-center w-14 h-14 rounded-2xl bg-[#F0EDE1] text-[#1D4ED8]">
             <TrendingUp className="w-7 h-7" strokeWidth={2.4} />
           </div>
         </div>

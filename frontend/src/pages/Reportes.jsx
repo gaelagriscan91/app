@@ -250,7 +250,7 @@ export default function Reportes() {
           data-testid="tab-cosechas"
           className={`flex-1 flex items-center justify-center gap-2 h-11 px-4 rounded-xl font-bold text-sm transition-all ${
             tab === "cosechas"
-              ? "bg-[#1E4620] text-white shadow-md"
+              ? "bg-[#1D4ED8] text-white shadow-md"
               : "text-[#556047] hover:bg-[#F0EDE1]"
           }`}
         >
@@ -262,7 +262,7 @@ export default function Reportes() {
           data-testid="tab-recibos"
           className={`flex-1 flex items-center justify-center gap-2 h-11 px-4 rounded-xl font-bold text-sm transition-all ${
             tab === "recibos"
-              ? "bg-[#1E4620] text-white shadow-md"
+              ? "bg-[#1D4ED8] text-white shadow-md"
               : "text-[#556047] hover:bg-[#F0EDE1]"
           }`}
         >
@@ -300,7 +300,7 @@ export default function Reportes() {
       {/* Filters */}
       <div className="field-card p-4 sm:p-5 space-y-4">
         <div className="flex items-center gap-2">
-          <Filter className="w-5 h-5 text-[#1E4620]" />
+          <Filter className="w-5 h-5 text-[#1D4ED8]" />
           <h3 className="text-base font-bold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>
             Filtros
           </h3>
@@ -365,7 +365,7 @@ export default function Reportes() {
 
       {/* Totals */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-2xl bg-[#1E4620] text-white p-4 border-2 border-[#153417] shadow-sm" data-testid="report-total-kilos">
+        <div className="rounded-2xl bg-[#1D4ED8] text-white p-4 border-2 border-[#1E3A8A] shadow-sm" data-testid="report-total-kilos">
           <div className="text-[11px] font-bold uppercase tracking-wider opacity-90 flex items-center gap-1"><Wheat className="w-3.5 h-3.5" /> Kilos</div>
           <div className="font-mono-stat text-xl sm:text-2xl mt-1">{formatNumber(totals.kilos, 2)}</div>
         </div>
@@ -373,7 +373,7 @@ export default function Reportes() {
           <div className="text-[11px] font-bold uppercase tracking-wider text-[#556047]">Unidades</div>
           <div className="font-mono-stat text-xl sm:text-2xl mt-1">{formatNumber(totals.units, 0)}</div>
         </div>
-        <div className="rounded-2xl bg-[#E65100] text-white p-4 border-2 border-[#C63D00] shadow-sm" data-testid="report-total-payment">
+        <div className="rounded-2xl bg-[#DC2626] text-white p-4 border-2 border-[#B91C1C] shadow-sm" data-testid="report-total-payment">
           <div className="text-[11px] font-bold uppercase tracking-wider opacity-90 flex items-center gap-1"><DollarSign className="w-3.5 h-3.5" /> Total pago</div>
           <div className="font-mono-stat text-xl sm:text-2xl mt-1">{formatCurrency(totals.payment)}</div>
         </div>
@@ -406,7 +406,7 @@ export default function Reportes() {
                   <td className="px-4 py-2.5">{r.product_name}</td>
                   <td className="px-4 py-2.5 text-right font-mono-stat">{formatNumber(r.kilos, 2)}</td>
                   <td className="px-4 py-2.5 text-right font-mono-stat">{formatNumber(r.units, 0)}</td>
-                  <td className="px-4 py-2.5 text-right font-mono-stat text-[#15803D]">{formatCurrency(r.payment)}</td>
+                  <td className="px-4 py-2.5 text-right font-mono-stat text-[#1D4ED8]">{formatCurrency(r.payment)}</td>
                 </tr>
               ))}
             </tbody>
@@ -426,7 +426,7 @@ export default function Reportes() {
                     <div className="text-xs text-[#556047] font-semibold">{r.date} • {r.parcel_name}</div>
                     <div className="text-xs text-[#556047] font-semibold">{r.product_name} • {formatNumber(r.kilos, 2)} Kg • {formatNumber(r.units, 0)} u.</div>
                   </div>
-                  <div className="font-mono-stat text-base text-[#15803D]">{formatCurrency(r.payment)}</div>
+                  <div className="font-mono-stat text-base text-[#1D4ED8]">{formatCurrency(r.payment)}</div>
                 </div>
               </div>
             ))

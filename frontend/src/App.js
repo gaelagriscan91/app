@@ -18,7 +18,7 @@ function Protected({ children }) {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F7F5EE]">
-        <div className="text-[#1E4620] font-semibold">Cargando…</div>
+        <div className="text-[#1D4ED8] font-semibold">Cargando…</div>
       </div>
     );
   }

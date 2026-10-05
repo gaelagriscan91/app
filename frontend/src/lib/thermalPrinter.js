@@ -205,7 +205,7 @@ export function receiptTicketHtml(receipt, businessName = "AgriScan") {
   .sub { font-size: 9px; color: #333; margin-left: 8px; }
   .section-title { font-weight: bold; margin-top: 4px; }
   .sign { margin-top: 20px; font-size: 10px; }
-  .print-btn { position: fixed; top: 8px; right: 8px; background: #1E4620; color: white; padding: 6px 10px; border: none; border-radius: 4px; font-weight: bold; font-size: 11px; }
+  .print-btn { position: fixed; top: 8px; right: 8px; background: #1D4ED8; color: white; padding: 6px 10px; border: none; border-radius: 4px; font-weight: bold; font-size: 11px; }
 </style></head><body>
   <button class="print-btn no-print" onclick="window.print()">Imprimir</button>
   <h1>${businessName}</h1>

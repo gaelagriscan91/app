@@ -76,10 +76,10 @@ export default function QrScanner({ onScan, active = true, fullscreen = false, o
           <div id={containerId} className="absolute inset-0" />
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <div className="relative w-[70%] max-w-sm aspect-square">
-              <span className="absolute -top-0.5 -left-0.5 w-12 h-12 border-t-4 border-l-4 border-[#F4B860] rounded-tl-xl" />
-              <span className="absolute -top-0.5 -right-0.5 w-12 h-12 border-t-4 border-r-4 border-[#F4B860] rounded-tr-xl" />
-              <span className="absolute -bottom-0.5 -left-0.5 w-12 h-12 border-b-4 border-l-4 border-[#F4B860] rounded-bl-xl" />
-              <span className="absolute -bottom-0.5 -right-0.5 w-12 h-12 border-b-4 border-r-4 border-[#F4B860] rounded-br-xl" />
+              <span className="absolute -top-0.5 -left-0.5 w-12 h-12 border-t-4 border-l-4 border-[#2563EB] rounded-tl-xl" />
+              <span className="absolute -top-0.5 -right-0.5 w-12 h-12 border-t-4 border-r-4 border-[#2563EB] rounded-tr-xl" />
+              <span className="absolute -bottom-0.5 -left-0.5 w-12 h-12 border-b-4 border-l-4 border-[#2563EB] rounded-bl-xl" />
+              <span className="absolute -bottom-0.5 -right-0.5 w-12 h-12 border-b-4 border-r-4 border-[#2563EB] rounded-br-xl" />
             </div>
           </div>
           {error && (
@@ -99,10 +99,10 @@ export default function QrScanner({ onScan, active = true, fullscreen = false, o
         <div id={containerId} className="absolute inset-0" />
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="relative w-[65%] aspect-square">
-            <span className="absolute -top-0.5 -left-0.5 w-8 h-8 border-t-4 border-l-4 border-[#F4B860] rounded-tl-xl" />
-            <span className="absolute -top-0.5 -right-0.5 w-8 h-8 border-t-4 border-r-4 border-[#F4B860] rounded-tr-xl" />
-            <span className="absolute -bottom-0.5 -left-0.5 w-8 h-8 border-b-4 border-l-4 border-[#F4B860] rounded-bl-xl" />
-            <span className="absolute -bottom-0.5 -right-0.5 w-8 h-8 border-b-4 border-r-4 border-[#F4B860] rounded-br-xl" />
+            <span className="absolute -top-0.5 -left-0.5 w-8 h-8 border-t-4 border-l-4 border-[#2563EB] rounded-tl-xl" />
+            <span className="absolute -top-0.5 -right-0.5 w-8 h-8 border-t-4 border-r-4 border-[#2563EB] rounded-tr-xl" />
+            <span className="absolute -bottom-0.5 -left-0.5 w-8 h-8 border-b-4 border-l-4 border-[#2563EB] rounded-bl-xl" />
+            <span className="absolute -bottom-0.5 -right-0.5 w-8 h-8 border-b-4 border-r-4 border-[#2563EB] rounded-br-xl" />
           </div>
         </div>
       </div>

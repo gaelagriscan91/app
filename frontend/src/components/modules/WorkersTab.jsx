@@ -121,18 +121,18 @@ export default function WorkersTab() {
         * { box-sizing: border-box; }
         body { font-family: Arial, sans-serif; margin: 0; padding: 12mm; background: #fff; }
         .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10mm; }
-        .card { border: 2px solid #1E4620; border-radius: 8px; padding: 10px; text-align: center; break-inside: avoid; page-break-inside: avoid; }
+        .card { border: 2px solid #1D4ED8; border-radius: 8px; padding: 10px; text-align: center; break-inside: avoid; page-break-inside: avoid; }
         .card h3 { margin: 0 0 2px; font-size: 16px; color: #1A2210; }
         .card .meta { font-size: 11px; color: #556047; margin-bottom: 8px; }
         .card .qr { display: flex; justify-content: center; margin: 4px 0; }
         .card .qr svg { width: 160px; height: 160px; }
         .card .code { font-family: monospace; font-size: 11px; color: #555; margin-top: 4px; }
         .header { text-align: center; margin-bottom: 10mm; }
-        .header h1 { color: #1E4620; margin: 0; font-size: 22px; }
+        .header h1 { color: #1D4ED8; margin: 0; font-size: 22px; }
         .header p { color: #556047; font-size: 12px; margin: 2px 0; }
         @page { margin: 10mm; }
         @media print { .no-print { display: none; } }
-        .print-btn { position: fixed; top: 12px; right: 12px; background: #1E4620; color: white; padding: 8px 14px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        .print-btn { position: fixed; top: 12px; right: 12px; background: #1D4ED8; color: white; padding: 8px 14px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
       </style></head><body>
         <button class="print-btn no-print" onclick="window.print()">🖨 Imprimir</button>
         <div class="header">
@@ -164,7 +164,7 @@ export default function WorkersTab() {
         <button
           onClick={printAllQr}
           disabled={rows.length === 0}
-          className="h-14 px-5 bg-white border-2 border-[#1E4620] text-[#1E4620] hover:bg-emerald-50 font-bold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50"
+          className="h-14 px-5 bg-white border-2 border-[#1D4ED8] text-[#1D4ED8] hover:bg-blue-50 font-bold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50"
           data-testid="print-all-qr-button"
         >
           <PrinterIcon className="w-5 h-5" /> Imprimir todos los QR
@@ -190,7 +190,7 @@ export default function WorkersTab() {
             </select>
           </div>
           <label className="flex items-center gap-2 font-semibold text-[#1A2210]">
-            <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} className="w-5 h-5 accent-[#1E4620]" />
+            <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} className="w-5 h-5 accent-[#1D4ED8]" />
             Activo
           </label>
           <button onClick={save} disabled={saving} className="field-btn-primary disabled:opacity-60" data-testid="worker-save-button">
@@ -201,7 +201,7 @@ export default function WorkersTab() {
 
       <div className="field-card divide-y divide-[#E2DDD0]">
         {loading ? (
-          <div className="p-6 flex justify-center text-[#1E4620]"><Loader2 className="w-6 h-6 animate-spin" /></div>
+          <div className="p-6 flex justify-center text-[#1D4ED8]"><Loader2 className="w-6 h-6 animate-spin" /></div>
         ) : rows.length === 0 ? (
           <div className="p-6 text-center text-[#556047] font-semibold">Sin trabajadores</div>
         ) : (
@@ -220,10 +220,10 @@ export default function WorkersTab() {
                 {r.active === false ? (
                   <span className="text-[10px] bg-red-50 text-red-700 border border-red-200 font-bold px-2 py-0.5 rounded-full">Inactivo</span>
                 ) : (
-                  <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold px-2 py-0.5 rounded-full">Activo</span>
+                  <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 font-bold px-2 py-0.5 rounded-full">Activo</span>
                 )}
-                <button onClick={() => setQrWorker(r)} className="w-9 h-9 rounded-lg hover:bg-[#F0EDE1] text-[#1E4620]" data-testid={`worker-qr-${r.id}`} title="Ver QR"><QrCode className="w-4 h-4 mx-auto" /></button>
-                <button onClick={() => startEdit(r)} className="w-9 h-9 rounded-lg hover:bg-[#F0EDE1] text-[#1E4620]" data-testid={`worker-edit-${r.id}`}><Pencil className="w-4 h-4 mx-auto" /></button>
+                <button onClick={() => setQrWorker(r)} className="w-9 h-9 rounded-lg hover:bg-[#F0EDE1] text-[#1D4ED8]" data-testid={`worker-qr-${r.id}`} title="Ver QR"><QrCode className="w-4 h-4 mx-auto" /></button>
+                <button onClick={() => startEdit(r)} className="w-9 h-9 rounded-lg hover:bg-[#F0EDE1] text-[#1D4ED8]" data-testid={`worker-edit-${r.id}`}><Pencil className="w-4 h-4 mx-auto" /></button>
                 <button onClick={() => remove(r.id)} className="w-9 h-9 rounded-lg hover:bg-red-50 text-red-600" data-testid={`worker-delete-${r.id}`}><Trash2 className="w-4 h-4 mx-auto" /></button>
               </div>
             </div>
@@ -263,14 +263,14 @@ export default function WorkersTab() {
               <button
                 onClick={printQr}
                 disabled={!qrWorker.qr_code}
-                className="flex-1 h-11 bg-[#1E4620] hover:bg-[#153417] text-white font-bold rounded-xl disabled:opacity-50 flex items-center justify-center gap-1.5"
+                className="flex-1 h-11 bg-[#1D4ED8] hover:bg-[#1E3A8A] text-white font-bold rounded-xl disabled:opacity-50 flex items-center justify-center gap-1.5"
                 data-testid="qr-print-button"
               >
                 <Printer className="w-4 h-4" /> Imprimir
               </button>
               <button
                 onClick={() => regenQr(qrWorker.id)}
-                className="h-11 px-4 bg-white border-2 border-[#1E4620] text-[#1E4620] hover:bg-emerald-50 font-bold rounded-xl flex items-center gap-1.5"
+                className="h-11 px-4 bg-white border-2 border-[#1D4ED8] text-[#1D4ED8] hover:bg-blue-50 font-bold rounded-xl flex items-center gap-1.5"
                 data-testid="qr-regen-button"
               >
                 <RefreshCw className="w-4 h-4" /> Regenerar

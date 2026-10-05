@@ -75,6 +75,7 @@ export default function ScanHarvestMode() {
       name: w.name,
       at: new Date().toISOString(),
       source, // "qr" | "manual"
+      priceAt: parseFloat(pricePerUnit) || 0,
     };
     setScanLog((prev) => {
       const next = [entry, ...prev].slice(0, 1000);
@@ -400,7 +401,7 @@ export default function ScanHarvestMode() {
         <div className="flex items-center justify-between px-3 h-14">
           <div className="min-w-0 flex-1">
             <div className="text-[10px] font-bold uppercase tracking-wider opacity-80 flex items-center gap-1.5">
-              <span className="inline-block w-2 h-2 rounded-full bg-emerald-300" />
+              <span className="inline-block w-2 h-2 rounded-full bg-blue-300" />
               Cosechando · {parcelName || "—"}
             </div>
           </div>
@@ -480,7 +481,7 @@ export default function ScanHarvestMode() {
             setShareMode((v) => !v);
           }}
           className={`absolute top-[72px] right-3 h-11 px-3 rounded-full flex items-center gap-1.5 font-extrabold text-xs shadow-xl ${
-            shareMode ? "bg-[#E65100] text-white" : "bg-white text-[#1A2210]"
+            shareMode ? "bg-[#DC2626] text-white" : "bg-white text-[#1A2210]"
           }`}
           data-testid="scan-share-toggle"
           aria-label="Canasta compartida"
@@ -492,7 +493,7 @@ export default function ScanHarvestMode() {
         {/* Side action: Manual add */}
         <button
           onClick={() => setShowManual(true)}
-          className="absolute right-3 bottom-[180px] w-12 h-12 rounded-full bg-[#E65100] hover:bg-[#C63D00] text-white flex items-center justify-center shadow-xl"
+          className="absolute right-3 bottom-[180px] w-12 h-12 rounded-full bg-[#DC2626] hover:bg-[#B91C1C] text-white flex items-center justify-center shadow-xl"
           data-testid="scan-manual-fab"
           aria-label="Agregar manual"
         >
@@ -632,7 +633,7 @@ export default function ScanHarvestMode() {
           <button
             onClick={save}
             disabled={saving || (Object.keys(tally).length === 0 && !(shareMode && shareBuffer.length > 0 && shareBaskets > 0))}
-            className="h-[52px] px-4 rounded-xl bg-[#E65100] hover:bg-[#C63D00] active:scale-[0.98] text-white font-extrabold flex items-center gap-1.5 shadow-md disabled:opacity-50"
+            className="h-[52px] px-4 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] active:scale-[0.98] text-white font-extrabold flex items-center gap-1.5 shadow-md disabled:opacity-50"
             data-testid="scan-save-button"
             style={{ fontFamily: "Outfit, sans-serif" }}
           >
@@ -665,7 +666,7 @@ export default function ScanHarvestMode() {
             </div>
             <button
               onClick={() => setEditPrice(false)}
-              className="w-full h-12 rounded-xl bg-[#1E4620] hover:bg-[#153417] text-white font-extrabold mt-4"
+              className="w-full h-12 rounded-xl bg-[#1D4ED8] hover:bg-[#1E3A8A] text-white font-extrabold mt-4"
               data-testid="scan-edit-price-done"
             >
               Listo
@@ -766,13 +767,13 @@ export default function ScanHarvestMode() {
                               <div className="font-bold text-[#1A2210] truncate flex items-center gap-1.5">
                                 {r.name}
                                 {pendingRow && (
-                                  <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#E65100]/15 text-[#E65100]">
+                                  <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#DC2626]/15 text-[#DC2626]">
                                     {formatNumber(pendingRow.count, pendingRow.count % 1 === 0 ? 0 : 2)} sin guardar
                                   </span>
                                 )}
                               </div>
                               <div className="text-xs text-[#556047] font-semibold">
-                                {formatNumber(r.count, 0)} pieza{r.count !== 1 ? "s" : ""} • <span className="text-[#15803D] font-bold">{formatCurrency(r.payment)}</span>
+                                {formatNumber(r.count, 0)} pieza{r.count !== 1 ? "s" : ""} • <span className="text-[#1D4ED8] font-bold">{formatCurrency(r.payment)}</span>
                               </div>
                             </div>
                             {pendingRow && (
@@ -786,7 +787,7 @@ export default function ScanHarvestMode() {
                                 </button>
                                 <button
                                   onClick={() => bump(r.id, 1)}
-                                  className="w-9 h-9 rounded-xl bg-[#1E4620] hover:bg-[#153417] text-white flex items-center justify-center"
+                                  className="w-9 h-9 rounded-xl bg-[#1D4ED8] hover:bg-[#1E3A8A] text-white flex items-center justify-center"
                                   data-testid={`scan-inc-${r.id}`}
                                 >
                                   <Plus className="w-4 h-4" />
@@ -816,6 +817,7 @@ export default function ScanHarvestMode() {
                         const d = new Date(e.at);
                         const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
                         const date = d.toLocaleDateString();
+                        const earned = Number(e.priceAt ?? pricePerUnit) || 0;
                         return (
                           <li key={e.id} className="py-2.5 flex items-center justify-between gap-3" data-testid={`scan-registro-row-${e.id}`}>
                             <div className="min-w-0 flex-1">
@@ -824,8 +826,8 @@ export default function ScanHarvestMode() {
                                 <span
                                   className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
                                     e.source === "manual"
-                                      ? "bg-[#E65100]/15 text-[#E65100]"
-                                      : "bg-[#1E4620]/15 text-[#1E4620]"
+                                      ? "bg-[#DC2626]/15 text-[#DC2626]"
+                                      : "bg-[#1D4ED8]/15 text-[#1D4ED8]"
                                   }`}
                                 >
                                   {e.source === "manual" ? "Manual" : "QR"}
@@ -833,6 +835,14 @@ export default function ScanHarvestMode() {
                               </div>
                               <div className="text-[11px] text-[#556047] font-semibold font-mono-stat">
                                 {date} · {time}
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className="font-mono-stat text-base font-extrabold text-[#1D4ED8]" data-testid={`scan-registro-earned-${e.id}`}>
+                                {formatCurrency(earned)}
+                              </div>
+                              <div className="text-[10px] font-bold uppercase tracking-wider text-[#889078] leading-none">
+                                /pza
                               </div>
                             </div>
                           </li>
@@ -853,7 +863,7 @@ export default function ScanHarvestMode() {
                 <button
                   onClick={() => { setShowList(false); save(); }}
                   disabled={saving || Object.keys(tally).length === 0}
-                  className="h-12 px-4 rounded-xl bg-[#E65100] hover:bg-[#C63D00] text-white font-extrabold flex items-center gap-1.5 disabled:opacity-50"
+                  className="h-12 px-4 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white font-extrabold flex items-center gap-1.5 disabled:opacity-50"
                   data-testid="scan-list-save"
                   style={{ fontFamily: "Outfit, sans-serif" }}
                 >

@@ -105,7 +105,7 @@ export default function CrewsTab() {
                       type="checkbox"
                       checked={form.worker_ids.includes(w.id)}
                       onChange={() => toggleWorker(w.id)}
-                      className="w-5 h-5 accent-[#1E4620]"
+                      className="w-5 h-5 accent-[#1D4ED8]"
                       data-testid={`crew-worker-check-${w.id}`}
                     />
                     <span className="font-semibold text-[#1A2210] text-sm">{w.name}</span>
@@ -122,7 +122,7 @@ export default function CrewsTab() {
           </div>
 
           <label className="flex items-center gap-2 font-semibold text-[#1A2210]">
-            <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} className="w-5 h-5 accent-[#1E4620]" />
+            <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} className="w-5 h-5 accent-[#1D4ED8]" />
             Activa
           </label>
 
@@ -134,7 +134,7 @@ export default function CrewsTab() {
 
       <div className="space-y-2">
         {loading ? (
-          <div className="field-card p-6 flex justify-center text-[#1E4620]"><Loader2 className="w-6 h-6 animate-spin" /></div>
+          <div className="field-card p-6 flex justify-center text-[#1D4ED8]"><Loader2 className="w-6 h-6 animate-spin" /></div>
         ) : rows.length === 0 ? (
           <div className="field-card p-6 text-center text-[#556047] font-semibold">
             Sin cuadrillas aún. Crea una para agrupar trabajadores con su jefe.
@@ -146,7 +146,7 @@ export default function CrewsTab() {
                 <div className="min-w-0 flex-1">
                   <h3 className="font-bold text-lg text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>{r.name}</h3>
                   {r.boss ? (
-                    <div className="inline-flex items-center gap-1 mt-1 text-xs font-bold bg-[#1E4620] text-white px-2 py-1 rounded-full">
+                    <div className="inline-flex items-center gap-1 mt-1 text-xs font-bold bg-[#1D4ED8] text-white px-2 py-1 rounded-full">
                       <UserCog className="w-3.5 h-3.5" /> {r.boss.name}
                     </div>
                   ) : (
@@ -165,7 +165,7 @@ export default function CrewsTab() {
                   {r.notes && <div className="text-xs italic text-[#889078] mt-1">{r.notes}</div>}
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <button onClick={() => startEdit(r)} className="w-9 h-9 rounded-lg hover:bg-[#F0EDE1] text-[#1E4620]" data-testid={`crew-edit-${r.id}`}><Pencil className="w-4 h-4 mx-auto" /></button>
+                  <button onClick={() => startEdit(r)} className="w-9 h-9 rounded-lg hover:bg-[#F0EDE1] text-[#1D4ED8]" data-testid={`crew-edit-${r.id}`}><Pencil className="w-4 h-4 mx-auto" /></button>
                   <button onClick={() => remove(r.id)} className="w-9 h-9 rounded-lg hover:bg-red-50 text-red-600" data-testid={`crew-delete-${r.id}`}><Trash2 className="w-4 h-4 mx-auto" /></button>
                 </div>
               </div>

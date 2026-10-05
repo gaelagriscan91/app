@@ -46,11 +46,11 @@ function receiptHtml(receipt, businessName = "AgriScan") {
 <style>
   * { box-sizing: border-box; }
   body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #1a2210; padding: 32px; max-width: 780px; margin: 0 auto; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #1E4620; padding-bottom: 16px; margin-bottom: 20px; }
-  .brand { font-size: 24px; font-weight: 900; color: #1E4620; letter-spacing: -0.5px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #1D4ED8; padding-bottom: 16px; margin-bottom: 20px; }
+  .brand { font-size: 24px; font-weight: 900; color: #1D4ED8; letter-spacing: -0.5px; }
   .brand small { display: block; font-size: 11px; color: #666; font-weight: 600; margin-top: 2px; letter-spacing: 2px; text-transform: uppercase; }
   .doc-title { text-align: right; }
-  .doc-title h2 { margin: 0; font-size: 18px; color: #1E4620; }
+  .doc-title h2 { margin: 0; font-size: 18px; color: #1D4ED8; }
   .doc-title .range { color: #666; font-size: 12px; margin-top: 4px; }
   .worker { background: #F7F5EE; border: 1px solid #E2DDD0; padding: 14px 16px; border-radius: 12px; margin-bottom: 18px; }
   .worker h3 { margin: 0; font-size: 20px; color: #1A2210; }
@@ -59,25 +59,25 @@ function receiptHtml(receipt, businessName = "AgriScan") {
   .stat { background: #FFF; border: 2px solid #E2DDD0; padding: 10px 12px; border-radius: 10px; }
   .stat .label { font-size: 10px; color: #556047; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
   .stat .value { font-size: 18px; font-weight: 800; color: #1A2210; margin-top: 4px; font-family: 'Courier New', monospace; }
-  .stat.highlight { background: #1E4620; color: white; border-color: #0F2912; }
+  .stat.highlight { background: #1D4ED8; color: white; border-color: #0F2912; }
   .stat.highlight .label { color: #d7e5d8; }
   .stat.highlight .value { color: white; }
-  .stat.accent { background: #E65100; color: white; border-color: #c13f00; }
+  .stat.accent { background: #DC2626; color: white; border-color: #c13f00; }
   .stat.accent .label { color: #ffd9b8; }
   .stat.accent .value { color: white; }
-  h4 { font-size: 13px; color: #1E4620; margin: 18px 0 8px; letter-spacing: 1px; text-transform: uppercase; border-bottom: 1px solid #E2DDD0; padding-bottom: 4px; }
+  h4 { font-size: 13px; color: #1D4ED8; margin: 18px 0 8px; letter-spacing: 1px; text-transform: uppercase; border-bottom: 1px solid #E2DDD0; padding-bottom: 4px; }
   table { width: 100%; border-collapse: collapse; font-size: 12px; }
   th { text-align: left; background: #F0EDE1; color: #1A2210; font-weight: 700; padding: 7px 10px; border-bottom: 2px solid #D4CEB8; }
   td { padding: 6px 10px; border-bottom: 1px solid #EEE; color: #333; }
   td.right, th.right { text-align: right; }
-  .total-row { background: #1E4620; color: white; }
+  .total-row { background: #1D4ED8; color: white; }
   .total-row td { color: white; font-weight: 800; padding: 10px; border: none; }
   .signature { margin-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
   .sign-box { border-top: 1px solid #1A2210; padding-top: 6px; text-align: center; font-size: 11px; color: #556047; font-weight: 600; }
   .footer { margin-top: 24px; text-align: center; font-size: 10px; color: #999; }
   @media print { body { padding: 16px; } .no-print { display: none; } }
   @page { margin: 15mm; }
-  .print-btn { position: fixed; top: 16px; right: 16px; background: #1E4620; color: white; padding: 10px 16px; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 14px; }
+  .print-btn { position: fixed; top: 16px; right: 16px; background: #1D4ED8; color: white; padding: 10px 16px; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 14px; }
 </style></head>
 <body>
   <button class="print-btn no-print" onclick="window.print()">🖨 Imprimir</button>
@@ -420,7 +420,7 @@ export default function RecibosTab() {
     <div className="space-y-5">
       <div className="field-card p-4 sm:p-5 space-y-4">
         <div className="flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-[#1E4620]" />
+          <Calendar className="w-5 h-5 text-[#1D4ED8]" />
           <h3 className="text-base font-bold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>
             Período de pago
           </h3>
@@ -459,7 +459,7 @@ export default function RecibosTab() {
                 onClick={() => setFormat("carta")}
                 data-testid="format-carta"
                 className={`h-11 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 border-2 ${
-                  format === "carta" ? "bg-[#1E4620] text-white border-[#1E4620]" : "bg-white text-[#556047] border-[#E2DDD0] hover:bg-[#F7F5EE]"
+                  format === "carta" ? "bg-[#1D4ED8] text-white border-[#1D4ED8]" : "bg-white text-[#556047] border-[#E2DDD0] hover:bg-[#F7F5EE]"
                 }`}
               >
                 <FileCheck className="w-4 h-4" /> Carta / A4
@@ -468,7 +468,7 @@ export default function RecibosTab() {
                 onClick={() => setFormat("ticket")}
                 data-testid="format-ticket"
                 className={`h-11 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 border-2 ${
-                  format === "ticket" ? "bg-[#1E4620] text-white border-[#1E4620]" : "bg-white text-[#556047] border-[#E2DDD0] hover:bg-[#F7F5EE]"
+                  format === "ticket" ? "bg-[#1D4ED8] text-white border-[#1D4ED8]" : "bg-white text-[#556047] border-[#E2DDD0] hover:bg-[#F7F5EE]"
                 }`}
               >
                 <Receipt className="w-4 h-4" /> Ticket 80mm
@@ -479,7 +479,7 @@ export default function RecibosTab() {
           <div className="flex items-center justify-between gap-2 bg-[#F0EDE1] rounded-xl p-3 border border-[#D4CEB8]">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5 text-sm font-bold text-[#1A2210]">
-                <Bluetooth className={`w-4 h-4 ${btConnected ? "text-[#15803D]" : "text-[#889078]"}`} />
+                <Bluetooth className={`w-4 h-4 ${btConnected ? "text-[#1D4ED8]" : "text-[#889078]"}`} />
                 Impresora Bluetooth
               </div>
               <div className="text-xs text-[#556047] font-semibold truncate">
@@ -491,7 +491,7 @@ export default function RecibosTab() {
                 Desconectar
               </button>
             ) : (
-              <button onClick={connectBluetooth} className="h-10 px-3 bg-[#1E4620] hover:bg-[#153417] text-white font-bold rounded-xl text-sm flex items-center gap-1.5" data-testid="bt-connect">
+              <button onClick={connectBluetooth} className="h-10 px-3 bg-[#1D4ED8] hover:bg-[#1E3A8A] text-white font-bold rounded-xl text-sm flex items-center gap-1.5" data-testid="bt-connect">
                 <BluetoothSearching className="w-4 h-4" /> Conectar
               </button>
             )}
@@ -505,7 +505,7 @@ export default function RecibosTab() {
             <PrinterIcon className="w-5 h-5" /> Imprimir todos ({rows.length})
           </button>
           {btConnected && rows.length > 0 && (
-            <button onClick={printAllBluetooth} disabled={!!btPrinting} className="h-14 px-5 bg-[#1E4620] hover:bg-[#153417] text-white font-bold rounded-xl flex items-center justify-center gap-2 disabled:opacity-60" data-testid="bt-print-all">
+            <button onClick={printAllBluetooth} disabled={!!btPrinting} className="h-14 px-5 bg-[#1D4ED8] hover:bg-[#1E3A8A] text-white font-bold rounded-xl flex items-center justify-center gap-2 disabled:opacity-60" data-testid="bt-print-all">
               {btPrinting ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Bluetooth className="w-5 h-5" /> Imprimir en ticketera</>}
             </button>
           )}
@@ -527,7 +527,7 @@ export default function RecibosTab() {
       {/* Totals */}
       {rows.length > 0 && (
         <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-2xl bg-[#1E4620] text-white p-4 border-2 border-[#153417] shadow-sm" data-testid="recibos-total-hours">
+          <div className="rounded-2xl bg-[#1D4ED8] text-white p-4 border-2 border-[#1E3A8A] shadow-sm" data-testid="recibos-total-hours">
             <div className="text-[11px] font-bold uppercase tracking-wider opacity-90 flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> Horas</div>
             <div className="font-mono-stat text-xl sm:text-2xl mt-1">{formatNumber(totals.hours, 2)}</div>
           </div>
@@ -535,7 +535,7 @@ export default function RecibosTab() {
             <div className="text-[11px] font-bold uppercase tracking-wider text-[#556047] flex items-center gap-1"><Users className="w-3.5 h-3.5" /> Trabajadores</div>
             <div className="font-mono-stat text-xl sm:text-2xl mt-1">{rows.length}</div>
           </div>
-          <div className="rounded-2xl bg-[#E65100] text-white p-4 border-2 border-[#C63D00] shadow-sm" data-testid="recibos-total-payment">
+          <div className="rounded-2xl bg-[#DC2626] text-white p-4 border-2 border-[#B91C1C] shadow-sm" data-testid="recibos-total-payment">
             <div className="text-[11px] font-bold uppercase tracking-wider opacity-90 flex items-center gap-1"><DollarSign className="w-3.5 h-3.5" /> Nómina</div>
             <div className="font-mono-stat text-xl sm:text-2xl mt-1">{formatCurrency(totals.payment)}</div>
           </div>
@@ -544,7 +544,7 @@ export default function RecibosTab() {
 
       {/* Receipt cards */}
       {loading ? (
-        <div className="flex items-center justify-center py-10 text-[#1E4620]"><Loader2 className="w-6 h-6 animate-spin" /></div>
+        <div className="flex items-center justify-center py-10 text-[#1D4ED8]"><Loader2 className="w-6 h-6 animate-spin" /></div>
       ) : rows.length === 0 ? (
         <div className="field-card p-8 text-center">
           <FileText className="w-10 h-10 mx-auto text-[#889078] mb-2" />
@@ -566,7 +566,7 @@ export default function RecibosTab() {
                 <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => printReceipt(r)}
-                  className="h-10 px-4 bg-[#1E4620] hover:bg-[#153417] text-white font-bold rounded-xl flex items-center gap-1.5 shadow-sm"
+                  className="h-10 px-4 bg-[#1D4ED8] hover:bg-[#1E3A8A] text-white font-bold rounded-xl flex items-center gap-1.5 shadow-sm"
                   data-testid={`recibo-print-${r.worker_id}`}
                 >
                   <Printer className="w-4 h-4" /> {format === "ticket" ? "Ticket" : "Imprimir"}
@@ -584,7 +584,7 @@ export default function RecibosTab() {
                   <button
                     onClick={() => printBluetooth(r)}
                     disabled={btPrinting === r.worker_id}
-                    className="h-10 px-3 bg-white border-2 border-[#1E4620] text-[#1E4620] hover:bg-emerald-50 font-bold rounded-xl flex items-center gap-1.5 disabled:opacity-60"
+                    className="h-10 px-3 bg-white border-2 border-[#1D4ED8] text-[#1D4ED8] hover:bg-blue-50 font-bold rounded-xl flex items-center gap-1.5 disabled:opacity-60"
                     data-testid={`bt-print-${r.worker_id}`}
                     title="Imprimir en ticketera Bluetooth"
                   >
@@ -609,7 +609,7 @@ export default function RecibosTab() {
                     {formatNumber(r.total_kilos, 0)}+{formatNumber(r.total_units, 0)}
                   </div>
                 </div>
-                <div className="bg-[#E65100] rounded-xl p-2.5 border border-[#C63D00] text-white">
+                <div className="bg-[#DC2626] rounded-xl p-2.5 border border-[#B91C1C] text-white">
                   <div className="text-[10px] font-bold uppercase tracking-wider opacity-90">Pago</div>
                   <div className="font-mono-stat text-base mt-0.5">{formatCurrency(r.total_payment)}</div>
                 </div>

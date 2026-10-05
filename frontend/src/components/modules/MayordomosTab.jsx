@@ -44,7 +44,7 @@ export default function MayordomosTab() {
         </h2>
         <button
           onClick={() => { setEditing(null); setShowForm(true); }}
-          className="h-11 px-4 bg-[#1E4620] hover:bg-[#153417] text-white font-bold rounded-xl flex items-center gap-1.5"
+          className="h-11 px-4 bg-[#1D4ED8] hover:bg-[#1E3A8A] text-white font-bold rounded-xl flex items-center gap-1.5"
           data-testid="mayordomo-add-button"
         >
           <UserPlus className="w-4 h-4" /> Nuevo mayordomo
@@ -52,7 +52,7 @@ export default function MayordomosTab() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-8 text-[#1E4620]"><Loader2 className="w-6 h-6 animate-spin" /></div>
+        <div className="flex justify-center py-8 text-[#1D4ED8]"><Loader2 className="w-6 h-6 animate-spin" /></div>
       ) : rows.length === 0 ? (
         <div className="field-card p-8 text-center">
           <Shield className="w-10 h-10 mx-auto text-[#889078] mb-2" />
@@ -67,7 +67,7 @@ export default function MayordomosTab() {
             return (
               <div
                 key={u.id}
-                className={`field-card p-4 border-l-4 ${isAdmin ? "border-l-[#E89C3F]" : isInactive ? "border-l-[#889078]" : "border-l-emerald-500"}`}
+                className={`field-card p-4 border-l-4 ${isAdmin ? "border-l-[#2563EB]" : isInactive ? "border-l-[#889078]" : "border-l-[#2563EB]"}`}
                 data-testid={`mayordomo-row-${u.id}`}
               >
                 <div className="flex items-start justify-between">
@@ -77,11 +77,11 @@ export default function MayordomosTab() {
                         {u.name}
                       </h3>
                       {isAdmin ? (
-                        <span className="bg-[#E89C3F] text-white px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                        <span className="bg-[#2563EB] text-white px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
                           <Shield className="w-3 h-3" /> Admin
                         </span>
                       ) : (
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${isInactive ? "bg-[#889078] text-white" : "bg-emerald-500 text-white"}`}>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${isInactive ? "bg-[#889078] text-white" : "bg-[#2563EB] text-white"}`}>
                           {isInactive ? "Inactivo" : "Activo"}
                         </span>
                       )}
@@ -254,7 +254,7 @@ function MayordomoForm({ editing, onClose, onSaved }) {
               type="checkbox"
               checked={active}
               onChange={(e) => setActive(e.target.checked)}
-              className="w-5 h-5 accent-[#1E4620]"
+              className="w-5 h-5 accent-[#1D4ED8]"
               data-testid="mayordomo-active-toggle"
             />
             <span className="font-bold text-sm text-[#1A2210]">Cuenta activa</span>
@@ -272,7 +272,7 @@ function MayordomoForm({ editing, onClose, onSaved }) {
             <button
               type="submit"
               disabled={saving}
-              className="h-12 rounded-xl bg-[#1E4620] hover:bg-[#153417] text-white font-bold flex items-center justify-center gap-2 disabled:opacity-60"
+              className="h-12 rounded-xl bg-[#1D4ED8] hover:bg-[#1E3A8A] text-white font-bold flex items-center justify-center gap-2 disabled:opacity-60"
               data-testid="mayordomo-save-button"
             >
               {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <><UserPlus className="w-4 h-4" /> {isEdit ? "Guardar" : "Crear acceso"}</>}

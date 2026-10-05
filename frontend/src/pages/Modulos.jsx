@@ -40,7 +40,7 @@ export default function Modulos() {
             data-testid={testid}
             className={`flex-1 min-w-fit flex items-center justify-center gap-2 h-11 px-4 rounded-xl font-bold text-sm transition-all ${
               tab === id
-                ? "bg-[#1E4620] text-white shadow-md"
+                ? "bg-[#1D4ED8] text-white shadow-md"
                 : "text-[#556047] hover:bg-[#F0EDE1]"
             }`}
           >

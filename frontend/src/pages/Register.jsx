@@ -93,7 +93,7 @@ export default function Register() {
 
             <div className="text-center text-sm text-[#556047] pt-2">
               ¿Ya tienes cuenta?{" "}
-              <Link to="/login" className="text-[#1E4620] font-bold hover:underline" data-testid="link-login">
+              <Link to="/login" className="text-[#1D4ED8] font-bold hover:underline" data-testid="link-login">
                 Iniciar sesión
               </Link>
             </div>
