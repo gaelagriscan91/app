@@ -451,14 +451,6 @@ export default function RecibosTab() {
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div>
-            <label className="block text-xs font-bold text-[#1A2210] mb-1 uppercase tracking-wider">Desde</label>
-            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="field-input !h-12 !text-base" data-testid="recibos-date-from" />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-[#1A2210] mb-1 uppercase tracking-wider">Hasta</label>
-            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="field-input !h-12 !text-base" data-testid="recibos-date-to" />
-          </div>
-          <div>
             <label className="block text-xs font-bold text-[#1A2210] mb-1 uppercase tracking-wider">Cuadrilla</label>
             <select value={crewId} onChange={(e) => setCrewId(e.target.value)} className="field-input !h-12 !text-base" data-testid="recibos-crew">
               <option value="">Todas</option>

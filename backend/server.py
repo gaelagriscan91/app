@@ -1138,6 +1138,18 @@ async def save_receipt_history(payload: ReceiptSaveIn, user: CurrentUser):
     total_units = round(sum(float(r.get("total_units", 0)) for r in rows), 2)
     total_payment = round(sum(float(r.get("total_payment", 0)) for r in rows), 2)
 
+    # Collect unique parcel + product names across all workers' harvests
+    parcel_set = []
+    product_set = []
+    for r in rows:
+        for h in r.get("harvests", []) or []:
+            pn = (h.get("parcel_name") or "").strip()
+            if pn and pn != "—" and pn not in parcel_set:
+                parcel_set.append(pn)
+            prd = (h.get("product_name") or "").strip()
+            if prd and prd != "—" and prd not in product_set:
+                product_set.append(prd)
+
     doc = {
         "owner_id": user["_id"],
         "saved_by_email": user.get("email", ""),
@@ -1154,6 +1166,8 @@ async def save_receipt_history(payload: ReceiptSaveIn, user: CurrentUser):
         "total_kilos": total_kilos,
         "total_units": total_units,
         "total_payment": total_payment,
+        "parcels": parcel_set,
+        "products": product_set,
         "rows": rows,
     }
     res = await db.receipts_history.insert_one(doc)

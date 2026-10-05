@@ -155,22 +155,48 @@ export default function RegistroTab() {
                     <X className="w-5 h-5" />
                   </button>
                 </div>
-                <div className="text-xs text-[#556047] font-semibold mb-3">
-                  {fmtDate(selected.date_from)} → {fmtDate(selected.date_to)} · Guardado {fmtDateTime(selected.saved_at)}
-                  {selected.saved_by_name ? ` · por ${selected.saved_by_name}` : ""}
+                {/* Rancho / Trabajo / Fecha */}
+                <div className="bg-[#EFF6FF] border border-[#DBEAFE] rounded-xl p-3 mb-3 space-y-1.5">
+                  <div className="flex items-start gap-2">
+                    <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#556047] w-16 pt-0.5">Rancho</div>
+                    <div className="text-sm font-bold text-[#1A2210] flex-1">
+                      {(selected.parcels && selected.parcels.length > 0) ? selected.parcels.join(", ") : "—"}
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#556047] w-16 pt-0.5">Trabajo</div>
+                    <div className="text-sm font-bold text-[#1A2210] flex-1">
+                      {(selected.products && selected.products.length > 0) ? selected.products.join(", ") : "—"}
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#556047] w-16 pt-0.5">Fecha</div>
+                    <div className="text-sm font-bold text-[#1A2210] flex-1">
+                      {fmtDate(selected.date_from)} → {fmtDate(selected.date_to)}
+                    </div>
+                  </div>
                 </div>
-                <div className="grid grid-cols-3 gap-2 mb-4">
-                  <div className="rounded-xl bg-[#1D4ED8] text-white p-3">
-                    <div className="text-[10px] font-bold uppercase tracking-wider opacity-90">Horas</div>
-                    <div className="font-mono-stat text-lg mt-0.5">{formatNumber(selected.total_hours, 2)}</div>
+                <div className="text-[11px] text-[#889078] font-semibold mb-3">
+                  Guardado {fmtDateTime(selected.saved_at)}{selected.saved_by_name ? ` · por ${selected.saved_by_name}` : ""}
+                </div>
+                <div className="grid grid-cols-4 gap-2 mb-4">
+                  <div className="rounded-xl bg-[#1D4ED8] text-white p-2.5">
+                    <div className="text-[9px] font-bold uppercase tracking-wider opacity-90">Horas</div>
+                    <div className="font-mono-stat text-base mt-0.5">{formatNumber(selected.total_hours, 2)}</div>
                   </div>
-                  <div className="rounded-xl bg-white border-2 border-[#E2DDD0] p-3">
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-[#556047]">Trab.</div>
-                    <div className="font-mono-stat text-lg mt-0.5 text-[#1A2210]">{selected.workers_count}</div>
+                  <div className="rounded-xl bg-white border-2 border-[#E2DDD0] p-2.5">
+                    <div className="text-[9px] font-bold uppercase tracking-wider text-[#556047]">Trab.</div>
+                    <div className="font-mono-stat text-base mt-0.5 text-[#1A2210]">{selected.workers_count}</div>
                   </div>
-                  <div className="rounded-xl bg-[#DC2626] text-white p-3">
-                    <div className="text-[10px] font-bold uppercase tracking-wider opacity-90">Nómina</div>
-                    <div className="font-mono-stat text-sm mt-0.5">{formatCurrency(selected.total_payment)}</div>
+                  <div className="rounded-xl bg-white border-2 border-[#E2DDD0] p-2.5">
+                    <div className="text-[9px] font-bold uppercase tracking-wider text-[#556047]">Piezas</div>
+                    <div className="font-mono-stat text-base mt-0.5 text-[#1A2210]">
+                      {Math.round(selected.total_units || 0)}
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-[#DC2626] text-white p-2.5">
+                    <div className="text-[9px] font-bold uppercase tracking-wider opacity-90">Nómina</div>
+                    <div className="font-mono-stat text-xs mt-0.5 break-words">{formatCurrency(selected.total_payment)}</div>
                   </div>
                 </div>
                 <div className="space-y-2">
