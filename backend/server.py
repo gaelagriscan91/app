@@ -1018,6 +1018,12 @@ async def receipts_export(
         "Total kilos", "Total piezas",
         "Precio/pieza", "Total a pagar ($)",
     ])
+    def _fmt_hours(h: float) -> str:
+        """Match the app display: '0min', '45min', '1h 23min'."""
+        total_min = int(round(float(h or 0) * 60))
+        hh, mm = divmod(total_min, 60)
+        return f"{hh}h {mm}min" if hh > 0 else f"{mm}min"
+
     grand_hours = 0.0
     grand_kilos = 0.0
     grand_units = 0.0
@@ -1032,7 +1038,7 @@ async def receipts_export(
             r.get("role", ""),
             r.get("date_from", ""),
             r.get("date_to", ""),
-            float(r.get("total_hours", 0)),
+            _fmt_hours(r.get("total_hours", 0)),
             int(r.get("days_worked", 0)),
             float(r.get("total_kilos", 0)),
             total_units,
@@ -1047,7 +1053,7 @@ async def receipts_export(
     ws.append([])
     ws.append([
         "TOTALES", "", "", "", "",
-        round(grand_hours, 2),
+        _fmt_hours(grand_hours),
         "",
         round(grand_kilos, 2),
         round(grand_units, 2),
@@ -1084,12 +1090,19 @@ def _hhmm(iso_ts: Optional[str]) -> str:
 
 
 def _duration_hours(ci: Optional[str], co: Optional[str]) -> float:
-    if not ci or not co:
+    """Hours between check_in and check_out. If still 'en campo' (no check_out),
+    counts up to current UTC time so partial hours are reflected everywhere."""
+    if not ci:
         return 0.0
     try:
         a = datetime.fromisoformat(ci)
-        b = datetime.fromisoformat(co)
-        return round((b - a).total_seconds() / 3600.0, 2)
+        if co:
+            b = datetime.fromisoformat(co)
+        else:
+            # Ensure tz-aware subtraction regardless of ci having tz info or not
+            b = datetime.now(a.tzinfo) if a.tzinfo else datetime.utcnow()
+        secs = max(0.0, (b - a).total_seconds())
+        return round(secs / 3600.0, 2)
     except Exception:
         return 0.0
 
