@@ -1110,6 +1110,94 @@ async def receipts_export(
 
 
 # ---------------------------------------------------------------------------
+# Receipts History — persisted snapshots the user can review later
+# ---------------------------------------------------------------------------
+class ReceiptSaveIn(BaseModel):
+    date_from: str
+    date_to: str
+    worker_id: Optional[str] = None
+    crew_id: Optional[str] = None
+    note: Optional[str] = ""
+
+
+@api_router.post("/receipts/history")
+async def save_receipt_history(payload: ReceiptSaveIn, user: CurrentUser):
+    """Store a snapshot of the current receipts for later review."""
+    rows = await receipts(
+        user=user,
+        date_from=payload.date_from,
+        date_to=payload.date_to,
+        worker_id=payload.worker_id,
+        crew_id=payload.crew_id,
+    )
+    if not rows:
+        raise HTTPException(status_code=400, detail="No hay actividad para guardar en este periodo")
+
+    total_hours = round(sum(float(r.get("total_hours", 0)) for r in rows), 2)
+    total_kilos = round(sum(float(r.get("total_kilos", 0)) for r in rows), 2)
+    total_units = round(sum(float(r.get("total_units", 0)) for r in rows), 2)
+    total_payment = round(sum(float(r.get("total_payment", 0)) for r in rows), 2)
+
+    doc = {
+        "owner_id": user["_id"],
+        "saved_by_email": user.get("email", ""),
+        "saved_by_name": user.get("name") or user.get("email", ""),
+        "saved_by_role": user.get("role", ""),
+        "saved_at": datetime.now(timezone.utc).isoformat(),
+        "date_from": payload.date_from,
+        "date_to": payload.date_to,
+        "worker_id": payload.worker_id,
+        "crew_id": payload.crew_id,
+        "note": (payload.note or "").strip(),
+        "workers_count": len(rows),
+        "total_hours": total_hours,
+        "total_kilos": total_kilos,
+        "total_units": total_units,
+        "total_payment": total_payment,
+        "rows": rows,
+    }
+    res = await db.receipts_history.insert_one(doc)
+    doc["id"] = str(res.inserted_id)
+    doc.pop("_id", None)
+    return doc
+
+
+@api_router.get("/receipts/history")
+async def list_receipt_history(user: CurrentUser):
+    cursor = db.receipts_history.find({**scope_filter(user)}).sort("saved_at", -1).limit(500)
+    out = []
+    async for d in cursor:
+        d["id"] = str(d.pop("_id"))
+        # Trim heavy row payload for the list view
+        d.pop("rows", None)
+        out.append(d)
+    return out
+
+
+@api_router.get("/receipts/history/{hid}")
+async def get_receipt_history(hid: str, user: CurrentUser):
+    try:
+        d = await db.receipts_history.find_one({"_id": ObjectId(hid), **scope_filter(user)})
+    except Exception:
+        raise HTTPException(status_code=400, detail="ID inválido")
+    if not d:
+        raise HTTPException(status_code=404, detail="No encontrado")
+    d["id"] = str(d.pop("_id"))
+    return d
+
+
+@api_router.delete("/receipts/history/{hid}")
+async def delete_receipt_history(hid: str, user: CurrentUser):
+    try:
+        res = await db.receipts_history.delete_one({"_id": ObjectId(hid), **scope_filter(user)})
+    except Exception:
+        raise HTTPException(status_code=400, detail="ID inválido")
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="No encontrado")
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
 # Attendance (Asistencia) - Entrada / Salida
 # ---------------------------------------------------------------------------
 def _hhmm(iso_ts: Optional[str]) -> str:

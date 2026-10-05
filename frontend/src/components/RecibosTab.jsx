@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Printer, Loader2, Calendar, Users, Clock, DollarSign, FileText, PrinterIcon, Bluetooth, BluetoothSearching, Receipt, FileCheck, Share2 } from "lucide-react";
+import { Printer, Loader2, Calendar, Users, Clock, DollarSign, FileText, PrinterIcon, Bluetooth, BluetoothSearching, Receipt, FileCheck, Share2, Save } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatCurrency, formatNumber } from "@/lib/api";
 import { thermalPrinter, buildReceiptLines, receiptTicketHtml } from "@/lib/thermalPrinter";
@@ -167,6 +167,28 @@ export default function RecibosTab() {
   const [btName, setBtName] = useState("");
   const [btPrinting, setBtPrinting] = useState("");
   const [sharing, setSharing] = useState("");
+  const [savingReceipt, setSavingReceipt] = useState(false);
+
+  const saveReceipt = async () => {
+    if (rows.length === 0) {
+      toast.error("Sin actividad para guardar");
+      return;
+    }
+    setSavingReceipt(true);
+    try {
+      await api.post("/receipts/history", {
+        date_from: dateFrom,
+        date_to: dateTo,
+        worker_id: workerId || null,
+        crew_id: crewId || null,
+      });
+      toast.success("✓ Recibo guardado en Registro");
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "No se pudo guardar el recibo");
+    } finally {
+      setSavingReceipt(false);
+    }
+  };
 
   const fmtMoney = (n) => Number(n || 0).toLocaleString("es-MX", { style: "currency", currency: "MXN" });
 
@@ -520,6 +542,15 @@ export default function RecibosTab() {
           style={{ fontFamily: "Outfit, sans-serif" }}
         >
           {sharing === "__all__" ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Share2 className="w-5 h-5" /> Compartir todos ({rows.length})</>}
+        </button>
+        <button
+          onClick={saveReceipt}
+          disabled={savingReceipt || rows.length === 0}
+          className="w-full h-12 rounded-xl bg-[#059669] hover:bg-[#047857] active:scale-[0.99] text-white font-extrabold flex items-center justify-center gap-2 shadow-md disabled:opacity-60 border-2 border-[#065F46]"
+          data-testid="recibos-save-button"
+          style={{ fontFamily: "Outfit, sans-serif" }}
+        >
+          {savingReceipt ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Save className="w-5 h-5" /> Guardar recibo</>}
         </button>
         <p className="text-[11px] text-[#889078] font-semibold text-center -mt-1">
           Envía por WhatsApp, Mensajes, Gmail, Correo, Telegram…
