@@ -67,20 +67,13 @@ export default function Dashboard() {
       </div>
 
       {/* Quick CTAs */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <button
           onClick={() => navigate("/registrar?mode=qr")}
           className="field-btn-primary"
           data-testid="dashboard-cta-scan-harvest"
         >
           <ScanLine className="w-6 h-6" /> Cosechar por QR
-        </button>
-        <button
-          onClick={() => navigate("/registrar")}
-          className="field-btn-accent"
-          data-testid="dashboard-cta-registrar"
-        >
-          <Wheat className="w-6 h-6" /> Registrar manual
         </button>
         <button
           onClick={() => navigate("/asistencia")}
@@ -92,29 +85,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <StatCard
-          label="En campo ahora"
-          value={data?.present_now || 0}
-          sub="Trabajadores sin salida"
-          Icon={UserCheck}
-          variant="dark"
-          testid="stat-present-now"
-        />
-        <StatCard
-          label="Jornadas cerradas"
-          value={data?.closed_today || 0}
-          sub="Hoy"
-          Icon={Users}
-          testid="stat-closed-today"
-        />
-        <StatCard
-          label="Kilos hoy"
-          value={formatNumber(data?.today_kilos, 1)}
-          sub="Kg cosechados"
-          Icon={Wheat}
-          testid="stat-today-kilos"
-        />
+      <div className="grid grid-cols-1 gap-3 sm:gap-4">
         <StatCard
           label="Pago hoy"
           value={formatCurrency(data?.today_payment)}
@@ -123,32 +94,6 @@ export default function Dashboard() {
           variant="accent"
           testid="stat-today-payment"
         />
-      </div>
-
-      {/* Month summary */}
-      <div className="field-card p-5">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-xs font-bold uppercase tracking-wider text-[#556047]">Resumen del mes</div>
-            <div className="font-mono-stat text-2xl sm:text-3xl mt-1 text-[#1A2210]">
-              {formatNumber(data?.month_kilos, 0)} <span className="text-base">Kg</span>
-            </div>
-            <div className="text-sm font-bold text-[#1D4ED8] mt-0.5">{formatCurrency(data?.month_payment)}</div>
-          </div>
-          <div className="hidden sm:flex items-center justify-center w-14 h-14 rounded-2xl bg-[#F0EDE1] text-[#1D4ED8]">
-            <TrendingUp className="w-7 h-7" strokeWidth={2.4} />
-          </div>
-        </div>
-        <div className="mt-4 pt-4 border-t border-[#E2DDD0] grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <div className="text-xs text-[#556047] font-bold uppercase tracking-wider">Trabajadores</div>
-            <div className="font-mono-stat text-xl text-[#1A2210]">{data?.workers_count || 0}</div>
-          </div>
-          <div>
-            <div className="text-xs text-[#556047] font-bold uppercase tracking-wider">Parcelas</div>
-            <div className="font-mono-stat text-xl text-[#1A2210]">{data?.parcels_count || 0}</div>
-          </div>
-        </div>
       </div>
 
       {/* Month records list */}
