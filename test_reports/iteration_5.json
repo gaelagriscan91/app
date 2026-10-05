@@ -1,0 +1,30 @@
+{
+  "summary": "Backend-only testing of attendance-gate on POST /api/harvests. Created 5 pytest cases covering: (1) harvest blocked when worker has no check-in today, (2) attendance check precedes product check, (3) invalid product still returns 'Producto no válido' after check-in, (4) harvest succeeds after check-in, (5) check-in today does not satisfy harvest for a different date. ALL 5 TESTS PASS.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_attendance_gate.py",
+    "/app/test_reports/pytest/pytest_results_iter5.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is 1494 lines — recommend splitting into routers (workers, harvests, attendance, products) for maintainability.",
+    "In create_harvest the error message hardcodes 'hoy' but the check uses data.date which could be any date; message is slightly misleading when date != today. Minor UX issue.",
+    "ObjectId(data.worker_id) in error-path fallback (line 628) could raise if client sends an invalid worker_id — would surface as 500 instead of 400. Consider try/except."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "not tested (backend-only request)"},
+  "test_credentials": "gaelmartin158@gmail.com / agriscan2026 (works)",
+  "seed_data_creation": "Each test creates a TEST_AttGate_<timestamp> worker and deletes it in teardown. One successful harvest is created in test_harvest_succeeds_after_checkin and deleted. Attendance records for today for TEST workers remain (acceptable, worker is deleted).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Attendance-gate on /api/harvests is working as specified. Spanish detail 'no tiene entrada registrada hoy' is returned with 400. Attendance check runs before product validation. test_attendance_gate.py is reusable for regression.",
+  "rca of the issue": "N/A — fix verified correct."
+}

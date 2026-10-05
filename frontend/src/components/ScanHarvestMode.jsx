@@ -258,11 +258,26 @@ export default function ScanHarvestMode() {
       return;
     }
 
+    // In share mode, QR scans also join the group (sharing a basket among workers scanned)
+    if (shareMode) {
+      const alreadyIn = shareBuffer.some((x) => x.id === w.id);
+      if (!alreadyIn) {
+        if (!shareSessionIdRef.current) {
+          shareSessionIdRef.current = `share-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        }
+        setShareBuffer((prev) => [...prev, { id: w.id, name: w.name }]);
+        setShareBaskets((n) => (n < 1 ? 1 : n));
+        logScan(w, "qr", { sharedBasket: true, shareSessionId: shareSessionIdRef.current });
+      }
+      scannedCodesRef.current.set(key, now);
+      playBeep();
+      setLastWorker({ id: w.id, name: w.name });
+      return;
+    }
+
     scannedCodesRef.current.set(key, now);
     playBeep();
     setLastWorker({ id: w.id, name: w.name });
-    // QR scans NEVER share — always +1 piece for the scanned worker, even if shareMode is on.
-    // Share only applies to workers added manually.
     setTally((prev) => {
       const cur = prev[w.id] || { name: w.name, count: 0 };
       return { ...prev, [w.id]: { name: w.name, count: cur.count + 1 } };
@@ -559,12 +574,31 @@ export default function ScanHarvestMode() {
         {/* Shared-basket toggle (below pause) */}
         <button
           onClick={() => {
-            if (shareMode && shareBuffer.length > 0) {
-              if (!window.confirm("Hay una canasta compartida sin guardar. ¿Descartar?")) return;
-              setShareBuffer([]);
-              setShareBaskets(0);
+            if (shareMode) {
+              // Turning OFF
+              if (shareBuffer.length > 0) {
+                if (!window.confirm("Hay una canasta compartida sin guardar. ¿Descartar?")) return;
+                setShareBuffer([]);
+                setShareBaskets(0);
+                shareSessionIdRef.current = null;
+              }
+              setShareMode(false);
+            } else {
+              // Turning ON: offer to pull existing tally workers into the shared group
+              const tallyEntries = Object.entries(tally);
+              if (tallyEntries.length > 0) {
+                const ok = window.confirm(
+                  `¿Agrupar los ${tallyEntries.length} trabajador(es) actuales como canasta compartida?`
+                );
+                if (ok) {
+                  shareSessionIdRef.current = `share-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+                  setShareBuffer(tallyEntries.map(([id, v]) => ({ id, name: v.name })));
+                  setShareBaskets(1);
+                  setTally({});
+                }
+              }
+              setShareMode(true);
             }
-            setShareMode((v) => !v);
           }}
           className={`absolute top-[72px] right-3 h-11 px-3 rounded-full flex items-center gap-1.5 font-extrabold text-xs shadow-xl ${
             shareMode ? "bg-[#DC2626] text-white" : "bg-white text-[#1A2210]"

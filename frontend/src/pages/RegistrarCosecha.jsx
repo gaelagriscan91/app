@@ -108,6 +108,7 @@ export default function RegistrarCosecha() {
     }
     setSaving(true);
     try {
+      // Backend will reject if worker has no check-in today; propagate the exact message
       await api.post("/harvests", {
         worker_id: wid,
         parcel_id: parcelId,
@@ -127,7 +128,8 @@ export default function RegistrarCosecha() {
       setUnits("");
       // Stay on the manual form so you can register the next worker
     } catch (err) {
-      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "Error al guardar");
+      const detail = formatApiErrorDetail(err.response?.data?.detail);
+      toast.error(detail || "Error al guardar");
     } finally {
       setSaving(false);
     }
