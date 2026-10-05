@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import api, { formatApiErrorDetail, formatCurrency, formatNumber, todayISO } from "@/lib/api";
+import api, { formatApiErrorDetail, formatCurrency, formatNumber, todayISO, formatHHMM } from "@/lib/api";
 import QrScanner from "@/components/QrScanner";
 import QuickAddWorker from "@/components/QuickAddWorker";
 
@@ -110,8 +110,8 @@ export default function Asistencia() {
     setProcessing(true);
     try {
       const { data: res } = await api.post("/attendance/scan", { code, date });
-      if (res.action === "check_in") toast.success(`✅ Entrada: ${res.worker_name} • ${res.check_in_hhmm}`);
-      else if (res.action === "check_out") toast.success(`🏁 Salida: ${res.worker_name} • ${res.check_out_hhmm} (${res.hours}h)`);
+      if (res.action === "check_in") toast.success(`✅ Entrada: ${res.worker_name} • ${formatHHMM(res.check_in)}`);
+      else if (res.action === "check_out") toast.success(`🏁 Salida: ${res.worker_name} • ${formatHHMM(res.check_out)} (${res.hours}h)`);
       await load();
     } catch (e) {
       toast.error(formatApiErrorDetail(e.response?.data?.detail) || "No se pudo registrar");
@@ -457,7 +457,7 @@ export default function Asistencia() {
                   <div className="min-w-0 flex-1">
                     <div className="font-bold text-[#1A2210] truncate">{r.worker_name}</div>
                     <div className="text-[11px] text-[#889078] font-semibold font-mono-stat">
-                      {r.check_in_hhmm}{r.check_out_hhmm ? ` → ${r.check_out_hhmm}` : " →"}
+                      {formatHHMM(r.check_in) || "—"}{formatHHMM(r.check_out) ? ` → ${formatHHMM(r.check_out)}` : " →"}
                     </div>
                   </div>
                   <div className="text-right">
@@ -933,9 +933,9 @@ function CheckInView(props) {
             >
               <div className="min-w-[70px]">
                 <div className="text-xs text-[#889078] font-semibold uppercase tracking-wider">Hora</div>
-                <div className="font-bold text-[#1A2210] text-base">{r.check_in_hhmm}</div>
-                {r.check_out_hhmm && (
-                  <div className="text-xs text-red-700 font-bold mt-0.5">↓ {r.check_out_hhmm}</div>
+                <div className="font-bold text-[#1A2210] text-base">{formatHHMM(r.check_in) || "—"}</div>
+                {r.check_out && (
+                  <div className="text-xs text-red-700 font-bold mt-0.5">↓ {formatHHMM(r.check_out)}</div>
                 )}
               </div>
               <div className="min-w-0 flex-1 border-l border-[#E2DDD0] pl-3">
@@ -1083,7 +1083,9 @@ function SummaryView({ data, selectedParcel, harvestsToday = [], date, onClose }
       ].join("\n");
       const lines = data.rows.map((r) => {
         const agg = byWorker[r.worker_id] || { pieces: 0, kilos: 0, payment: 0 };
-        const timeRange = `${r.check_in_hhmm || "—"}${r.check_out_hhmm ? `→${r.check_out_hhmm}` : "→en campo"}`;
+        const ci = formatHHMM(r.check_in);
+        const co = formatHHMM(r.check_out);
+        const timeRange = `${ci || "—"}${co ? `→${co}` : "→en campo"}`;
         return `• ${r.worker_name} · ${timeRange} · ${formatHours(r.hours)} · ${agg.pieces.toFixed(agg.pieces % 1 === 0 ? 0 : 2)}u · ${fmtMoney(agg.payment)}`;
       }).join("\n");
       const text = header + "\n" + lines;
@@ -1184,7 +1186,7 @@ function SummaryView({ data, selectedParcel, harvestsToday = [], date, onClose }
                       <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Nombre</div>
                       <div className="font-bold text-[#1A2210] text-base truncate">{r.worker_name}</div>
                       <div className="text-[11px] text-[#556047] font-semibold font-mono-stat mt-0.5">
-                        {r.check_in_hhmm || "—"}{r.check_out_hhmm ? ` → ${r.check_out_hhmm}` : " → en campo"}
+                        {formatHHMM(r.check_in) || "—"}{formatHHMM(r.check_out) ? ` → ${formatHHMM(r.check_out)}` : " → en campo"}
                       </div>
                     </div>
                     <div className="text-right">
