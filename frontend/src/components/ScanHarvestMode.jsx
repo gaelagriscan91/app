@@ -369,17 +369,25 @@ export default function ScanHarvestMode() {
   const totalScanned = scanLog.length;
 
   const save = async () => {
-    // Commit pending shared basket into tally before saving
-    if (shareBuffer.length > 0 && shareBaskets > 0) {
-      commitSharedBasket();
-      await new Promise((r) => setTimeout(r, 50));
+    // Build final tally inline (avoid React async setState race with commitSharedBasket)
+    const finalTally = { ...tally };
+    const price = parseFloat(pricePerUnit) || 0;
+    const hasShare = shareBuffer.length > 0 && shareBaskets > 0;
+    let sharePieces = 0;
+    let earnedPerSharer = 0;
+    if (hasShare) {
+      sharePieces = shareBaskets / shareBuffer.length;
+      earnedPerSharer = +(sharePieces * price).toFixed(2);
+      shareBuffer.forEach((w) => {
+        const cur = finalTally[w.id] || { name: w.name, count: 0 };
+        finalTally[w.id] = { name: w.name, count: +(cur.count + sharePieces).toFixed(4) };
+      });
     }
-    const entries = Object.entries(tally);
+    const entries = Object.entries(finalTally);
     if (entries.length === 0) {
       toast.error("No hay escaneos para guardar");
       return;
     }
-    const price = parseFloat(pricePerUnit) || 0;
     if (price <= 0) {
       toast.error("Pon el precio antes de guardar");
       return;
@@ -403,11 +411,28 @@ export default function ScanHarvestMode() {
           })
         )
       );
-      toast.success(`Guardado: ${entries.length} trabajador(es) · ${formatCurrency(totals.payment)}`, { duration: 2500 });
+      // Patch scanLog for shared-basket entries with real earned $
+      const sessionId = shareSessionIdRef.current;
+      if (hasShare && sessionId) {
+        setScanLog((prev) => {
+          const next = prev.map((e) =>
+            e.shareSessionId === sessionId
+              ? { ...e, earned: earnedPerSharer, baskets: shareBaskets, sharers: shareBuffer.length, sharePieces: +sharePieces.toFixed(4) }
+              : e
+          );
+          try { localStorage.setItem(scanLogKey, JSON.stringify(next)); } catch {}
+          return next;
+        });
+      }
+      const totalPayment = entries.reduce((s, [, v]) => s + v.count * price, 0);
+      toast.success(`Guardado: ${entries.length} trabajador(es) · ${formatCurrency(totalPayment)}`, { duration: 2500 });
       setTally({});
+      setShareBuffer([]);
+      setShareBaskets(0);
+      setShareMode(false);
+      shareSessionIdRef.current = null;
       setLastWorker(null);
       scannedCodesRef.current.clear();
-      // Keep camera ON so the user keeps scanning the next batch
       setScannerOn(true);
     } catch (e) {
       toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Error al guardar");
