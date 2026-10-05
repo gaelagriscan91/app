@@ -90,7 +90,7 @@ export default function Asistencia() {
   const mayordomoName = session.mayordomo || selectedCrew?.boss?.name || "—";
 
   const presentCount = data.rows.length;
-  const openCount = data.rows.filter((r) => !r.check_out_hhmm).length;
+  const openCount = data.rows.filter((r) => !r.check_out).length;
   const presentWorkerIds = useMemo(() => new Set(data.rows.map((r) => r.worker_id)), [data.rows]);
 
   const nowGreeting = () => {
@@ -149,7 +149,7 @@ export default function Asistencia() {
   };
 
   const checkoutAll = async () => {
-    const open = data.rows.filter((r) => !r.check_out_hhmm);
+    const open = data.rows.filter((r) => !r.check_out);
     if (open.length === 0) {
       toast.info("No hay trabajadores con jornada abierta");
       setConfirmCheckout(false);
@@ -243,7 +243,7 @@ export default function Asistencia() {
     setClosingDay(true);
     try {
       // Close any still-open attendance in bulk
-      const openRows = data.rows.filter((r) => !r.check_out_hhmm);
+      const openRows = data.rows.filter((r) => !r.check_out);
       for (const r of openRows) {
         try { await api.post("/attendance/scan", { code: r.worker_id, date }); } catch (_) {}
       }
@@ -432,7 +432,7 @@ export default function Asistencia() {
               const shortId = (w?.id_document || w?.id || "").toString().slice(-3) || "—";
               // Live elapsed time since check-in (or final duration if checked out)
               let elapsedLabel = "—";
-              const open = !r.check_out_hhmm && r.check_in;
+              const open = !r.check_out && r.check_in;
               if (r.check_out && r.check_in) {
                 const h = Number(r.hours) || 0;
                 const hh = Math.floor(h);
