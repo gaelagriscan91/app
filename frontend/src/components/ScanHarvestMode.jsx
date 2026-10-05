@@ -233,13 +233,7 @@ export default function ScanHarvestMode() {
     scannedCodesRef.current.set(key, now);
     playBeep();
     setLastWorker({ id: w.id, name: w.name });
-    if (shareMode) {
-      // Shared basket: add worker to the sharing group (dedupe)
-      setShareBuffer((prev) => (prev.some((x) => x.id === w.id) ? prev : [...prev, { id: w.id, name: w.name }]));
-      setShareBaskets((n) => (n < 1 ? 1 : n)); // first scan opens 1 basket
-      logScan(w, "qr");
-      return;
-    }
+    // QR scans NEVER share — always +1 piece for the scanned worker, even if shareMode is on
     setTally((prev) => {
       const cur = prev[w.id] || { name: w.name, count: 0 };
       return { ...prev, [w.id]: { name: w.name, count: cur.count + 1 } };
