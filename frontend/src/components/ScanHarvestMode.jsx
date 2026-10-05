@@ -61,6 +61,7 @@ export default function ScanHarvestMode() {
   const [shareMode, setShareMode] = useState(false);
   const [shareBuffer, setShareBuffer] = useState([]); // [{id, name}] unique sharers
   const [shareBaskets, setShareBaskets] = useState(0); // # of baskets shared by this group
+  const shareSessionIdRef = useRef(null); // id tagging scanLog entries of the current share group
 
   // Audit scan log — one entry per scan event (QR + manual). Persisted by date.
   const scanLogKey = `agriscan.scanlog.${todayKey}`;
@@ -68,7 +69,7 @@ export default function ScanHarvestMode() {
     try { return JSON.parse(localStorage.getItem(scanLogKey) || "[]"); }
     catch { return []; }
   });
-  const logScan = (w, source) => {
+  const logScan = (w, source, extra = {}) => {
     const entry = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       workerId: w.id,
@@ -76,6 +77,7 @@ export default function ScanHarvestMode() {
       at: new Date().toISOString(),
       source, // "qr" | "manual"
       priceAt: parseFloat(pricePerUnit) || 0,
+      ...extra,
     };
     setScanLog((prev) => {
       const next = [entry, ...prev].slice(0, 1000);
@@ -247,9 +249,19 @@ export default function ScanHarvestMode() {
     playBeep();
     setLastWorker({ id: w.id, name: w.name });
     if (shareMode) {
-      setShareBuffer((prev) => (prev.some((x) => x.id === w.id) ? prev : [...prev, { id: w.id, name: w.name }]));
+      const alreadyIn = shareBuffer.some((x) => x.id === w.id);
+      if (alreadyIn) {
+        // Same worker already in group — just acknowledge
+        setShowManual(false);
+        return;
+      }
+      // Start/continue share session
+      if (!shareSessionIdRef.current) {
+        shareSessionIdRef.current = `share-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      }
+      setShareBuffer((prev) => [...prev, { id: w.id, name: w.name }]);
       setShareBaskets((n) => (n < 1 ? 1 : n));
-      logScan(w, "manual");
+      logScan(w, "manual", { sharedBasket: true, shareSessionId: shareSessionIdRef.current });
       setShowManual(false);
       return;
     }
@@ -265,6 +277,9 @@ export default function ScanHarvestMode() {
   const commitSharedBasket = () => {
     if (shareBuffer.length === 0 || shareBaskets <= 0) return 0;
     const share = shareBaskets / shareBuffer.length;
+    const priceAtNow = parseFloat(pricePerUnit) || 0;
+    const earnedPerSharer = share * priceAtNow;
+    const sessionId = shareSessionIdRef.current;
     setTally((prev) => {
       const next = { ...prev };
       shareBuffer.forEach((w) => {
@@ -273,10 +288,29 @@ export default function ScanHarvestMode() {
       });
       return next;
     });
+    // Patch scanLog entries of this session with real earned amount + metadata
+    if (sessionId) {
+      setScanLog((prev) => {
+        const next = prev.map((e) =>
+          e.shareSessionId === sessionId
+            ? {
+                ...e,
+                earned: +earnedPerSharer.toFixed(2),
+                baskets: shareBaskets,
+                sharers: shareBuffer.length,
+                sharePieces: +share.toFixed(4),
+              }
+            : e
+        );
+        try { localStorage.setItem(scanLogKey, JSON.stringify(next)); } catch {}
+        return next;
+      });
+    }
     const n = shareBuffer.length;
     setShareBuffer([]);
     setShareBaskets(0);
     setShareMode(false);
+    shareSessionIdRef.current = null;
     return n;
   };
 
@@ -811,11 +845,13 @@ export default function ScanHarvestMode() {
                         const d = new Date(e.at);
                         const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
                         const date = d.toLocaleDateString();
-                        const earned = Number(e.priceAt ?? pricePerUnit) || 0;
+                        const earned = e.earned !== undefined ? Number(e.earned) : Number(e.priceAt ?? pricePerUnit) || 0;
+                        const isShared = e.sharedBasket === true;
+                        const pending = isShared && e.earned === undefined;
                         return (
                           <li key={e.id} className="py-2.5 flex items-center justify-between gap-3" data-testid={`scan-registro-row-${e.id}`}>
                             <div className="min-w-0 flex-1">
-                              <div className="font-bold text-[#1A2210] truncate flex items-center gap-1.5">
+                              <div className="font-bold text-[#1A2210] truncate flex items-center gap-1.5 flex-wrap">
                                 {e.name}
                                 <span
                                   className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
@@ -826,17 +862,22 @@ export default function ScanHarvestMode() {
                                 >
                                   {e.source === "manual" ? "Manual" : "QR"}
                                 </span>
+                                {isShared && (
+                                  <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#E65100]/15 text-[#E65100]">
+                                    Compartida{e.sharers ? ` ·${e.sharers}` : ""}
+                                  </span>
+                                )}
                               </div>
                               <div className="text-[11px] text-[#556047] font-semibold font-mono-stat">
                                 {date} · {time}
                               </div>
                             </div>
                             <div className="text-right shrink-0">
-                              <div className="font-mono-stat text-base font-extrabold text-[#1D4ED8]" data-testid={`scan-registro-earned-${e.id}`}>
-                                {formatCurrency(earned)}
+                              <div className={`font-mono-stat text-base font-extrabold ${pending ? "text-[#889078]" : "text-[#1D4ED8]"}`} data-testid={`scan-registro-earned-${e.id}`}>
+                                {pending ? "—" : formatCurrency(earned)}
                               </div>
                               <div className="text-[10px] font-bold uppercase tracking-wider text-[#889078] leading-none">
-                                /pza
+                                {pending ? "sin guardar" : (isShared ? `${e.sharePieces?.toFixed(2) || "—"} pza` : "/pza")}
                               </div>
                             </div>
                           </li>
