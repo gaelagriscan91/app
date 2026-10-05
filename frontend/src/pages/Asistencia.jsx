@@ -165,7 +165,8 @@ export default function Asistencia() {
 
   // ============== Tile Click Handlers ==============
   const onCheckIn = () => {
-    if (!session.parcelId || !session.mayordomo) {
+    // If there are already workers checked in today, skip the session gate
+    if (presentCount === 0 && (!session.parcelId || !session.mayordomo)) {
       toast.info("Primero elige Rancho y Mayordomo");
       setSessionModalOpen(true);
       return;
@@ -174,7 +175,8 @@ export default function Asistencia() {
   };
 
   const onPicking = () => {
-    if (!session.parcelId || !session.productId) {
+    // If there are already workers checked in today, skip the session gate
+    if (presentCount === 0 && (!session.parcelId || !session.productId)) {
       toast.info("Primero elige Rancho y Trabajo");
       setSessionModalOpen(true);
       return;
@@ -183,12 +185,10 @@ export default function Asistencia() {
       toast.error("No puedes empezar a cosechar: aún no hay trabajadores con entrada registrada");
       return;
     }
-    // Navigate to QR harvest mode with session preloaded
-    const params = new URLSearchParams({
-      mode: "qr",
-      parcel: session.parcelId,
-      product: session.productId,
-    });
+    // Navigate to QR harvest mode with session preloaded (if available)
+    const params = new URLSearchParams({ mode: "qr" });
+    if (session.parcelId) params.set("parcel", session.parcelId);
+    if (session.productId) params.set("product", session.productId);
     navigate(`/registrar?${params.toString()}`);
   };
 
