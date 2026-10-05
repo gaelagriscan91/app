@@ -788,6 +788,10 @@ async def dashboard(user: CurrentUser):
             weekly[d]["kilos"] += float(r.get("kilos", 0))
             weekly[d]["payment"] += float(r.get("payment", 0))
 
+    # Full month records enriched (sorted newest first)
+    month_sorted = sorted(month_rows, key=lambda r: (r.get("date", ""), str(r.get("_id", ""))), reverse=True)
+    month_records = [await _enrich_harvest(r) for r in month_sorted[:500]]
+
     return {
         "today_kilos": round(today_kilos, 2),
         "today_payment": round(today_payment, 2),
@@ -798,6 +802,8 @@ async def dashboard(user: CurrentUser):
         "present_now": present_now,
         "closed_today": closed_today,
         "weekly": list(weekly.values()),
+        "month_records": month_records,
+        "month_records_count": len(month_rows),
     }
 
 

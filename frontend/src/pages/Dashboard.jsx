@@ -150,6 +150,52 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Month records list */}
+      <div className="field-card p-0 overflow-hidden" data-testid="dashboard-month-records">
+        <div className="px-5 py-4 border-b border-[#E2DDD0] flex items-center justify-between">
+          <div>
+            <div className="text-xs font-bold uppercase tracking-wider text-[#556047]">Registros del mes</div>
+            <div className="text-sm font-extrabold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>
+              {data?.month_records_count || 0} cosechas
+            </div>
+          </div>
+          <button
+            onClick={() => navigate("/reportes")}
+            className="h-9 px-3 rounded-xl bg-[#F0EDE1] hover:bg-[#E2DDD0] text-[#556047] font-bold text-xs flex items-center gap-1"
+            data-testid="dashboard-see-all-reports"
+          >
+            Ver reportes <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        {(!data?.month_records || data.month_records.length === 0) ? (
+          <div className="px-5 py-8 text-center text-sm text-[#556047] font-semibold">
+            Sin registros este mes aún.
+          </div>
+        ) : (
+          <ul className="divide-y divide-[#E2DDD0] max-h-[480px] overflow-y-auto">
+            {data.month_records.map((r) => (
+              <li key={r.id} className="px-5 py-3 flex items-center justify-between gap-3" data-testid={`dashboard-record-${r.id}`}>
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-[#1A2210] truncate flex items-center gap-1.5">
+                    {r.worker_name || "—"}
+                    <span className="text-[10px] font-bold text-[#556047]">·</span>
+                    <span className="text-[11px] font-semibold text-[#556047] truncate">{r.product_name || r.parcel_name || ""}</span>
+                  </div>
+                  <div className="text-[11px] text-[#556047] font-semibold font-mono-stat">
+                    {r.date} · {r.kilos ? `${formatNumber(r.kilos, 2)}Kg` : ""} {r.units ? `${formatNumber(r.units, r.units % 1 === 0 ? 0 : 2)}u` : ""}
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="font-mono-stat text-base font-extrabold text-[#1D4ED8]">
+                    {formatCurrency(r.payment)}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

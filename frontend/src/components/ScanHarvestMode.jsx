@@ -211,7 +211,8 @@ export default function ScanHarvestMode() {
 
     const lastAt = scannedCodesRef.current.get(key) || 0;
     const elapsed = now - lastAt;
-    if (lastAt > 0 && elapsed < SCAN_COOLDOWN_MS) {
+    if (lastAt > 0 && elapsed < SCAN_COOLDOWN_MS && !shareMode) {
+      // Cooldown applies only outside share mode (in share mode, re-scanning is intentional)
       const remaining = Math.ceil((SCAN_COOLDOWN_MS - elapsed) / 1000);
       const mins = Math.floor(remaining / 60);
       const secs = remaining % 60;
