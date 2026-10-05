@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Html5Qrcode } from "html5-qrcode";
 import {
   Camera, CameraOff, Minus, Plus, Save, Loader2, RotateCcw,
-  DollarSign, X, UserPlus, ListChecks,
+  DollarSign, X, UserPlus, ListChecks, Users, Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatCurrency, formatNumber, formatApiErrorDetail, todayISO } from "@/lib/api";
@@ -56,6 +56,10 @@ export default function ScanHarvestMode() {
   const [showManual, setShowManual] = useState(false);
   const [editPrice, setEditPrice] = useState(false);
   const [listTab, setListTab] = useState("registro"); // "conteo" | "registro"
+
+  // Shared-basket mode: multiple workers split 1 piece until basket is closed
+  const [shareMode, setShareMode] = useState(false);
+  const [shareBuffer, setShareBuffer] = useState([]); // [{id, name}] unique
 
   // Audit scan log — one entry per scan event (QR + manual). Persisted by date.
   const scanLogKey = `agriscan.scanlog.${todayKey}`;
@@ -227,6 +231,13 @@ export default function ScanHarvestMode() {
     scannedCodesRef.current.set(key, now);
     playBeep();
     setLastWorker({ id: w.id, name: w.name });
+    if (shareMode) {
+      // Shared basket: add worker to buffer (dedupe); piece is split on close
+      setShareBuffer((prev) => (prev.some((x) => x.id === w.id) ? prev : [...prev, { id: w.id, name: w.name }]));
+      toast.success(`Canasta compartida: +${w.name}`, { duration: 1200 });
+      logScan(w, "qr");
+      return;
+    }
     setTally((prev) => {
       const cur = prev[w.id] || { name: w.name, count: 0 };
       return { ...prev, [w.id]: { name: w.name, count: cur.count + 1 } };
@@ -239,12 +250,37 @@ export default function ScanHarvestMode() {
     if (!w) return;
     playBeep();
     setLastWorker({ id: w.id, name: w.name });
+    if (shareMode) {
+      setShareBuffer((prev) => (prev.some((x) => x.id === w.id) ? prev : [...prev, { id: w.id, name: w.name }]));
+      toast.success(`Canasta compartida: +${w.name}`, { duration: 1200 });
+      logScan(w, "manual");
+      setShowManual(false);
+      return;
+    }
     setTally((prev) => {
       const cur = prev[w.id] || { name: w.name, count: 0 };
       return { ...prev, [w.id]: { name: w.name, count: cur.count + 1 } };
     });
     logScan(w, "manual");
     setShowManual(false);
+  };
+
+  // Close a shared basket: distribute 1 piece / N across the buffer, clear buffer
+  const closeSharedBasket = () => {
+    if (shareBuffer.length === 0) return 0;
+    const share = 1 / shareBuffer.length;
+    setTally((prev) => {
+      const next = { ...prev };
+      shareBuffer.forEach((w) => {
+        const cur = next[w.id] || { name: w.name, count: 0 };
+        next[w.id] = { name: w.name, count: +(cur.count + share).toFixed(4) };
+      });
+      return next;
+    });
+    const n = shareBuffer.length;
+    setShareBuffer([]);
+    toast.success(`Canasta cerrada · ${n} trabajadores · ${(share).toFixed(2)} c/u`, { duration: 1800 });
+    return n;
   };
 
   const bump = (workerId, delta) => {
@@ -300,6 +336,12 @@ export default function ScanHarvestMode() {
   const totalScanned = scanLog.length;
 
   const save = async () => {
+    // Auto-close any pending shared basket before saving
+    if (shareBuffer.length > 0) {
+      closeSharedBasket();
+      // Allow state to flush
+      await new Promise((r) => setTimeout(r, 50));
+    }
     const entries = Object.entries(tally);
     if (entries.length === 0) {
       toast.error("No hay escaneos para guardar");
@@ -325,7 +367,7 @@ export default function ScanHarvestMode() {
             price_mode: "piece",
             date: todayKey,
             photo_path: "",
-            notes: "Cosecha escaneada",
+            notes: v.count % 1 !== 0 ? "Canasta compartida" : "Cosecha escaneada",
           })
         )
       );
@@ -425,6 +467,49 @@ export default function ScanHarvestMode() {
         >
           {scannerOn ? <CameraOff className="w-5 h-5" /> : <Camera className="w-5 h-5" />}
         </button>
+
+        {/* Shared-basket toggle (below pause) */}
+        <button
+          onClick={() => {
+            if (shareMode && shareBuffer.length > 0) {
+              if (!window.confirm("Hay una canasta sin cerrar. ¿Descartar?")) return;
+              setShareBuffer([]);
+            }
+            setShareMode((v) => !v);
+          }}
+          className={`absolute top-[72px] right-3 h-11 px-3 rounded-full flex items-center gap-1.5 font-extrabold text-xs shadow-xl ${
+            shareMode ? "bg-[#E65100] text-white" : "bg-white text-[#1A2210]"
+          }`}
+          data-testid="scan-share-toggle"
+          aria-label="Canasta compartida"
+        >
+          <Users className="w-4 h-4" />
+          {shareMode ? "Compartir ON" : "Compartir"}
+        </button>
+
+        {/* Shared-basket buffer card (shows while filling a shared basket) */}
+        {shareMode && shareBuffer.length > 0 && (
+          <div className="absolute top-[132px] left-3 right-3 bg-[#E65100] text-white rounded-xl shadow-2xl px-3 py-2.5 flex items-center gap-3 border-2 border-[#C63D00]" data-testid="scan-share-buffer">
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] font-bold uppercase tracking-wider opacity-90 leading-none">
+                Canasta compartida · {shareBuffer.length} trabajador{shareBuffer.length !== 1 ? "es" : ""}
+              </div>
+              <div className="text-sm font-bold truncate mt-0.5">
+                {shareBuffer.map((w) => w.name).join(" · ")}
+              </div>
+              <div className="text-[11px] opacity-85 mt-0.5">
+                → {(1 / shareBuffer.length).toFixed(2)} pieza c/u · {formatCurrency((parseFloat(pricePerUnit) || 0) / shareBuffer.length)} c/u
+              </div>
+            </div>
+            <button
+              onClick={closeSharedBasket}
+              className="h-10 px-3 bg-white text-[#E65100] font-extrabold rounded-xl flex items-center gap-1.5 shadow-sm"
+              data-testid="scan-share-close"
+            >
+              <Check className="w-4 h-4" /> Cerrar
+            </button>
+          </div>
+        )}
 
         {/* Side action: Manual add */}
         <button
