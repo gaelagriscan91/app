@@ -47,3 +47,18 @@ export function todayISO() {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
+
+/**
+ * Format an ISO timestamp as HH:MM in the user's local timezone.
+ * Backend stores times in UTC; this converts to local for display.
+ */
+export function formatHHMM(iso) {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  } catch (_) {
+    return "";
+  }
+}
