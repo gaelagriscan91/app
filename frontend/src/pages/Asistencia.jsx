@@ -1072,23 +1072,13 @@ function SummaryView({ data, selectedParcel, harvestsToday = [], date, onClose }
     if (data.rows.length === 0) { toast.error("Sin trabajadores para compartir"); return; }
     setSharing(true);
     try {
-      const header = [
+      const text = [
         "📋 AgriScan — Resumen de jornada",
         `${date} · ${selectedParcel?.name || "Sin ubicación"}`,
         `👥 ${totalWorkers} trabajadores · ⏱  ${formatHours(totalHoursAll)}`,
         `🧺 ${totalPieces.toFixed(2)} piezas · ⚖️ ${totalKilos.toFixed(2)}Kg`,
         `💵 Total: ${fmtMoney(totalPayment)}`,
-        "",
-        "— Por trabajador —",
       ].join("\n");
-      const lines = data.rows.map((r) => {
-        const agg = byWorker[r.worker_id] || { pieces: 0, kilos: 0, payment: 0 };
-        const ci = formatHHMM(r.check_in);
-        const co = formatHHMM(r.check_out);
-        const timeRange = `${ci || "—"}${co ? `→${co}` : "→en campo"}`;
-        return `• ${r.worker_name} · ${timeRange} · ${formatHours(r.hours)} · ${agg.pieces.toFixed(agg.pieces % 1 === 0 ? 0 : 2)}u · ${fmtMoney(agg.payment)}`;
-      }).join("\n");
-      const text = header + "\n" + lines;
 
       // Try to attach the Excel file (same format as Recibos share)
       let blob = null;
