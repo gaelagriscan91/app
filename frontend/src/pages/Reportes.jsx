@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Download, Filter, Loader2, Wheat, DollarSign, FileText, FileSpreadsheet } from "lucide-react";
+import { Download, Filter, Loader2, Wheat, DollarSign, FileText, FileSpreadsheet, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import api, { API, formatCurrency, formatNumber } from "@/lib/api";
 import RecibosTab from "@/components/RecibosTab";
@@ -27,6 +27,7 @@ export default function Reportes() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [sharing, setSharing] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -106,6 +107,96 @@ export default function Reportes() {
       toast.error("No se pudo exportar");
     } finally {
       setExporting(false);
+    }
+  };
+
+  const buildShareSummary = () => {
+    const lines = [
+      "📋 AgriScan — Reporte de cosechas",
+      `Periodo: ${dateFrom || "—"} → ${dateTo || "—"}`,
+      "",
+      `🌾 Kilos: ${formatNumber(totals.kilos, 2)}`,
+      `📦 Unidades: ${formatNumber(totals.units, 0)}`,
+      `💵 Total a pagar: ${formatCurrency(totals.payment)}`,
+      "",
+    ];
+    const topRows = rows.slice(0, 20);
+    topRows.forEach((r) => {
+      lines.push(`• ${r.date} ${r.worker_name} — ${formatNumber(r.units, 0)} u. — ${formatCurrency(r.payment)}`);
+    });
+    if (rows.length > topRows.length) {
+      lines.push(`…y ${rows.length - topRows.length} registros más (ver Excel adjunto).`);
+    }
+    return lines.join("\n");
+  };
+
+  const shareReport = async () => {
+    if (rows.length === 0) {
+      toast.error("No hay datos para compartir");
+      return;
+    }
+    setSharing(true);
+    try {
+      // 1) Download the Excel blob first
+      const resp = await api.get("/harvests/export", {
+        params: {
+          date_from: dateFrom || undefined,
+          date_to: dateTo || undefined,
+          worker_id: workerId || undefined,
+          parcel_id: parcelId || undefined,
+          product_id: productId || undefined,
+        },
+        responseType: "blob",
+      });
+      const filename = `reporte_cosechas_${todayISO()}.xlsx`;
+      const file = new File([resp.data], filename, {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const summary = buildShareSummary();
+
+      // 2) Try native Web Share API with the file (iOS/Android share sheet → WhatsApp, Gmail, Mensajes, Telegram…)
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            title: "Reporte de cosechas",
+            text: summary,
+            files: [file],
+          });
+          toast.success("Reporte compartido");
+          return;
+        } catch (err) {
+          if (err?.name === "AbortError") return; // user cancelled
+          // fall through to text-only share
+        }
+      }
+
+      // 3) Fallback: share only the text summary (no attachment)
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: "Reporte de cosechas", text: summary });
+          toast.success("Resumen compartido (sin archivo). Descarga el Excel para enviarlo también.");
+          return;
+        } catch (err) {
+          if (err?.name === "AbortError") return;
+        }
+      }
+
+      // 4) Last fallback: copy summary to clipboard + download the Excel
+      try {
+        await navigator.clipboard.writeText(summary);
+        toast.success("Resumen copiado al portapapeles. También descargamos el Excel.");
+      } catch (_) {
+        toast.success("Reporte descargado. Adjúntalo manualmente al mensaje o correo.");
+      }
+      const url = window.URL.createObjectURL(resp.data);
+      const a = document.createElement("a");
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error("No se pudo compartir el reporte");
+    } finally {
+      setSharing(false);
     }
   };
 
@@ -200,6 +291,18 @@ export default function Reportes() {
             {exporting ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Download className="w-5 h-5" /> Exportar a Excel</>}
           </button>
         </div>
+        <button
+          onClick={shareReport}
+          disabled={sharing || rows.length === 0}
+          className="w-full h-12 rounded-xl bg-[#1E2746] hover:bg-[#172038] active:scale-[0.99] text-white font-extrabold flex items-center justify-center gap-2 shadow-md disabled:opacity-60 border-2 border-[#111A2E]"
+          data-testid="share-report-button"
+          style={{ fontFamily: "Outfit, sans-serif" }}
+        >
+          {sharing ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Share2 className="w-5 h-5" /> Compartir reporte</>}
+        </button>
+        <p className="text-[11px] text-[#889078] font-semibold text-center -mt-1">
+          Abre tu bandeja de compartir: WhatsApp, Mensajes, Gmail, Correo, Telegram…
+        </p>
       </div>
 
       {/* Totals */}
