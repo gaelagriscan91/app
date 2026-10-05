@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Camera, CameraOff, Keyboard, Users, Loader2, Trash2, X, ArrowLeft, UserPlus,
-  Search, CheckCircle2, Sun, Moon, ShoppingBasket, CloudCheck, ChevronRight, MapPin, UserCircle2, Share2,
+  Search, CheckCircle2, Sun, Moon, ShoppingBasket, CloudCheck, ChevronRight, MapPin, UserCircle2, Share2, LogOut,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -50,6 +50,7 @@ export default function Asistencia() {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [confirmCheckout, setConfirmCheckout] = useState(false);
   const [checkingOutAll, setCheckingOutAll] = useState(false);
+  const [showCheckoutMenu, setShowCheckoutMenu] = useState(false);
   const lastScanRef = useRef({ code: "", at: 0 });
 
   const saveSession = (patch) => {
@@ -303,6 +304,11 @@ export default function Asistencia() {
       showCrewPicker={showCrewPicker}
       setShowCrewPicker2={setShowCrewPicker}
       moveCrew={moveCrew}
+      showCheckoutMenu={showCheckoutMenu}
+      setShowCheckoutMenu={setShowCheckoutMenu}
+      openCount={openCount}
+      setConfirmCheckout={setConfirmCheckout}
+      setView={setView}
     />
   );
 
@@ -844,6 +850,7 @@ function CheckInView(props) {
     manualOpen, manualCode, setManualCode, workers, setWorkers, setManualOpen2,
     quickAddOpen, setQuickAddOpen, submitCode, processing,
     showCrewPicker, setShowCrewPicker2, moveCrew,
+    showCheckoutMenu, setShowCheckoutMenu, openCount, setConfirmCheckout, setView,
   } = props;
 
   return (
@@ -881,6 +888,52 @@ function CheckInView(props) {
             >
               <Keyboard className="w-5 h-5" />
             </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowCheckoutMenu((v) => !v)}
+                className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm text-[#DC2626]"
+                title="Salida"
+                data-testid="checkout-menu-button"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
+              {showCheckoutMenu && (
+                <>
+                  <div
+                    className="fixed inset-0 z-20"
+                    onClick={() => setShowCheckoutMenu(false)}
+                  />
+                  <div className="absolute right-0 top-12 w-56 bg-white rounded-2xl shadow-xl border border-[#E2DDD0] overflow-hidden z-30">
+                    <button
+                      onClick={() => {
+                        setShowCheckoutMenu(false);
+                        if (openCount === 0) { toast.info("No hay trabajadores con jornada abierta"); return; }
+                        setConfirmCheckout(true);
+                      }}
+                      className="w-full text-left px-4 py-3 text-sm font-bold text-[#1A2210] hover:bg-[#F7F5EE] flex items-center gap-2 border-b border-[#F0EDE1]"
+                      data-testid="checkout-all-option"
+                    >
+                      <Moon className="w-4 h-4 text-[#5A4A98]" /> Salida a todos
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowCheckoutMenu(false);
+                        if (openCount === 0) { toast.info("No hay trabajadores con jornada abierta"); return; }
+                        // Go back to list (hub view) where each row has an individual "Salida" button
+                        setView("hub");
+                        setTimeout(() => {
+                          document.querySelector('[data-testid^="hub-checkout-"]')?.scrollIntoView({ behavior: "smooth", block: "center" });
+                        }, 100);
+                      }}
+                      className="w-full text-left px-4 py-3 text-sm font-bold text-[#1A2210] hover:bg-[#F7F5EE] flex items-center gap-2"
+                      data-testid="checkout-individual-option"
+                    >
+                      <UserCircle2 className="w-4 h-4 text-[#DC2626]" /> Salida individual
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
             <button
               onClick={() => setScannerOn((v) => !v)}
               className={`w-10 h-10 rounded-full flex items-center justify-center shadow-sm ${scannerOn ? "bg-red-100 text-red-700" : "bg-white text-[#1A2210]"}`}
