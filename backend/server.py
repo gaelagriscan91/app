@@ -618,20 +618,6 @@ async def list_harvests(
 
 @api_router.post("/harvests")
 async def create_harvest(data: HarvestIn, user: CurrentUser):
-    # Require attendance (check-in) for the worker on that date
-    att = await db.attendance.find_one({
-        "worker_id": data.worker_id,
-        "date": data.date,
-        **scope_filter(user),
-    })
-    if not att or not att.get("check_in"):
-        wk = await db.workers.find_one({"_id": ObjectId(data.worker_id)})
-        name = (wk or {}).get("name", "Trabajador")
-        raise HTTPException(
-            status_code=400,
-            detail=f"{name} no tiene entrada registrada hoy. Haz Check-in primero.",
-        )
-
     # Snapshot pricing from product if not provided
     prod = await db.products.find_one({"_id": ObjectId(data.product_id)})
     if not prod:

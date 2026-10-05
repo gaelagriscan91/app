@@ -252,12 +252,6 @@ export default function ScanHarvestMode() {
       }
     }
 
-    // Gate: worker must have Check-in today
-    if (!checkedInIds.has(w.id)) {
-      toast.error(`⛔ ${w.name} no tiene Check-in hoy. Regístrale entrada primero.`, { duration: 3500 });
-      return;
-    }
-
     // In share mode, QR scans also join the group (sharing a basket among workers scanned)
     if (shareMode) {
       const alreadyIn = shareBuffer.some((x) => x.id === w.id);
@@ -288,12 +282,6 @@ export default function ScanHarvestMode() {
   const addManual = (workerId) => {
     const w = workers.find((x) => x.id === workerId);
     if (!w) return;
-    // Gate: worker must have Check-in today
-    if (!checkedInIds.has(w.id)) {
-      toast.error(`⛔ ${w.name} no tiene Check-in hoy. Regístrale entrada primero.`, { duration: 3500 });
-      setShowManual(false);
-      return;
-    }
     playBeep();
     setLastWorker({ id: w.id, name: w.name });
     if (shareMode) {
