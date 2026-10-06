@@ -365,6 +365,24 @@ export default function ScanHarvestMode() {
     });
   };
 
+  // Mark the LAST scanned piece as a fraction. Default scan adds +1 (completo).
+  // Tapping these buttons adjusts the last +1 to the chosen fraction.
+  // Example: 1/2 -> delta = 0.5 - 1 = -0.5 so last entry becomes 0.5 instead of 1.
+  const markLastAs = (fraction) => {
+    if (!lastWorker) {
+      toast.error("Primero escanea un trabajador");
+      return;
+    }
+    if (shareMode) {
+      // In share mode, set the shared basket count directly
+      setShareBaskets(fraction);
+      return;
+    }
+    const delta = fraction - 1;
+    if (delta === 0) return;
+    bump(lastWorker.id, delta);
+  };
+
   const resetTally = () => {
     if (Object.keys(tally).length === 0) return;
     if (!window.confirm("¿Reiniciar conteos?")) return;
@@ -695,6 +713,24 @@ export default function ScanHarvestMode() {
                   <Plus className="w-5 h-5" />
                 </button>
               </div>
+            </div>
+            {/* Quick fraction selector — adjusts the last added piece */}
+            <div className="grid grid-cols-4 gap-1.5 mt-2">
+              {[
+                { frac: 1, label: "Completo", testid: "frac-full" },
+                { frac: 0.75, label: "3/4", testid: "frac-three-quarter" },
+                { frac: 0.5, label: "1/2", testid: "frac-half" },
+                { frac: 0.25, label: "1/4", testid: "frac-quarter" },
+              ].map(({ frac, label, testid }) => (
+                <button
+                  key={testid}
+                  onClick={() => markLastAs(frac)}
+                  className="h-9 rounded-lg bg-white/15 hover:bg-white/25 active:scale-[0.97] text-white font-extrabold text-xs flex items-center justify-center transition"
+                  data-testid={testid}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
         ) : (

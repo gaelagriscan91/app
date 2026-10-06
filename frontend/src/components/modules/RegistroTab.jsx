@@ -200,21 +200,36 @@ export default function RegistroTab() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  {(selected.rows || []).map((r) => (
-                    <div key={r.worker_id} className="field-card p-3" data-testid={`registro-detail-row-${r.worker_id}`}>
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="min-w-0 flex-1">
+                  {(selected.rows || []).map((r) => {
+                    const harvests = r.harvests || [];
+                    const parcels = [...new Set(harvests.map((h) => h.parcel_name).filter((x) => x && x !== "—"))];
+                    const products = [...new Set(harvests.map((h) => h.product_name).filter((x) => x && x !== "—"))];
+                    const prices = [...new Set(harvests.map((h) => h.price_per_unit).filter((x) => x > 0))];
+                    const priceLabel = prices.length === 0 ? "—" : prices.length === 1 ? formatCurrency(prices[0]) : "Varios";
+                    const dates = harvests.map((h) => h.date).filter(Boolean).sort();
+                    const dateLabel = dates.length === 0
+                      ? `${fmtDate(selected.date_from)} → ${fmtDate(selected.date_to)}`
+                      : dates[0] === dates[dates.length - 1]
+                        ? fmtDate(dates[0])
+                        : `${fmtDate(dates[0])} → ${fmtDate(dates[dates.length - 1])}`;
+                    return (
+                      <div key={r.worker_id} className="field-card p-3" data-testid={`registro-detail-row-${r.worker_id}`}>
+                        <div className="flex items-center justify-between gap-2 mb-2">
                           <div className="font-bold text-[#1A2210] truncate">{r.worker_name}</div>
-                          <div className="text-[11px] text-[#889078] font-semibold">
-                            {formatNumber(r.total_hours, 2)}h · {r.days_worked || 0}d · {Math.round(r.total_units || 0)}u
+                          <div className="font-mono-stat font-extrabold text-[#1D4ED8]">
+                            {formatCurrency(r.total_payment)}
                           </div>
                         </div>
-                        <div className="font-mono-stat font-extrabold text-[#1D4ED8]">
-                          {formatCurrency(r.total_payment)}
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+                          <div><span className="text-[#889078] font-bold uppercase tracking-wider">Rancho:</span> <span className="text-[#1A2210] font-bold">{parcels.join(", ") || "—"}</span></div>
+                          <div><span className="text-[#889078] font-bold uppercase tracking-wider">Trabajo:</span> <span className="text-[#1A2210] font-bold">{products.join(", ") || "—"}</span></div>
+                          <div><span className="text-[#889078] font-bold uppercase tracking-wider">Precio/canasta:</span> <span className="text-[#1A2210] font-bold font-mono-stat">{priceLabel}</span></div>
+                          <div><span className="text-[#889078] font-bold uppercase tracking-wider">Canastas:</span> <span className="text-[#1A2210] font-bold font-mono-stat">{Math.round(r.total_units || 0)}</span></div>
+                          <div className="col-span-2"><span className="text-[#889078] font-bold uppercase tracking-wider">Fecha:</span> <span className="text-[#1A2210] font-bold">{dateLabel}</span></div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </>
             )}
