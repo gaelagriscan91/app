@@ -223,9 +223,10 @@ export default function RegistroTab() {
                         <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
                           <div><span className="text-[#889078] font-bold uppercase tracking-wider">Rancho:</span> <span className="text-[#1A2210] font-bold">{parcels.join(", ") || "—"}</span></div>
                           <div><span className="text-[#889078] font-bold uppercase tracking-wider">Trabajo:</span> <span className="text-[#1A2210] font-bold">{products.join(", ") || "—"}</span></div>
-                          <div><span className="text-[#889078] font-bold uppercase tracking-wider">Precio/canasta:</span> <span className="text-[#1A2210] font-bold font-mono-stat">{priceLabel}</span></div>
-                          <div><span className="text-[#889078] font-bold uppercase tracking-wider">Canastas:</span> <span className="text-[#1A2210] font-bold font-mono-stat">{Math.round(r.total_units || 0)}</span></div>
-                          <div className="col-span-2"><span className="text-[#889078] font-bold uppercase tracking-wider">Fecha:</span> <span className="text-[#1A2210] font-bold">{dateLabel}</span></div>
+                          <div><span className="text-[#889078] font-bold uppercase tracking-wider">Precio/pieza:</span> <span className="text-[#1A2210] font-bold font-mono-stat">{priceLabel}</span></div>
+                          <div><span className="text-[#889078] font-bold uppercase tracking-wider">Piezas:</span> <span className="text-[#1A2210] font-bold font-mono-stat">{Math.round(r.total_units || 0)}</span></div>
+                          <div><span className="text-[#889078] font-bold uppercase tracking-wider">Horas:</span> <span className="text-[#1A2210] font-bold font-mono-stat">{formatNumber(r.total_hours || 0, 2)}h</span></div>
+                          <div><span className="text-[#889078] font-bold uppercase tracking-wider">Fecha:</span> <span className="text-[#1A2210] font-bold">{dateLabel}</span></div>
                         </div>
                       </div>
                     );

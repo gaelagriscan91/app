@@ -29,9 +29,6 @@ export default function Modulos() {
         <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1A2210] tracking-tight" style={{ fontFamily: "Outfit, sans-serif" }}>
           Módulos
         </h1>
-        <p className="text-sm text-[#556047] font-semibold">
-          Trabajadores, parcelas y productos{isAdmin ? " · Gestión de mayordomos" : ""}
-        </p>
       </div>
 
       <div className="field-card p-1.5 flex gap-1.5 overflow-x-auto">

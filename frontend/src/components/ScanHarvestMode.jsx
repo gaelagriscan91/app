@@ -884,7 +884,7 @@ export default function ScanHarvestMode() {
                 }`}
                 data-testid="scan-tab-registro"
               >
-                Registro ({scanLogByWorker.length})
+                Empleados activos ({scanLogByWorker.length})
               </button>
               <button
                 onClick={() => setListTab("conteo")}
