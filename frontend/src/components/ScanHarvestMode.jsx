@@ -90,6 +90,7 @@ export default function ScanHarvestMode() {
       at: new Date().toISOString(),
       source, // "qr" | "manual"
       priceAt: parseFloat(pricePerUnit) || 0,
+      fraction: 1,
       ...extra,
     };
     setScanLog((prev) => {
@@ -379,8 +380,16 @@ export default function ScanHarvestMode() {
       return;
     }
     const delta = fraction - 1;
-    if (delta === 0) return;
-    bump(lastWorker.id, delta);
+    if (delta !== 0) bump(lastWorker.id, delta);
+    // Patch the latest scanLog entry for this worker (newest first in the array)
+    setScanLog((prev) => {
+      const idx = prev.findIndex((e) => e.workerId === lastWorker.id && !e.sharedBasket);
+      if (idx === -1) return prev;
+      const next = [...prev];
+      next[idx] = { ...next[idx], fraction };
+      try { localStorage.setItem(scanLogKey, JSON.stringify(next)); } catch {}
+      return next;
+    });
   };
 
   const resetTally = () => {
@@ -961,9 +970,12 @@ export default function ScanHarvestMode() {
                         const d = new Date(e.at);
                         const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
                         const date = d.toLocaleDateString();
-                        const earned = e.earned !== undefined ? Number(e.earned) : Number(e.priceAt ?? pricePerUnit) || 0;
+                        const basePrice = Number(e.priceAt ?? pricePerUnit) || 0;
+                        const frac = typeof e.fraction === "number" ? e.fraction : 1;
+                        const earned = e.earned !== undefined ? Number(e.earned) : basePrice * frac;
                         const isShared = e.sharedBasket === true;
                         const pending = isShared && e.earned === undefined;
+                        const fracLabel = frac === 1 ? "" : frac === 0.5 ? "½" : frac === 0.75 ? "¾" : frac === 0.25 ? "¼" : frac.toFixed(2);
                         return (
                           <li key={e.id} className="py-2.5 flex items-center justify-between gap-3" data-testid={`scan-registro-row-${e.id}`}>
                             <div className="min-w-0 flex-1">
@@ -978,6 +990,11 @@ export default function ScanHarvestMode() {
                                 >
                                   {e.source === "manual" ? "Manual" : "QR"}
                                 </span>
+                                {fracLabel && !isShared && (
+                                  <span className="text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#1D4ED8]/15 text-[#1D4ED8]">
+                                    {fracLabel}
+                                  </span>
+                                )}
                                 {isShared && (
                                   <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#E65100]/15 text-[#E65100]">
                                     Compartida{e.sharers ? ` ·${e.sharers}` : ""}
@@ -993,7 +1010,7 @@ export default function ScanHarvestMode() {
                                 {pending ? "—" : formatCurrency(earned)}
                               </div>
                               <div className="text-[10px] font-bold uppercase tracking-wider text-[#889078] leading-none">
-                                {pending ? "sin guardar" : (isShared ? `${e.sharePieces?.toFixed(2) || "—"} pza` : "/pza")}
+                                {pending ? "sin guardar" : (isShared ? `${e.sharePieces?.toFixed(2) || "—"} pza` : (frac === 1 ? "/pza" : `${frac} pza`))}
                               </div>
                             </div>
                           </li>
