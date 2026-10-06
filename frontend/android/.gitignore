@@ -6,6 +6,11 @@
 *.ap_
 *.aab
 
+# Signing (NEVER commit these — use GitHub Secrets)
+keystore.properties
+*.jks
+*.keystore
+
 # Files for the ART/Dalvik VM
 *.dex
 
