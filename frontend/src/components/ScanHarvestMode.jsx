@@ -352,9 +352,15 @@ export default function ScanHarvestMode() {
         : -frac;
       bump(entry.workerId, delta);
     }
-    // If already persisted, delete the server-side harvest too
+    // If already persisted, delete the server-side harvest too (may be locked by a saved receipt)
     if (entry.harvestId) {
-      try { await api.delete(`/harvests/${entry.harvestId}`); } catch (_) {}
+      try {
+        await api.delete(`/harvests/${entry.harvestId}`);
+      } catch (err) {
+        const detail = err?.response?.data?.detail || "No se pudo borrar";
+        toast.error(detail);
+        return; // keep the scan in the log; it's still tied to a protected record
+      }
     }
     // Remove entry from log
     setScanLog((prev) => {

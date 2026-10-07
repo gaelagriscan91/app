@@ -895,6 +895,20 @@ async def delete_harvest(hid: str, user: CurrentUser):
     existing = await db.harvests.find_one({"_id": ObjectId(hid), **scope_filter(user)})
     if not existing:
         raise HTTPException(status_code=404, detail="Cosecha no encontrada")
+    # Protect harvests that are part of a saved receipt (immutable snapshot)
+    hdate = existing.get("date", "")
+    wid = str(existing.get("worker_id", ""))
+    locked = await db.receipts_history.find_one({
+        **scope_filter(user),
+        "date_from": {"$lte": hdate},
+        "date_to": {"$gte": hdate},
+        "rows.worker_id": wid,
+    })
+    if locked:
+        raise HTTPException(
+            status_code=400,
+            detail="No se puede borrar: este registro ya está incluido en un recibo guardado.",
+        )
     await db.harvests.delete_one({"_id": ObjectId(hid)})
     return {"ok": True}
 
