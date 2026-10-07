@@ -47,6 +47,9 @@ export default function Asistencia() {
   const [showCrewPicker, setShowCrewPicker] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualCode, setManualCode] = useState("");
+  const [manualSelected, setManualSelected] = useState(() => new Set());
+  const [manualSearch, setManualSearch] = useState("");
+  const [manualSubmitting, setManualSubmitting] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [confirmCheckout, setConfirmCheckout] = useState(false);
   const [checkingOutAll, setCheckingOutAll] = useState(false);
@@ -304,6 +307,12 @@ export default function Asistencia() {
       showCrewPicker={showCrewPicker}
       setShowCrewPicker2={setShowCrewPicker}
       moveCrew={moveCrew}
+      manualSelected={manualSelected}
+      setManualSelected={setManualSelected}
+      manualSearch={manualSearch}
+      setManualSearch={setManualSearch}
+      manualSubmitting={manualSubmitting}
+      setManualSubmitting={setManualSubmitting}
       showCheckoutMenu={showCheckoutMenu}
       setShowCheckoutMenu={setShowCheckoutMenu}
       openCount={openCount}
@@ -850,6 +859,8 @@ function CheckInView(props) {
     manualOpen, manualCode, setManualCode, workers, setWorkers, setManualOpen2,
     quickAddOpen, setQuickAddOpen, submitCode, processing,
     showCrewPicker, setShowCrewPicker2, moveCrew,
+    manualSelected, setManualSelected, manualSearch, setManualSearch,
+    manualSubmitting, setManualSubmitting,
     showCheckoutMenu, setShowCheckoutMenu, openCount, setConfirmCheckout, setView,
   } = props;
 
@@ -1011,42 +1022,117 @@ function CheckInView(props) {
       </div>
 
       {/* Manual entry modal */}
-      {manualOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setManualOpen2(false)}>
-          <div className="bg-white rounded-t-3xl sm:rounded-3xl p-6 w-full sm:max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-lg">Entrada manual</h3>
-              <button onClick={() => setManualOpen2(false)}><X className="w-5 h-5" /></button>
-            </div>
-            <select
-              value={manualCode}
-              onChange={(e) => setManualCode(e.target.value)}
-              className="field-input !h-12 !text-base w-full mb-3"
-              data-testid="manual-worker-select"
-            >
-              <option value="">— Trabajador —</option>
-              {workers.map((w) => <option key={w.id} value={w.qr_code || w.id}>{w.name}</option>)}
-            </select>
-            <div className="flex gap-2 mb-3">
-              <button
-                onClick={() => setQuickAddOpen(true)}
-                className="flex-1 h-11 bg-white border-2 border-[#1D4ED8] text-[#1D4ED8] font-bold rounded-xl flex items-center justify-center gap-1.5"
-                data-testid="asist-quick-add-button"
-              >
-                <UserPlus className="w-4 h-4" /> Nuevo
-              </button>
-              <button
-                onClick={async () => { await submitCode(manualCode); setManualCode(""); setManualOpen2(false); }}
-                disabled={!manualCode || processing}
-                className="flex-1 h-11 bg-[#1D4ED8] hover:bg-[#1E3A8A] text-white font-bold rounded-xl disabled:opacity-50"
-                data-testid="manual-submit-button"
-              >
-                Marcar
-              </button>
+      {manualOpen && (() => {
+        const checkedInIds = new Set((data?.rows || []).filter((r) => r.check_in).map((r) => String(r.worker_id)));
+        const needle = (manualSearch || "").trim().toLowerCase();
+        const eligible = (workers || []).filter((w) => !checkedInIds.has(String(w.id)));
+        const list = needle ? eligible.filter((w) => (w.name || "").toLowerCase().includes(needle)) : eligible;
+        const allSelected = list.length > 0 && list.every((w) => manualSelected.has(w.id));
+        const toggleAll = () => {
+          const next = new Set(manualSelected);
+          if (allSelected) list.forEach((w) => next.delete(w.id));
+          else list.forEach((w) => next.add(w.id));
+          setManualSelected(next);
+        };
+        const toggleOne = (id) => {
+          const next = new Set(manualSelected);
+          if (next.has(id)) next.delete(id);
+          else next.add(id);
+          setManualSelected(next);
+        };
+        const closeModal = () => {
+          setManualOpen2(false);
+          setManualSelected(new Set());
+          setManualSearch("");
+        };
+        const markSelected = async () => {
+          if (manualSelected.size === 0) return;
+          setManualSubmitting(true);
+          try {
+            const ids = [...manualSelected];
+            for (const id of ids) {
+              const w = (workers || []).find((x) => x.id === id);
+              const code = w?.qr_code || id;
+              try { await submitCode(code); } catch (_) {}
+            }
+          } finally {
+            setManualSubmitting(false);
+            closeModal();
+          }
+        };
+        return (
+          <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={closeModal}>
+            <div className="bg-white rounded-t-3xl sm:rounded-3xl p-5 w-full sm:max-w-md shadow-2xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-extrabold text-lg" style={{ fontFamily: "Outfit, sans-serif" }}>Entrada</h3>
+                <button onClick={closeModal} data-testid="manual-close"><X className="w-5 h-5" /></button>
+              </div>
+              <input
+                type="text"
+                value={manualSearch}
+                onChange={(e) => setManualSearch(e.target.value)}
+                placeholder="Buscar trabajador…"
+                className="field-input !h-11 !text-base w-full mb-2"
+                data-testid="manual-search-input"
+              />
+              <div className="flex items-center justify-between mb-2">
+                <button
+                  type="button"
+                  onClick={toggleAll}
+                  className="h-9 px-3 rounded-lg bg-[#F0EDE1] hover:bg-[#E2DDD0] text-[#1A2210] text-xs font-extrabold uppercase tracking-wider"
+                  data-testid="manual-toggle-all"
+                >
+                  {allSelected ? "Quitar todos" : "Seleccionar todos"}
+                </button>
+                <span className="text-xs text-[#556047] font-bold font-mono-stat">
+                  {manualSelected.size} / {list.length}
+                </span>
+              </div>
+              <ul className="flex-1 overflow-y-auto divide-y divide-[#E2DDD0] -mx-1 border border-[#E2DDD0] rounded-xl" data-testid="manual-worker-list">
+                {list.length === 0 ? (
+                  <li className="px-4 py-6 text-center text-sm text-[#556047] font-semibold">
+                    {eligible.length === 0 ? "Todos los trabajadores ya tienen entrada hoy." : "Sin coincidencias."}
+                  </li>
+                ) : list.map((w) => {
+                  const sel = manualSelected.has(w.id);
+                  return (
+                    <li key={w.id}>
+                      <button
+                        type="button"
+                        onClick={() => toggleOne(w.id)}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 text-left ${sel ? "bg-[#EFF6FF]" : "hover:bg-[#F7F5EE]"}`}
+                        data-testid={`manual-worker-${w.id}`}
+                      >
+                        <span className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 ${sel ? "bg-[#1D4ED8] border-[#1D4ED8]" : "border-[#889078]"}`}>
+                          {sel ? <CheckCircle2 className="w-3.5 h-3.5 text-white" /> : null}
+                        </span>
+                        <span className="font-bold text-sm text-[#1A2210] truncate flex-1">{w.name}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={() => setQuickAddOpen(true)}
+                  className="flex-1 h-11 bg-white border-2 border-[#1D4ED8] text-[#1D4ED8] font-bold rounded-xl flex items-center justify-center gap-1.5"
+                  data-testid="asist-quick-add-button"
+                >
+                  <UserPlus className="w-4 h-4" /> Nuevo
+                </button>
+                <button
+                  onClick={markSelected}
+                  disabled={manualSelected.size === 0 || manualSubmitting || processing}
+                  className="flex-[1.4] h-11 bg-[#1D4ED8] hover:bg-[#1E3A8A] text-white font-extrabold rounded-xl disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  data-testid="manual-submit-button"
+                >
+                  {manualSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Marcar{manualSelected.size > 0 ? ` (${manualSelected.size})` : ""}</>}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Crew picker modal */}
       {showCrewPicker && (
