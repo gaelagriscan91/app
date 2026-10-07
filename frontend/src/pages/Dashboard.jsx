@@ -1,51 +1,43 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Wheat, Users, DollarSign, TrendingUp, Loader2, ArrowRight, ScanLine, UserCheck } from "lucide-react";
+import { Loader2, ArrowRight, ScanLine, UserCheck, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import api, { formatCurrency, formatNumber } from "@/lib/api";
-
-function StatCard({ label, value, sub, Icon, variant = "light", testid }) {
-  const base = "rounded-2xl p-4 sm:p-5 border-2 shadow-sm transition-transform hover:-translate-y-0.5";
-  const styles =
-    variant === "dark"
-      ? "bg-[#1D4ED8] border-[#1E3A8A] text-white"
-      : variant === "accent"
-      ? "bg-[#DC2626] border-[#B91C1C] text-white"
-      : "bg-white border-[#E2DDD0] text-[#1A2210]";
-  return (
-    <div className={`${base} ${styles}`} data-testid={testid}>
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <div className={`text-[11px] sm:text-xs font-bold uppercase tracking-wider ${variant === "light" ? "text-[#556047]" : "opacity-90"}`}>
-            {label}
-          </div>
-          <div className="font-mono-stat text-2xl sm:text-3xl mt-1 leading-none">{value}</div>
-          {sub ? <div className={`text-xs mt-1.5 font-semibold ${variant === "light" ? "text-[#556047]" : "opacity-85"}`}>{sub}</div> : null}
-        </div>
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${variant === "light" ? "bg-[#F0EDE1] text-[#1D4ED8]" : "bg-white/15 text-white"}`}>
-          <Icon className="w-5 h-5" strokeWidth={2.4} />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState("");
+
+  const load = async () => {
+    try {
+      const { data } = await api.get("/dashboard");
+      setData(data);
+    } catch (e) {
+      /* ignore */
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    (async () => {
-      try {
-        const { data } = await api.get("/dashboard");
-        setData(data);
-      } catch (e) {
-        /* ignore */
-      } finally {
-        setLoading(false);
-      }
-    })();
+    load();
   }, []);
+
+  const deleteHarvest = async (id, workerName) => {
+    if (!window.confirm(`¿Borrar las piezas de ${workerName}?`)) return;
+    setDeletingId(id);
+    try {
+      await api.delete(`/harvests/${id}`);
+      toast.success("Piezas eliminadas");
+      await load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "No se pudo eliminar");
+    } finally {
+      setDeletingId("");
+    }
+  };
 
   if (loading) {
     return (
@@ -57,15 +49,6 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6" data-testid="dashboard-page">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1A2210] tracking-tight" style={{ fontFamily: "Outfit, sans-serif" }}>
-          Panel principal
-        </h1>
-        <p className="text-sm text-[#556047] font-semibold">
-          {new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-        </p>
-      </div>
-
       {/* Quick CTAs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <button
@@ -127,10 +110,21 @@ export default function Dashboard() {
                     {r.date}{!r.pending ? ` · ${r.kilos ? `${formatNumber(r.kilos, 2)}Kg` : ""} ${r.units ? `${formatNumber(r.units, r.units % 1 === 0 ? 0 : 2)}u` : ""}` : " · Esperando primera cosecha"}
                   </div>
                 </div>
-                <div className="text-right shrink-0">
+                <div className="text-right shrink-0 flex items-center gap-2">
                   <div className={`font-mono-stat text-base font-extrabold ${r.pending ? "text-[#889078]" : "text-[#1D4ED8]"}`}>
                     {r.pending ? "—" : formatCurrency(r.payment)}
                   </div>
+                  {!r.pending && (
+                    <button
+                      onClick={() => deleteHarvest(r.id, r.worker_name)}
+                      disabled={deletingId === r.id}
+                      className="w-8 h-8 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 flex items-center justify-center disabled:opacity-50"
+                      data-testid={`dashboard-record-delete-${r.id}`}
+                      title="Borrar piezas"
+                    >
+                      {deletingId === r.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                    </button>
+                  )}
                 </div>
               </li>
             ))}

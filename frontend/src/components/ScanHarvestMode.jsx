@@ -574,6 +574,29 @@ export default function ScanHarvestMode() {
           </div>
         </button>
 
+        {/* Unit mode toggle — pieza / hr / libra */}
+        <div className="absolute top-4 left-[112px] bg-white rounded-xl shadow-xl px-1 py-1 border border-black/5 flex items-center gap-0.5" data-testid="scan-unit-toggle">
+          {[
+            { key: "pieza", label: "pza" },
+            { key: "hora", label: "hr" },
+            { key: "libra", label: "lb" },
+          ].map((u) => {
+            const active = unitLabel === u.key;
+            return (
+              <button
+                key={u.key}
+                onClick={() => setUnitLabel(u.key)}
+                className={`h-9 px-2.5 rounded-lg text-xs font-extrabold transition ${
+                  active ? "bg-[#2B55D1] text-white shadow" : "text-[#556047] hover:bg-[#F0EDE1]"
+                }`}
+                data-testid={`scan-unit-${u.key}`}
+              >
+                {u.label}
+              </button>
+            );
+          })}
+        </div>
+
         {/* Pause/Resume floating button (top-right) */}
         <button
           onClick={() => setScannerOn((v) => !v)}
