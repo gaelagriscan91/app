@@ -9,15 +9,20 @@ import io
 import re
 import uuid
 import logging
+import secrets as _secrets
+import hashlib
 import bcrypt
 import jwt
+import httpx
 import requests
 from datetime import datetime, timezone, timedelta
+from html import escape
 from typing import List, Optional, Annotated
+from urllib.parse import urlparse
 
 from fastapi import (
     FastAPI, APIRouter, HTTPException, Depends, Request, Response,
-    UploadFile, File, Form, Query, Header
+    UploadFile, File, Form, Query, Header, BackgroundTasks
 )
 from fastapi.responses import StreamingResponse
 from starlette.middleware.cors import CORSMiddleware
@@ -178,6 +183,91 @@ CurrentUser = Annotated[dict, Depends(get_current_user)]
 
 
 # ---------------------------------------------------------------------------
+# Brute force protection + Password reset email
+# ---------------------------------------------------------------------------
+LOGIN_MAX_ATTEMPTS = 5
+LOGIN_LOCKOUT_MINUTES = 15
+RESET_MAX_REQUESTS = 5
+RESET_WINDOW_MINUTES = 15
+
+EMAIL_BASE_URL = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip().rstrip("/") or "https://integrations.emergentagent.com"
+EMAIL_KEY = os.environ.get("EMERGENT_EMAIL_KEY", "")
+EMAIL_FROM_NAME = os.environ.get("EMAIL_FROM_NAME") or "AgriScan"
+
+
+def _client_ip(request: Request) -> str:
+    xf = request.headers.get("x-forwarded-for", "")
+    if xf:
+        return xf.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+async def check_login_lockout(ip: str, email: str):
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=LOGIN_LOCKOUT_MINUTES)
+    cutoff_iso = cutoff.isoformat()
+    identifier = f"{ip}:{email}"
+    count = await db.login_attempts.count_documents({
+        "identifier": identifier,
+        "created_at": {"$gt": cutoff_iso},
+    })
+    if count >= LOGIN_MAX_ATTEMPTS:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Demasiados intentos. Intenta de nuevo en {LOGIN_LOCKOUT_MINUTES} minutos.",
+        )
+
+
+async def record_failed_login(ip: str, email: str):
+    identifier = f"{ip}:{email}"
+    await db.login_attempts.insert_one({
+        "identifier": identifier,
+        "email": email,
+        "ip": ip,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+
+async def clear_login_attempts(ip: str, email: str):
+    identifier = f"{ip}:{email}"
+    await db.login_attempts.delete_many({"identifier": identifier})
+
+
+async def send_password_reset_email(to_email: str, token: str) -> bool:
+    """Server-side template. Called via BackgroundTasks. Return value is for logging only."""
+    base = os.environ.get("FRONTEND_URL", "").rstrip("/")
+    link = f"{base}/reset-password?token={token}"
+    if not EMAIL_KEY or EMAIL_KEY.startswith("{") or EMAIL_KEY == "ek_8e830dbf65dd33f13bf415c9fa8314cb" or not base.startswith("https://"):
+        if urlparse(base).hostname in ("localhost", "127.0.0.1", "::1"):
+            logger.warning("Email not configured; password reset link: %s", link)
+        else:
+            logger.error("Password reset email not configured (EMERGENT_EMAIL_KEY / FRONTEND_URL)")
+        return False
+    brand = escape(EMAIL_FROM_NAME)
+    html = (
+        f'<table role="presentation" width="100%"><tr><td style="padding:24px;font-family:Arial,sans-serif">'
+        f'<p>Recibimos una solicitud para restablecer tu contraseña de {brand}.</p>'
+        f'<p><a href="{escape(link)}">Restablecer contraseña</a></p>'
+        f'<p>Este enlace expira en 1 hora y solo puede usarse una vez. Si no lo solicitaste, '
+        f'ignora este correo — tu contraseña no cambió.</p>'
+        f'<p style="font-size:12px;color:#888">Enviado por {brand}. Nunca te pediremos tu contraseña por correo.</p>'
+        f'</td></tr></table>'
+    )
+    try:
+        async with httpx.AsyncClient(timeout=30) as client_http:
+            resp = await client_http.post(
+                f"{EMAIL_BASE_URL}/api/v1/email/send",
+                headers={"X-Email-Key": EMAIL_KEY},
+                json={"to": [to_email], "subject": f"Restablecer tu contraseña de {EMAIL_FROM_NAME}",
+                      "html": html, "from_name": EMAIL_FROM_NAME},
+            )
+        resp.raise_for_status()
+        return True
+    except Exception as e:
+        logger.error(f"Password reset email failed: {e}")
+        return False
+
+
+# ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
 class RegisterIn(BaseModel):
@@ -312,17 +402,121 @@ async def register(data: RegisterIn, response: Response):
 
 
 @api_router.post("/auth/login")
-async def login(data: LoginIn, response: Response):
+async def login(data: LoginIn, request: Request, response: Response):
     email = data.email.lower().strip()
+    ip = _client_ip(request)
+    await check_login_lockout(ip, email)
     user = await db.users.find_one({"email": email})
     if not user or not verify_password(data.password, user["password_hash"]):
+        await record_failed_login(ip, email)
         raise HTTPException(status_code=401, detail="Correo o contraseña incorrectos")
+    await clear_login_attempts(ip, email)
     uid = str(user["_id"])
     ver = user.get("token_version", 0)
     access = create_access_token(uid, email, ver)
     refresh = create_refresh_token(uid, ver)
     set_auth_cookies(response, access, refresh)
     return {"id": uid, "email": email, "name": user.get("name", ""), "role": user.get("role", "user")}
+
+
+@api_router.post("/auth/refresh")
+async def refresh_token(request: Request, response: Response):
+    """Issue a new access token from a valid refresh cookie. Never goes through get_current_user."""
+    token = request.cookies.get("refresh_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Sin token de refresco")
+    try:
+        payload = jwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail="Tipo de token inválido")
+        user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
+        if not user:
+            raise HTTPException(status_code=401, detail="Usuario no encontrado")
+        if payload.get("ver", 0) != user.get("token_version", 0):
+            raise HTTPException(status_code=401, detail="Sesión expirada")
+        uid = str(user["_id"])
+        ver = user.get("token_version", 0)
+        access = create_access_token(uid, user["email"], ver)
+        response.set_cookie("access_token", access, httponly=True, secure=True,
+                            samesite="none", max_age=86400, path="/")
+        return {"ok": True}
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expirado")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Token inválido")
+
+
+class ForgotPasswordIn(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordIn(BaseModel):
+    token: str
+    password: str
+
+
+GENERIC_RESET_MSG = {"message": "Si el correo está registrado, te enviaremos un enlace para restablecer tu contraseña."}
+
+
+@api_router.post("/auth/forgot-password")
+async def forgot_password(data: ForgotPasswordIn, background_tasks: BackgroundTasks):
+    email = data.email.lower().strip()
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+    # 1) Record request BEFORE lookup (same work for registered/unregistered)
+    await db.password_reset_requests.insert_one({"email": email, "created_at": now_iso})
+    # 2) Rate limit per email
+    cutoff_iso = (now - timedelta(minutes=RESET_WINDOW_MINUTES)).isoformat()
+    recent = await db.password_reset_requests.count_documents({
+        "email": email, "created_at": {"$gt": cutoff_iso},
+    })
+    if recent > RESET_MAX_REQUESTS:
+        return GENERIC_RESET_MSG
+    # 3) Lookup user
+    user = await db.users.find_one({"email": email})
+    if not user:
+        return GENERIC_RESET_MSG
+    # 4) Create token (store hash, never raw)
+    raw_token = _secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+    await db.password_reset_tokens.insert_one({
+        "token_hash": token_hash,
+        "user_id": str(user["_id"]),
+        "email": email,
+        "expires_at": now + timedelta(hours=1),
+        "used": False,
+    })
+    # 5) Queue email send
+    background_tasks.add_task(send_password_reset_email, user["email"], raw_token)
+    return GENERIC_RESET_MSG
+
+
+@api_router.post("/auth/reset-password")
+async def reset_password(data: ResetPasswordIn):
+    if len(data.password) < 6:
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 6 caracteres")
+    now = datetime.now(timezone.utc)
+    token_hash = hashlib.sha256(data.token.encode()).hexdigest()
+    # Atomic claim
+    claimed = await db.password_reset_tokens.find_one_and_update(
+        {"token_hash": token_hash, "used": False, "expires_at": {"$gt": now}},
+        {"$set": {"used": True}},
+    )
+    if not claimed:
+        raise HTTPException(status_code=400, detail="Enlace inválido o expirado")
+    user_id = claimed["user_id"]
+    email = claimed["email"]
+    # Update password + bump token_version to invalidate existing sessions
+    await db.users.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"password_hash": hash_password(data.password)},
+         "$inc": {"token_version": 1}},
+    )
+    # Clean up other unused reset tokens for this user
+    await db.password_reset_tokens.delete_many({"user_id": user_id, "used": False})
+    # Clear brute-force lockout for this email
+    await db.login_attempts.delete_many({"email": email})
+    return {"ok": True}
 
 
 @api_router.post("/auth/logout")
@@ -1598,6 +1792,19 @@ async def startup_event():
     await db.users.create_index("email", unique=True)
     await db.attendance.create_index([("worker_id", 1), ("date", 1)], unique=True)
     await db.workers.create_index("qr_code")
+    # Auth brute-force + password reset
+    await db.login_attempts.create_index("identifier")
+    await db.login_attempts.create_index("email")
+    try:
+        await db.password_reset_tokens.create_index("token_hash", unique=True)
+        await db.password_reset_tokens.create_index("expires_at", expireAfterSeconds=0)
+    except Exception:
+        pass
+    await db.password_reset_requests.create_index("email")
+    try:
+        await db.password_reset_requests.create_index("created_at", expireAfterSeconds=900)
+    except Exception:
+        pass
     await seed_admin()
     await seed_demo()
     await backfill_worker_qr()

@@ -116,7 +116,18 @@ export default function Login() {
               )}
             </button>
 
-            <p className="text-center text-[11px] text-[#889078] pt-2 font-semibold">
+            <div className="text-center pt-1">
+              <button
+                type="button"
+                onClick={() => navigate("/forgot-password")}
+                className="text-sm text-[#1D4ED8] font-bold hover:underline"
+                data-testid="login-forgot-link"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            </div>
+
+            <p className="text-center text-[11px] text-[#889078] pt-1 font-semibold">
               ¿No tienes cuenta? Pide a tu administrador que te cree una.
             </p>
           </form>
