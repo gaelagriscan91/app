@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Html5Qrcode } from "html5-qrcode";
 import {
   Camera, CameraOff, Minus, Plus, Save, Loader2, RotateCcw,
-  DollarSign, X, UserPlus, ListChecks, Users, Check,
+  DollarSign, X, UserPlus, ListChecks, Users, Check, Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatCurrency, formatNumber, formatApiErrorDetail, todayISO } from "@/lib/api";
@@ -336,6 +336,28 @@ export default function ScanHarvestMode() {
     logScan(w, lbPrompt.source || "manual", { weightLb: +val.toFixed(2) });
     setLbPrompt(null);
     setLbValue("");
+  };
+
+  // Remove a scan log entry (e.g. scanned by mistake). Also reverts the tally.
+  const deleteScan = (entry) => {
+    if (!entry) return;
+    if (!window.confirm(`¿Borrar el escaneo de ${entry.name}?`)) return;
+    const frac = typeof entry.fraction === "number" ? entry.fraction : 1;
+    const isShared = entry.sharedBasket === true;
+    // Revert tally (skip shared-basket pending entries — they aren't in tally until commit)
+    if (!isShared || entry.earned !== undefined) {
+      const delta = entry.weightLb !== undefined ? -Number(entry.weightLb)
+        : isShared ? -Number(entry.sharePieces || 0)
+        : -frac;
+      bump(entry.workerId, delta);
+    }
+    // Remove entry from log
+    setScanLog((prev) => {
+      const next = prev.filter((e) => e.id !== entry.id);
+      try { localStorage.setItem(scanLogKey, JSON.stringify(next)); } catch {}
+      return next;
+    });
+    toast.success("Escaneo borrado");
   };
 
   // Commit shared basket on save: distribute (shareBaskets / N) to each sharer
@@ -1110,6 +1132,15 @@ export default function ScanHarvestMode() {
                                 {pending ? "sin guardar" : (isShared ? `${e.sharePieces?.toFixed(2) || "—"} pza` : (frac === 1 ? "/pza" : `${frac} pza`))}
                               </div>
                             </div>
+                            <button
+                              onClick={() => deleteScan(e)}
+                              className="w-9 h-9 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 flex items-center justify-center shrink-0"
+                              data-testid={`scan-registro-delete-${e.id}`}
+                              title="Borrar escaneo"
+                              aria-label="Borrar escaneo"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </li>
                         );
                       })}
