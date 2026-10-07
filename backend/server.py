@@ -1019,7 +1019,7 @@ async def dashboard(user: CurrentUser):
         "present_now": present_now,
         "closed_today": closed_today,
         "weekly": list(weekly.values()),
-        "month_records": pending_records + month_records,
+        "month_records": month_records + pending_records,
         "month_records_count": len(month_rows),
         "pending_count": len(pending_records),
     }
