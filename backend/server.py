@@ -986,6 +986,29 @@ async def dashboard(user: CurrentUser):
     month_sorted = sorted(month_rows, key=lambda r: (r.get("date", ""), str(r.get("_id", ""))), reverse=True)
     month_records = [await _enrich_harvest(r) for r in month_sorted[:500]]
 
+    # Add synthetic "pending" rows for workers with check-in today but no harvest yet
+    harvested_today_ids = {str(r.get("worker_id")) for r in today_rows}
+    pending_records = []
+    for a in att_today:
+        if not a.get("check_in"):
+            continue
+        wid = str(a.get("worker_id") or "")
+        if not wid or wid in harvested_today_ids:
+            continue
+        worker = await db.workers.find_one({"_id": ObjectId(wid)}) if wid else None
+        pending_records.append({
+            "id": f"pending-{wid}",
+            "worker_id": wid,
+            "worker_name": (worker or {}).get("name", "—"),
+            "date": today,
+            "parcel_name": "",
+            "product_name": "Sin cosecha aún",
+            "kilos": 0,
+            "units": 0,
+            "payment": 0,
+            "pending": True,
+        })
+
     return {
         "today_kilos": round(today_kilos, 2),
         "today_payment": round(today_payment, 2),
@@ -996,8 +1019,9 @@ async def dashboard(user: CurrentUser):
         "present_now": present_now,
         "closed_today": closed_today,
         "weekly": list(weekly.values()),
-        "month_records": month_records,
+        "month_records": pending_records + month_records,
         "month_records_count": len(month_rows),
+        "pending_count": len(pending_records),
     }
 
 

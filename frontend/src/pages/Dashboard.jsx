@@ -120,20 +120,28 @@ export default function Dashboard() {
         ) : (
           <ul className="divide-y divide-[#E2DDD0] max-h-[480px] overflow-y-auto">
             {data.month_records.map((r) => (
-              <li key={r.id} className="px-5 py-3 flex items-center justify-between gap-3" data-testid={`dashboard-record-${r.id}`}>
+              <li key={r.id} className={`px-5 py-3 flex items-center justify-between gap-3 ${r.pending ? "bg-amber-50/60" : ""}`} data-testid={`dashboard-record-${r.id}`}>
                 <div className="min-w-0 flex-1">
-                  <div className="font-bold text-[#1A2210] truncate flex items-center gap-1.5">
+                  <div className="font-bold text-[#1A2210] truncate flex items-center gap-1.5 flex-wrap">
                     {r.worker_name || "—"}
-                    <span className="text-[10px] font-bold text-[#556047]">·</span>
-                    <span className="text-[11px] font-semibold text-[#556047] truncate">{r.product_name || r.parcel_name || ""}</span>
+                    {r.pending ? (
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-200 text-amber-900">
+                        En campo · 0 piezas
+                      </span>
+                    ) : (
+                      <>
+                        <span className="text-[10px] font-bold text-[#556047]">·</span>
+                        <span className="text-[11px] font-semibold text-[#556047] truncate">{r.product_name || r.parcel_name || ""}</span>
+                      </>
+                    )}
                   </div>
                   <div className="text-[11px] text-[#556047] font-semibold font-mono-stat">
-                    {r.date} · {r.kilos ? `${formatNumber(r.kilos, 2)}Kg` : ""} {r.units ? `${formatNumber(r.units, r.units % 1 === 0 ? 0 : 2)}u` : ""}
+                    {r.date}{!r.pending ? ` · ${r.kilos ? `${formatNumber(r.kilos, 2)}Kg` : ""} ${r.units ? `${formatNumber(r.units, r.units % 1 === 0 ? 0 : 2)}u` : ""}` : " · Esperando primera cosecha"}
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <div className="font-mono-stat text-base font-extrabold text-[#1D4ED8]">
-                    {formatCurrency(r.payment)}
+                  <div className={`font-mono-stat text-base font-extrabold ${r.pending ? "text-[#889078]" : "text-[#1D4ED8]"}`}>
+                    {r.pending ? "—" : formatCurrency(r.payment)}
                   </div>
                 </div>
               </li>
