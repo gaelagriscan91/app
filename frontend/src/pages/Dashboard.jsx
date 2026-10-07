@@ -30,6 +30,18 @@ export default function Dashboard() {
     setDeletingId(id);
     try {
       await api.delete(`/harvests/${id}`);
+      // Also purge matching entry from any day's scanlog in localStorage
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (!key || !key.startsWith("agriscan.scanlog.")) continue;
+          const raw = JSON.parse(localStorage.getItem(key) || "[]");
+          const next = raw.filter((e) => e.harvestId !== id);
+          if (next.length !== raw.length) {
+            localStorage.setItem(key, JSON.stringify(next));
+          }
+        }
+      } catch (_) { /* ignore storage errors */ }
       toast.success("Piezas eliminadas");
       await load();
     } catch (e) {

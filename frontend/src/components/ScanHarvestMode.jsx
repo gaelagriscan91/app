@@ -338,8 +338,9 @@ export default function ScanHarvestMode() {
     setLbValue("");
   };
 
-  // Remove a scan log entry (e.g. scanned by mistake). Also reverts the tally.
-  const deleteScan = (entry) => {
+  // Remove a scan log entry (e.g. scanned by mistake). Also reverts the tally
+  // and, if the scan was already saved to the backend, deletes the server harvest.
+  const deleteScan = async (entry) => {
     if (!entry) return;
     if (!window.confirm(`¿Borrar el escaneo de ${entry.name}?`)) return;
     const frac = typeof entry.fraction === "number" ? entry.fraction : 1;
@@ -350,6 +351,10 @@ export default function ScanHarvestMode() {
         : isShared ? -Number(entry.sharePieces || 0)
         : -frac;
       bump(entry.workerId, delta);
+    }
+    // If already persisted, delete the server-side harvest too
+    if (entry.harvestId) {
+      try { await api.delete(`/harvests/${entry.harvestId}`); } catch (_) {}
     }
     // Remove entry from log
     setScanLog((prev) => {
@@ -541,21 +546,67 @@ export default function ScanHarvestMode() {
 
     setSaving(true);
     try {
-      await Promise.all(posts);
-      // Patch scanLog for shared-basket entries with real earned $
-      const sessionId = shareSessionIdRef.current;
-      if (hasShare && sessionId) {
-        setScanLog((prev) => {
-          const next = prev.map((e) =>
-            e.shareSessionId === sessionId
-              ? { ...e, earned: earnedPerSharer, baskets: shareBaskets, sharers: shareBuffer.length, sharePieces: +sharePieces.toFixed(4) }
-              : e
-          );
-          try { localStorage.setItem(scanLogKey, JSON.stringify(next)); } catch {}
-          return next;
+      // POST all; keep per-entry id so we can patch scanLog with harvestId mapping
+      const results = await Promise.all(
+        posts.map((p) => p.then((r) => r.data).catch((err) => { throw err; }))
+      );
+      // Rebuild a flat list in the same order posts were enqueued
+      // and map each post back to its scanLog entry (if any) so we can
+      // later delete the server-side harvest from the Registro.
+      const assignments = [];
+      Object.entries(logByWorker).forEach(([wid, items]) => {
+        items.forEach((item) => {
+          if (item.units <= 0) return;
+          assignments.push({ wid, source: item.source });
         });
-      }
-      const totalPayment = posts.length * 0 + Object.values(logByWorker).flat().reduce((s, x) => s + x.units * price, 0);
+      });
+      const harvestIdByScan = new Map(); // scanLog.id -> harvestId
+      // Walk assignments against today's scanLog (non-shared) and shared buffer entries
+      const nonSharedByWorker = {};
+      scanLog.filter((e) => !e.sharedBasket).forEach((e) => {
+        if (!nonSharedByWorker[e.workerId]) nonSharedByWorker[e.workerId] = [];
+        nonSharedByWorker[e.workerId].push(e);
+      });
+      const sharedByWorker = {};
+      scanLog.filter((e) => e.sharedBasket && e.shareSessionId === shareSessionIdRef.current).forEach((e) => {
+        if (!sharedByWorker[e.workerId]) sharedByWorker[e.workerId] = [];
+        sharedByWorker[e.workerId].push(e);
+      });
+      assignments.forEach((a, idx) => {
+        const harvest = results[idx];
+        const hid = harvest && (harvest.id || harvest._id);
+        if (!hid) return;
+        let picked = null;
+        if (a.source === "shared") {
+          const q = sharedByWorker[a.wid];
+          picked = q && q.shift();
+        } else if (a.source !== "manual-adjust") {
+          const q = nonSharedByWorker[a.wid];
+          picked = q && q.shift();
+        }
+        if (picked) harvestIdByScan.set(picked.id, hid);
+      });
+
+      // Persist harvestId on each matching scanLog entry
+      const sessionId = shareSessionIdRef.current;
+      setScanLog((prev) => {
+        const next = prev.map((e) => {
+          const hid = harvestIdByScan.get(e.id);
+          const patched = { ...e };
+          if (hid) patched.harvestId = hid;
+          if (sessionId && e.sharedBasket && e.shareSessionId === sessionId) {
+            patched.earned = earnedPerSharer;
+            patched.baskets = shareBaskets;
+            patched.sharers = shareBuffer.length;
+            patched.sharePieces = +sharePieces.toFixed(4);
+          }
+          return patched;
+        });
+        try { localStorage.setItem(scanLogKey, JSON.stringify(next)); } catch {}
+        return next;
+      });
+
+      const totalPayment = Object.values(logByWorker).flat().reduce((s, x) => s + x.units * price, 0);
       toast.success(`Guardado: ${posts.length} registro(s) · ${formatCurrency(totalPayment)}`, { duration: 2500 });
       setTally({});
       setShareBuffer([]);
