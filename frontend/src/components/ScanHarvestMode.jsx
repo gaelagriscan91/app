@@ -480,22 +480,57 @@ export default function ScanHarvestMode() {
   const totalScanned = scanLog.length;
 
   const save = async () => {
-    // Build final tally inline (avoid React async setState race with commitSharedBasket)
-    const finalTally = { ...tally };
     const price = parseFloat(pricePerUnit) || 0;
     const hasShare = shareBuffer.length > 0 && shareBaskets > 0;
-    let sharePieces = 0;
-    let earnedPerSharer = 0;
+    const sharePieces = hasShare ? shareBaskets / shareBuffer.length : 0;
+    const earnedPerSharer = +(sharePieces * price).toFixed(2);
+
+    // Build per-worker list of individual harvests (one row per scan)
+    const logByWorker = {};
+    scanLog.filter((e) => !e.sharedBasket).forEach((e) => {
+      const u = e.weightLb !== undefined ? Number(e.weightLb)
+        : (typeof e.fraction === "number" ? e.fraction : 1);
+      if (!logByWorker[e.workerId]) logByWorker[e.workerId] = [];
+      logByWorker[e.workerId].push({ units: +u.toFixed(4), source: e.source || "qr" });
+    });
     if (hasShare) {
-      sharePieces = shareBaskets / shareBuffer.length;
-      earnedPerSharer = +(sharePieces * price).toFixed(2);
       shareBuffer.forEach((w) => {
-        const cur = finalTally[w.id] || { name: w.name, count: 0 };
-        finalTally[w.id] = { name: w.name, count: +(cur.count + sharePieces).toFixed(4) };
+        if (!logByWorker[w.id]) logByWorker[w.id] = [];
+        logByWorker[w.id].push({ units: +sharePieces.toFixed(4), source: "shared" });
       });
     }
-    const entries = Object.entries(finalTally);
-    if (entries.length === 0) {
+    // Reconcile with tally: any extra piezas from manual +/- that aren't in the log
+    // become one compensating row per worker so nothing is lost.
+    Object.entries(tally).forEach(([wid, v]) => {
+      const logged = (logByWorker[wid] || []).reduce((s, x) => s + x.units, 0);
+      const delta = +(v.count - logged).toFixed(4);
+      if (delta > 0.001) {
+        if (!logByWorker[wid]) logByWorker[wid] = [];
+        logByWorker[wid].push({ units: delta, source: "manual-adjust" });
+      }
+    });
+
+    const posts = [];
+    Object.entries(logByWorker).forEach(([wid, items]) => {
+      items.forEach((item) => {
+        if (item.units <= 0) return;
+        posts.push(api.post("/harvests", {
+          worker_id: wid,
+          parcel_id: parcelId,
+          product_id: productId,
+          kilos: 0,
+          units: item.units,
+          price_per_kg: 0,
+          price_per_unit: price,
+          price_mode: "piece",
+          date: todayKey,
+          photo_path: "",
+          notes: item.source === "shared" ? "Canasta compartida" : "Cosecha escaneada",
+        }));
+      });
+    });
+
+    if (posts.length === 0) {
       toast.error("No hay escaneos para guardar");
       return;
     }
@@ -503,25 +538,10 @@ export default function ScanHarvestMode() {
       toast.error("Pon el precio antes de guardar");
       return;
     }
+
     setSaving(true);
     try {
-      await Promise.all(
-        entries.map(([workerId, v]) =>
-          api.post("/harvests", {
-            worker_id: workerId,
-            parcel_id: parcelId,
-            product_id: productId,
-            kilos: 0,
-            units: v.count,
-            price_per_kg: 0,
-            price_per_unit: price,
-            price_mode: "piece",
-            date: todayKey,
-            photo_path: "",
-            notes: v.count % 1 !== 0 ? "Canasta compartida" : "Cosecha escaneada",
-          })
-        )
-      );
+      await Promise.all(posts);
       // Patch scanLog for shared-basket entries with real earned $
       const sessionId = shareSessionIdRef.current;
       if (hasShare && sessionId) {
@@ -535,8 +555,8 @@ export default function ScanHarvestMode() {
           return next;
         });
       }
-      const totalPayment = entries.reduce((s, [, v]) => s + v.count * price, 0);
-      toast.success(`Guardado: ${entries.length} trabajador(es) · ${formatCurrency(totalPayment)}`, { duration: 2500 });
+      const totalPayment = posts.length * 0 + Object.values(logByWorker).flat().reduce((s, x) => s + x.units * price, 0);
+      toast.success(`Guardado: ${posts.length} registro(s) · ${formatCurrency(totalPayment)}`, { duration: 2500 });
       setTally({});
       setShareBuffer([]);
       setShareBaskets(0);
