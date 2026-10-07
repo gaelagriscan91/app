@@ -50,6 +50,8 @@ export default function ScanHarvestMode() {
   const [scannerOn, setScannerOn] = useState(true);
   const [tally, setTally] = useState({}); // { worker_id: {name, count} }
   const [lastWorker, setLastWorker] = useState(null); // {id, name}
+  const [lbPrompt, setLbPrompt] = useState(null); // {id, name, source} when unit=libra awaiting weight input
+  const [lbValue, setLbValue] = useState("");
   const [saving, setSaving] = useState(false);
 
   const [showList, setShowList] = useState(false); // detailed per-worker tally sheet
@@ -273,6 +275,13 @@ export default function ScanHarvestMode() {
     scannedCodesRef.current.set(key, now);
     playBeep();
     setLastWorker({ id: w.id, name: w.name });
+    if (unitLabel === "libra") {
+      // Pound mode: ask for total weight instead of auto +1
+      const cur = (tally[w.id] && tally[w.id].count) || 0;
+      setLbValue(cur ? String(cur) : "");
+      setLbPrompt({ id: w.id, name: w.name, source: "qr" });
+      return;
+    }
     setTally((prev) => {
       const cur = prev[w.id] || { name: w.name, count: 0 };
       return { ...prev, [w.id]: { name: w.name, count: cur.count + 1 } };
@@ -288,11 +297,9 @@ export default function ScanHarvestMode() {
     if (shareMode) {
       const alreadyIn = shareBuffer.some((x) => x.id === w.id);
       if (alreadyIn) {
-        // Same worker already in group — just acknowledge
         setShowManual(false);
         return;
       }
-      // Start/continue share session
       if (!shareSessionIdRef.current) {
         shareSessionIdRef.current = `share-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       }
@@ -302,12 +309,33 @@ export default function ScanHarvestMode() {
       setShowManual(false);
       return;
     }
+    if (unitLabel === "libra") {
+      const cur = (tally[w.id] && tally[w.id].count) || 0;
+      setLbValue(cur ? String(cur) : "");
+      setLbPrompt({ id: w.id, name: w.name, source: "manual" });
+      setShowManual(false);
+      return;
+    }
     setTally((prev) => {
       const cur = prev[w.id] || { name: w.name, count: 0 };
       return { ...prev, [w.id]: { name: w.name, count: cur.count + 1 } };
     });
     logScan(w, "manual");
     setShowManual(false);
+  };
+
+  const confirmLbInput = () => {
+    if (!lbPrompt) return;
+    const val = parseFloat(lbValue);
+    if (!val || val <= 0) {
+      toast.error("Ingresa un peso válido");
+      return;
+    }
+    const w = { id: lbPrompt.id, name: lbPrompt.name };
+    setTally((prev) => ({ ...prev, [w.id]: { name: w.name, count: +val.toFixed(2) } }));
+    logScan(w, lbPrompt.source || "manual", { weightLb: +val.toFixed(2) });
+    setLbPrompt(null);
+    setLbValue("");
   };
 
   // Commit shared basket on save: distribute (shareBaskets / N) to each sharer
@@ -875,6 +903,52 @@ export default function ScanHarvestMode() {
             >
               Cancelar
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Pound-weight input modal (when unit = libra) */}
+      {lbPrompt && (
+        <div className="fixed inset-0 z-[80] bg-black/70 flex items-end sm:items-center justify-center p-3" onClick={() => { setLbPrompt(null); setLbValue(""); }}>
+          <div className="bg-white rounded-2xl p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()} data-testid="scan-lb-modal">
+            <h3 className="text-lg font-extrabold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>
+              Total de libras
+            </h3>
+            <p className="text-sm text-[#556047] font-semibold mb-3">
+              Para <b>{lbPrompt.name}</b>
+            </p>
+            <input
+              type="number"
+              inputMode="decimal"
+              step="0.1"
+              min="0"
+              value={lbValue}
+              onChange={(e) => setLbValue(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") confirmLbInput(); }}
+              className="field-input !h-16 !text-3xl !font-mono-stat !font-extrabold text-center w-full"
+              placeholder="0.0"
+              data-testid="scan-lb-input"
+              autoFocus
+            />
+            <div className="text-center text-[11px] text-[#889078] font-bold uppercase tracking-wider mt-1">
+              libras · ${pricePerUnit || 0} c/u → <span className="text-[#1D4ED8]">{formatCurrency((parseFloat(lbValue) || 0) * (parseFloat(pricePerUnit) || 0))}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              <button
+                onClick={() => { setLbPrompt(null); setLbValue(""); }}
+                className="h-12 rounded-xl bg-[#F0EDE1] hover:bg-[#E2DDD0] text-[#556047] font-bold"
+                data-testid="scan-lb-cancel"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmLbInput}
+                className="h-12 rounded-xl bg-[#1D4ED8] hover:bg-[#1E3A8A] text-white font-extrabold"
+                data-testid="scan-lb-confirm"
+              >
+                Guardar
+              </button>
+            </div>
           </div>
         </div>
       )}
