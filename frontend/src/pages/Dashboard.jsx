@@ -84,18 +84,6 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 gap-3 sm:gap-4">
-        <StatCard
-          label="Pago hoy"
-          value={formatCurrency(data?.today_payment)}
-          sub="A pagar"
-          Icon={DollarSign}
-          variant="accent"
-          testid="stat-today-payment"
-        />
-      </div>
-
       {/* Month records list */}
       <div className="field-card p-0 overflow-hidden" data-testid="dashboard-month-records">
         <div className="px-5 py-4 border-b border-[#E2DDD0] flex items-center justify-between">
