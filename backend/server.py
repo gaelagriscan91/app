@@ -379,6 +379,7 @@ class MayordomoCreate(BaseModel):
     name: str
     role: Optional[str] = "user"
     active: bool = True
+    access_days: Optional[int] = None  # None = unlimited; otherwise auto-block after N days
 
 
 class MayordomoUpdate(BaseModel):
@@ -386,6 +387,7 @@ class MayordomoUpdate(BaseModel):
     password: Optional[str] = None
     role: Optional[str] = None
     active: Optional[bool] = None
+    access_days: Optional[int] = None  # When set, resets access_expires_at = now + N days
 
 
 # ---------------------------------------------------------------------------
@@ -410,6 +412,22 @@ async def login(data: LoginIn, request: Request, response: Response):
     if not user or not verify_password(data.password, user["password_hash"]):
         await record_failed_login(ip, email)
         raise HTTPException(status_code=401, detail="Correo o contraseña incorrectos")
+    # Auto-block when the access window has expired
+    exp_iso = user.get("access_expires_at")
+    if exp_iso and user.get("role") != "admin":
+        try:
+            exp_dt = datetime.fromisoformat(exp_iso)
+            if datetime.now(timezone.utc) > exp_dt:
+                if user.get("active") is not False:
+                    await db.users.update_one({"_id": user["_id"]}, {"$set": {"active": False}})
+                raise HTTPException(status_code=403, detail="Acceso vencido. Pide al administrador que renueve tu acceso.")
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+    # Block manually-deactivated accounts (non-admin)
+    if user.get("active") is False and user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Cuenta bloqueada. Contacta al administrador.")
     await clear_login_attempts(ip, email)
     uid = str(user["_id"])
     ver = user.get("token_version", 0)
@@ -1632,6 +1650,7 @@ async def admin_create_mayordomo(data: MayordomoCreate, user: CurrentUser):
     email = data.email.lower().strip()
     if await db.users.find_one({"email": email}):
         raise HTTPException(status_code=400, detail="El correo ya está registrado")
+    now = datetime.now(timezone.utc)
     doc = {
         "email": email,
         "password_hash": hash_password(data.password),
@@ -1640,8 +1659,11 @@ async def admin_create_mayordomo(data: MayordomoCreate, user: CurrentUser):
         "active": data.active,
         "token_version": 0,
         "created_by": user["_id"],
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": now.isoformat(),
     }
+    if data.access_days is not None and data.access_days > 0:
+        doc["access_days"] = int(data.access_days)
+        doc["access_expires_at"] = (now + timedelta(days=int(data.access_days))).isoformat()
     res = await db.users.insert_one(doc)
     doc["_id"] = res.inserted_id
     doc.pop("password_hash", None)
@@ -1664,6 +1686,14 @@ async def admin_update_mayordomo(uid: str, data: MayordomoUpdate, user: CurrentU
     if data.password:
         upd["password_hash"] = hash_password(data.password)
         upd["token_version"] = (existing.get("token_version", 0) or 0) + 1
+    if data.access_days is not None:
+        now = datetime.now(timezone.utc)
+        if data.access_days <= 0:
+            upd["access_days"] = None
+            upd["access_expires_at"] = None
+        else:
+            upd["access_days"] = int(data.access_days)
+            upd["access_expires_at"] = (now + timedelta(days=int(data.access_days))).isoformat()
     if not upd:
         raise HTTPException(status_code=400, detail="Nada que actualizar")
     await db.users.update_one({"_id": ObjectId(uid)}, {"$set": upd})

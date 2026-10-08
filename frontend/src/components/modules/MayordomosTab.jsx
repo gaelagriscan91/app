@@ -103,6 +103,16 @@ export default function MayordomosTab() {
                     <p className="text-xs text-[#556047] font-semibold truncate flex items-center gap-1 mt-0.5">
                       <Mail className="w-3 h-3" /> {u.email}
                     </p>
+                    {u.access_expires_at && !isAdmin && (() => {
+                      const exp = new Date(u.access_expires_at);
+                      const expired = exp.getTime() <= Date.now();
+                      const daysLeft = Math.max(0, Math.ceil((exp.getTime() - Date.now()) / 86400000));
+                      return (
+                        <p className={`text-[11px] font-extrabold mt-0.5 ${expired ? "text-red-600" : "text-amber-700"}`} data-testid={`mayordomo-expiry-${u.id}`}>
+                          {expired ? `Expiró el ${exp.toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}` : `Faltan ${daysLeft} día${daysLeft !== 1 ? "s" : ""}`}
+                        </p>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -176,6 +186,7 @@ function MayordomoForm({ editing, onClose, onSaved }) {
   const [email, setEmail] = useState(editing?.email || "");
   const [password, setPassword] = useState("");
   const [active, setActive] = useState(editing?.active !== false);
+  const [accessDays, setAccessDays] = useState(editing?.access_days != null ? String(editing.access_days) : "");
   const [showPass, setShowPass] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -187,18 +198,22 @@ function MayordomoForm({ editing, onClose, onSaved }) {
     if (!isEdit && (!email.trim() || !password.trim())) return toast.error("Correo y contraseña requeridos");
     setSaving(true);
     try {
+      const daysNum = accessDays.trim() === "" ? null : parseInt(accessDays, 10);
       if (isEdit) {
         const payload = { name: name.trim(), active };
         if (password.trim()) payload.password = password.trim();
+        if (accessDays.trim() !== "") payload.access_days = daysNum;
         await api.patch(`/admin/mayordomos/${editing.id}`, payload);
         toast.success(`${name} actualizado`);
       } else {
-        await api.post("/admin/mayordomos", {
+        const payload = {
           email: email.trim().toLowerCase(),
           password: password.trim(),
           name: name.trim(),
           active,
-        });
+        };
+        if (accessDays.trim() !== "" && daysNum > 0) payload.access_days = daysNum;
+        await api.post("/admin/mayordomos", payload);
         toast.success(`${name} creado. Comparte el acceso.`);
       }
       onSaved();
@@ -286,6 +301,55 @@ function MayordomoForm({ editing, onClose, onSaved }) {
             />
             <span className="font-bold text-sm text-[#1A2210]">Cuenta activa</span>
           </label>
+
+          <div>
+            <label className="block text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">
+              Días de acceso (bloquea automático después)
+            </label>
+            <div className="grid grid-cols-5 gap-1.5 mb-2">
+              {[7, 14, 30, 60, 90].map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setAccessDays(String(d))}
+                  className={`h-10 rounded-lg font-extrabold text-xs transition ${
+                    accessDays === String(d)
+                      ? "bg-[#1D4ED8] text-white"
+                      : "bg-white border-2 border-[#E2DDD0] text-[#556047] hover:bg-[#F7F5EE]"
+                  }`}
+                  data-testid={`mayordomo-days-${d}`}
+                >
+                  {d}d
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                min="0"
+                value={accessDays}
+                onChange={(e) => setAccessDays(e.target.value)}
+                placeholder="Personalizado (vacío = sin límite)"
+                className="field-input flex-1"
+                data-testid="mayordomo-days-input"
+              />
+              {accessDays && (
+                <button
+                  type="button"
+                  onClick={() => setAccessDays("")}
+                  className="h-12 px-3 rounded-xl bg-white border-2 border-[#E2DDD0] text-[#556047] font-bold text-xs"
+                  data-testid="mayordomo-days-clear"
+                >
+                  Sin límite
+                </button>
+              )}
+            </div>
+            {isEdit && editing?.access_expires_at && (
+              <p className="text-[11px] text-[#889078] mt-1 font-semibold">
+                Expira: {new Date(editing.access_expires_at).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })}
+              </p>
+            )}
+          </div>
 
           <div className="grid grid-cols-2 gap-2 pt-2">
             <button
