@@ -1,7 +1,7 @@
 # AgriScan — PRD
 
 ## Problema original
-Crear una app de registro de cosecha estilo PickTrace para equipos agrícolas:
+App de registro de cosecha estilo PickTrace para equipos agrícolas:
 - Registrar cosecha (Trabajador, Parcela, Producto, Kilos/Piezas, Fecha, Foto)
 - Calcular pago automáticamente por kilo/pieza/hora
 - Lista del día con totales
@@ -11,33 +11,33 @@ Crear una app de registro de cosecha estilo PickTrace para equipos agrícolas:
 - Multi-tenancy (Admin vs Mayordomos) y empaquetado Android vía Capacitor
 
 ## Arquitectura
-- Frontend: React + Tailwind + Shadcn (en `/app/frontend`)
-- Backend: FastAPI + MongoDB Motor (en `/app/backend/server.py`)
-- Android: Capacitor (en `/app/frontend/android`) con CI vía GitHub Actions
+- Frontend: React + Tailwind + Shadcn (`/app/frontend`)
+- Backend: FastAPI + MongoDB Motor (`/app/backend/server.py`)
+- Android: Capacitor (`/app/frontend/android`) con CI por GitHub Actions
 
-## Lo implementado hasta ahora
+## Implementado
 - Autenticación JWT con cookies; roles admin/user (mayordomo)
 - Mayordomos con fecha de expiración y bloqueo manual
-- Pantalla Check-In (Asistencia.jsx) con campos editables inline que persisten en `localStorage`
+- Check-In (Asistencia.jsx) con campos editables inline que persisten en `localStorage`
 - Escáner QR fullscreen (ScanHarvestMode.jsx) estilo nativo (flash/zoom/flip)
 - Dashboard (Inicio) con botón SCAN central siempre visible
-- Barra inferior dinámica con fracciones (1/4, 1/2, 3/4) y SAVE cuando hay escaneo pendiente
-- Bottom-sheet "¿Guardar recibo?" al volver del escáner
+- Barra inferior permanente: fracciones (1/4, 1/2, 3/4), SCAN y botón GUARDAR siempre visibles
+- Bottom-sheet "¿Guardar recibo?" con botón GUARDAR siempre disponible
 - Reportes y Lista del Día simplificados
-- Módulos: Trabajadores, Cuadrilla, Registro, Mayordomos (Parcelas y Productos removidos)
-- **(Nuevo 10/2026)** Inicio muestra únicamente los registros de escaneo; los check-ins (En campo) solo aparecen en Día/Registro
+- Módulos: Trabajadores, Cuadrilla, Registro, Mayordomos
+- **(10/2026)** Inicio solo muestra escaneos **del día de hoy** que ya fueron guardados vía SAVE. Los escaneos pendientes quedan ocultos hasta pulsar GUARDAR. Persiste en `localStorage` (`agriscan.savedIds`).
 
 ## Backlog priorizado
 ### P1
-- Guardar Block y Variedad en el schema `harvests` para que aparezcan históricamente en Reportes
+- Guardar Block y Variedad en el schema `harvests` (hoy solo viven en localStorage)
 
 ### P2
 - Generación de QR por pieza/canasta para modo "Escanear piezas"
 - Modo "Review" para bloquear jornada auditada
 
 ### P3
-- Refactor `server.py` (~1900 líneas) en routers (auth, workers, harvests, attendance)
-- Refactor `Dashboard.jsx` y `ScanHarvestMode.jsx` modularizando componentes
+- Refactor `server.py` (~1900 líneas) en routers
+- Refactor `Dashboard.jsx` modularizando componentes
 
 ## Credenciales de prueba
 Ver `/app/memory/test_credentials.md`

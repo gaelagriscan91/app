@@ -20,6 +20,13 @@ export default function Dashboard() {
   const [savedAt, setSavedAt] = useState(() => {
     try { return localStorage.getItem("agriscan.lastSavedAt") || ""; } catch (_) { return ""; }
   });
+  const [savedIds, setSavedIds] = useState(() => {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const raw = JSON.parse(localStorage.getItem("agriscan.savedIds") || "{}");
+      return new Set(raw[today] || []);
+    } catch (_) { return new Set(); }
+  });
 
   const load = async () => {
     try {
@@ -63,17 +70,16 @@ export default function Dashboard() {
 
   const rows = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
-    // Only show today's scan records that were already SAVEd (created_at <= savedAt)
+    // Only show today's scans that have been SAVEd at least once
     const list = (data?.month_records || []).filter((r) => {
       if (r.pending) return false;
       if (r.date !== today) return false;
-      if (!savedAt) return false;
-      return (r.created_at || "") <= savedAt;
+      return savedIds.has(r.id);
     });
     const q = (search || "").trim().toLowerCase();
     if (!q) return list;
     return list.filter((r) => (r.worker_name || "").toLowerCase().includes(q));
-  }, [data, search, savedAt]);
+  }, [data, search, savedIds]);
 
   const todayCount = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -109,7 +115,7 @@ export default function Dashboard() {
     }
   };
 
-  // SAVE — snapshot today's receipts into history
+  // SAVE — snapshot today's receipts into history AND mark today's scans as "shown"
   const saveReceipt = async () => {
     const today = new Date().toISOString().slice(0, 10);
     setSavingReceipt(true);
@@ -118,6 +124,18 @@ export default function Dashboard() {
       const now = new Date().toISOString();
       try { localStorage.setItem("agriscan.lastSavedAt", now); } catch (_) {}
       setSavedAt(now);
+      // Mark all of today's existing harvest ids as saved so they appear in Inicio
+      const todayIds = (data?.month_records || [])
+        .filter((r) => !r.pending && r.date === today)
+        .map((r) => r.id);
+      const nextSet = new Set(savedIds);
+      todayIds.forEach((id) => nextSet.add(id));
+      setSavedIds(nextSet);
+      try {
+        const raw = JSON.parse(localStorage.getItem("agriscan.savedIds") || "{}");
+        raw[today] = Array.from(nextSet);
+        localStorage.setItem("agriscan.savedIds", JSON.stringify(raw));
+      } catch (_) {}
       setShowSavePrompt(false);
       toast.success("Recibo guardado");
       await load();
