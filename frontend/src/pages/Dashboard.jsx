@@ -86,6 +86,15 @@ export default function Dashboard() {
     return (data?.month_records || []).filter((r) => r.date === today && !r.pending).length;
   }, [data]);
 
+  const activeWorkers = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const set = new Set();
+    (data?.month_records || []).forEach((r) => {
+      if (!r.pending && r.date === today && r.worker_id) set.add(r.worker_id);
+    });
+    return set.size;
+  }, [data]);
+
   const lastEntry = useMemo(() => {
     const nonPending = (data?.month_records || []).filter((r) => !r.pending);
     return nonPending[0] || null;
@@ -115,35 +124,38 @@ export default function Dashboard() {
     }
   };
 
-  // SAVE — snapshot today's receipts into history AND mark today's scans as "shown"
+  // SAVE — mark today's scans as visible AND snapshot the receipt into history
   const saveReceipt = async () => {
     const today = new Date().toISOString().slice(0, 10);
+    // Always flag local savedIds first (so the records appear in Inicio even if the
+    // backend receipt snapshot is a no-op because it was already stored).
+    const todayIds = (data?.month_records || [])
+      .filter((r) => !r.pending && r.date === today)
+      .map((r) => r.id);
+    if (todayIds.length === 0) {
+      toast.error("No hay escaneos para guardar");
+      return;
+    }
+    const nextSet = new Set(savedIds);
+    todayIds.forEach((id) => nextSet.add(id));
+    setSavedIds(nextSet);
+    try {
+      const raw = JSON.parse(localStorage.getItem("agriscan.savedIds") || "{}");
+      raw[today] = Array.from(nextSet);
+      localStorage.setItem("agriscan.savedIds", JSON.stringify(raw));
+    } catch (_) {}
+
     setSavingReceipt(true);
     try {
       await api.post("/receipts/history", { date_from: today, date_to: today });
-      const now = new Date().toISOString();
-      try { localStorage.setItem("agriscan.lastSavedAt", now); } catch (_) {}
-      setSavedAt(now);
-      // Mark all of today's existing harvest ids as saved so they appear in Inicio
-      const todayIds = (data?.month_records || [])
-        .filter((r) => !r.pending && r.date === today)
-        .map((r) => r.id);
-      const nextSet = new Set(savedIds);
-      todayIds.forEach((id) => nextSet.add(id));
-      setSavedIds(nextSet);
-      try {
-        const raw = JSON.parse(localStorage.getItem("agriscan.savedIds") || "{}");
-        raw[today] = Array.from(nextSet);
-        localStorage.setItem("agriscan.savedIds", JSON.stringify(raw));
-      } catch (_) {}
-      setShowSavePrompt(false);
-      toast.success("Recibo guardado");
-      await load();
-    } catch (e) {
-      toast.error(e?.response?.data?.detail || "No hay actividad para guardar");
-    } finally {
-      setSavingReceipt(false);
-    }
+    } catch (_) { /* receipt already exists for today — ignore */ }
+    const now = new Date().toISOString();
+    try { localStorage.setItem("agriscan.lastSavedAt", now); } catch (_) {}
+    setSavedAt(now);
+    setShowSavePrompt(false);
+    toast.success("Registro guardado");
+    setSavingReceipt(false);
+    await load();
   };
 
   // Show the action bar only when there's a NEW scan since last SAVE
@@ -239,7 +251,7 @@ export default function Dashboard() {
             {search ? "Sin coincidencias" : "Sin registros guardados hoy"}
           </div>
         ) : (
-          <ul className="space-y-2">
+          <ul className="divide-y divide-[#1F1F1F]">
             {rows.map((r) => {
               const dt = new Date(r.date + "T00:00:00");
               const dateLabel = `${dt.getMonth() + 1}/${dt.getDate()}/${dt.getFullYear()}`;
@@ -247,21 +259,38 @@ export default function Dashboard() {
               if (r.created_at) {
                 try {
                   const d = new Date(r.created_at);
-                  timeLabel = d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false });
+                  timeLabel = d.toLocaleTimeString("es-MX", {
+                    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true,
+                  }).toLowerCase();
                 } catch (_) {}
               }
+              const notes = (r.notes || "").toLowerCase();
+              const sourceLabel = notes.includes("manual") || notes.includes("ajuste")
+                ? "MANUAL"
+                : notes.includes("comparti") || notes.includes("shared")
+                ? "GRUPO"
+                : "QR";
+              const unitWord = (r.unit_label || "pieza").toLowerCase();
+              const unitShort = unitWord.startsWith("libra")
+                ? "LB"
+                : unitWord.startsWith("hora")
+                ? "HR"
+                : "PZA";
               return (
                 <li
                   key={r.id}
-                  className={`rounded-xl bg-[#1F1F1F] px-3 py-2.5 flex items-center justify-between gap-3 ${r.pending ? "border border-amber-800/60" : "border border-transparent"}`}
+                  onClick={() => deleteHarvest(r.id, r.worker_name)}
+                  className="py-3 flex items-center justify-between gap-3 cursor-pointer active:bg-[#1a1a1a]"
                   data-testid={`home-record-${r.id}`}
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="font-extrabold text-white truncate text-base">
+                    <div className="font-extrabold text-white truncate text-lg leading-tight">
                       {r.worker_name}
-                      {r.pending && <span className="ml-2 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">En campo</span>}
                     </div>
-                    <div className="text-[11px] text-gray-400 font-semibold mt-0.5 flex items-center gap-1.5">
+                    <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-400 font-semibold">
+                      <span className="px-1.5 py-[1px] rounded bg-rose-900/60 text-rose-300 font-extrabold tracking-wider text-[10px]">
+                        {sourceLabel}
+                      </span>
                       <span>{dateLabel}</span>
                       {timeLabel && (
                         <>
@@ -270,33 +299,18 @@ export default function Dashboard() {
                         </>
                       )}
                     </div>
-                    {!r.pending && (r.parcel_name || r.product_name) && (
-                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                        {r.parcel_name && <span className="text-[10px] font-semibold text-gray-300 bg-[#2A2A2A] px-1.5 py-0.5 rounded">{r.parcel_name}</span>}
-                        {r.product_name && <span className="text-[10px] font-semibold text-gray-300 bg-[#2A2A2A] px-1.5 py-0.5 rounded">{r.product_name}</span>}
-                      </div>
-                    )}
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="text-[10px] text-gray-500 font-bold uppercase tracking-wider leading-none">Pza</div>
-                    <div className="font-mono-stat text-base text-white font-extrabold leading-tight">
-                      {r.pending ? "0" : formatNumber(r.units, r.units % 1 === 0 ? 0 : 2)}
+                    <div className="font-mono-stat text-lg font-extrabold text-sky-400 leading-tight">
+                      {formatCurrency(r.payment)}
+                    </div>
+                    <div className="text-[12px] text-gray-400 font-semibold mt-0.5">
+                      <span className="font-mono-stat text-white font-extrabold mr-1">
+                        {formatNumber(r.units, r.units % 1 === 0 ? 0 : 2)}
+                      </span>
+                      /{unitShort}
                     </div>
                   </div>
-                  <div className={`font-mono-stat text-base font-extrabold shrink-0 ${r.pending ? "text-gray-500" : "text-white"}`}>
-                    {r.pending ? "—" : formatCurrency(r.payment)}
-                  </div>
-                  {!r.pending && (
-                    <button
-                      onClick={() => deleteHarvest(r.id, r.worker_name)}
-                      disabled={deletingId === r.id}
-                      className="w-8 h-8 rounded-lg bg-red-900/40 hover:bg-red-800/60 text-red-400 flex items-center justify-center shrink-0 disabled:opacity-50"
-                      data-testid={`home-delete-${r.id}`}
-                      title="Borrar"
-                    >
-                      {deletingId === r.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                    </button>
-                  )}
                 </li>
               );
             })}
@@ -304,59 +318,73 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Bottom action bar — SCAN always visible; fractions + SAVE only after new scan */}
+      {/* Bottom action bar — SCAN siempre visible, fracciones + SAVE arriba cuando hay escaneo */}
       <div className="fixed left-0 right-0 bottom-[70px] z-30 pointer-events-none">
         <div className="max-w-5xl mx-auto px-3 pointer-events-auto">
-          <div className="bg-[#111] border-t border-[#2A2A2A] rounded-t-2xl grid grid-cols-3 items-end gap-2 px-3 pt-2 pb-3 shadow-2xl">
-            {/* LEFT — Empleados + fraction shortcuts */}
-            <div>
-              <div className="text-[11px] font-extrabold uppercase tracking-wider text-gray-300 mb-1">
-                Empleados
-              </div>
-              <div className="grid grid-cols-3 gap-1">
-                {[{ f: 0.25, l: "1/4" }, { f: 0.5, l: "1/2" }, { f: 0.75, l: "3/4" }].map(({ f, l }) => (
+          <div className="bg-[#111] border-t border-[#2A2A2A] rounded-t-2xl px-3 pt-2 pb-3 shadow-2xl">
+            {/* Secondary row: fractions + SAVE (only when a scan is pending) */}
+            {hasUnsavedScan && (
+              <div className="grid grid-cols-2 gap-3 mb-2">
+                <div className="grid grid-cols-3 gap-1">
+                  {[{ f: 0.25, l: "1/4" }, { f: 0.5, l: "1/2" }, { f: 0.75, l: "3/4" }].map(({ f, l }) => (
+                    <button
+                      key={l}
+                      onClick={() => applyFractionToLast(f)}
+                      disabled={!lastEntry || applyingFrac !== null}
+                      className="h-7 rounded-md bg-[#DC2626] hover:bg-[#B91C1C] text-white text-[10px] font-extrabold disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
+                      data-testid={`home-frac-${l.replace("/", "-")}`}
+                    >
+                      {applyingFrac === f ? <Loader2 className="w-3 h-3 animate-spin" /> : l}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center justify-end">
                   <button
-                    key={l}
-                    onClick={() => applyFractionToLast(f)}
-                    disabled={!lastEntry || applyingFrac !== null}
-                    className="h-7 rounded-md bg-[#DC2626] hover:bg-[#B91C1C] text-white text-[10px] font-extrabold disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
-                    data-testid={`home-frac-${l.replace("/", "-")}`}
+                    onClick={saveReceipt}
+                    disabled={savingReceipt}
+                    className="h-7 px-5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-extrabold disabled:opacity-50 flex items-center"
+                    data-testid="home-save-button"
                   >
-                    {applyingFrac === f ? <Loader2 className="w-3 h-3 animate-spin" /> : l}
+                    {savingReceipt ? <Loader2 className="w-3 h-3 animate-spin" /> : "GUARDAR"}
                   </button>
-                ))}
+                </div>
+              </div>
+            )}
+
+            {/* Primary row: Empleado activo | SCAN | Pieza */}
+            <div className="grid grid-cols-3 items-center gap-2">
+              <div className="text-[13px] font-semibold text-gray-200">
+                Empleado activo: <span className="font-extrabold text-white">{activeWorkers}</span>
+              </div>
+              <div className="flex items-center justify-center">
+                <button
+                  onClick={() => navigate("/registrar?mode=qr")}
+                  className="w-20 h-20 rounded-full bg-[#DC2626] hover:bg-[#B91C1C] active:scale-95 text-white font-extrabold text-base shadow-[0_6px_20px_rgba(220,38,38,0.5)] flex items-center justify-center transition"
+                  data-testid="home-scan-button"
+                  aria-label="Escanear"
+                  style={{ fontFamily: "Outfit, sans-serif" }}
+                >
+                  SCAN
+                </button>
+              </div>
+              <div className="text-right text-[13px] font-semibold text-gray-200">
+                Pieza: <span className="font-extrabold text-white">{todayCount}</span>
               </div>
             </div>
 
-            {/* CENTER — SCAN big circular */}
-            <div className="flex items-center justify-center">
-              <button
-                onClick={() => navigate("/registrar?mode=qr")}
-                className="w-20 h-20 rounded-full bg-[#DC2626] hover:bg-[#B91C1C] active:scale-95 text-white font-extrabold text-base shadow-[0_6px_20px_rgba(220,38,38,0.5)] flex items-center justify-center transition"
-                data-testid="home-scan-button"
-                aria-label="Escanear"
-                style={{ fontFamily: "Outfit, sans-serif" }}
-              >
-                SCAN
-              </button>
-            </div>
-
-            {/* RIGHT — Pieza count + SAVE (siempre visible para registrar escaneo) */}
-            <div className="text-right">
-              <div className="text-[11px] font-extrabold uppercase tracking-wider text-gray-300 mb-1">
-                Pieza {todayCount}
-              </div>
-              <div className="flex items-center justify-end">
+            {/* Fallback SAVE button if no fractions row is shown */}
+            {!hasUnsavedScan && (
+              <div className="flex items-center justify-end mt-2">
                 <button
                   onClick={saveReceipt}
                   disabled={savingReceipt}
-                  className="h-7 px-4 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-extrabold disabled:opacity-50 flex items-center"
+                  className="h-7 px-5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-extrabold disabled:opacity-50 flex items-center"
                   data-testid="home-save-button"
                 >
-                  {savingReceipt ? <Loader2 className="w-3 h-3 animate-spin" /> : "SAVE"}
+                  {savingReceipt ? <Loader2 className="w-3 h-3 animate-spin" /> : "GUARDAR"}
                 </button>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
