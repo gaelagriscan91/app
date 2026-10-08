@@ -1,18 +1,24 @@
 import { useEffect, useState } from "react";
-import { Loader2, Wheat, DollarSign, Users, Calendar, Trash2 } from "lucide-react";
+import { Loader2, Clock, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import api, { formatCurrency, formatNumber, todayISO } from "@/lib/api";
+import api, { formatNumber, todayISO } from "@/lib/api";
 
 export default function ListaDia() {
   const [date, setDate] = useState(todayISO());
-  const [data, setData] = useState(null);
+  const [attendance, setAttendance] = useState([]);
+  const [harvestsByWorker, setHarvestsByWorker] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [addingId, setAddingId] = useState(null);
 
   const load = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get("/harvests/daily", { params: { date } });
-      setData(data);
+      const [attRes, dailyRes] = await Promise.all([
+        api.get("/attendance", { params: { date } }),
+        api.get("/harvests/daily", { params: { date } }),
+      ]);
+      setAttendance(attRes.data?.rows || []);
+      setHarvestsByWorker(dailyRes.data?.by_worker || []);
     } catch (e) {
       toast.error("No se pudo cargar la lista del día");
     } finally {
@@ -25,14 +31,21 @@ export default function ListaDia() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date]);
 
-  const onDelete = async (id) => {
-    if (!window.confirm("¿Eliminar este registro de cosecha?")) return;
+  // Workers working today but without check-in attendance
+  const checkedInIds = new Set(attendance.filter((a) => a.check_in).map((a) => a.worker_id));
+  const missingCheckIn = harvestsByWorker.filter((w) => !checkedInIds.has(w.worker_id));
+
+  const addCheckIn = async (workerId, workerName) => {
+    if (!workerId) return;
+    setAddingId(workerId);
     try {
-      await api.delete(`/harvests/${id}`);
-      toast.success("Registro eliminado");
-      load();
+      await api.post("/attendance/scan", { code: workerId, date });
+      toast.success(`Entrada registrada: ${workerName}`);
+      await load();
     } catch (e) {
-      toast.error("No se pudo eliminar");
+      toast.error(e.response?.data?.detail || "No se pudo registrar entrada");
+    } finally {
+      setAddingId(null);
     }
   };
 
@@ -43,7 +56,7 @@ export default function ListaDia() {
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1A2210] tracking-tight" style={{ fontFamily: "Outfit, sans-serif" }}>
             Lista del día
           </h1>
-          <p className="text-sm text-[#556047] font-semibold">Totales y detalle de cosechas</p>
+          <p className="text-sm text-[#556047] font-semibold">Entradas y horas de trabajadores</p>
         </div>
         <div>
           <label className="block text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">Fecha</label>
@@ -57,67 +70,93 @@ export default function ListaDia() {
         </div>
       </div>
 
-      {/* Totals */}
-      <div className="grid grid-cols-1 gap-3">
-        <div className="rounded-2xl bg-white border-2 border-[#E2DDD0] p-4 shadow-sm" data-testid="daily-total-units">
-          <div className="flex items-center justify-between">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-[#556047]">Unidades</div>
-            <Calendar className="w-5 h-5 text-[#889078]" />
-          </div>
-          <div className="font-mono-stat text-2xl sm:text-3xl mt-1 text-[#1A2210]">{formatNumber(data?.total_units || 0, 0)}</div>
-        </div>
-      </div>
-
       {loading ? (
         <div className="flex items-center justify-center py-10 text-[#1D4ED8]">
           <Loader2 className="w-6 h-6 animate-spin" />
         </div>
       ) : (
         <>
-          {/* Harvests detail */}
-          <div className="field-card p-4 sm:p-5">
-            <h3 className="text-lg font-bold text-[#1A2210] mb-3" style={{ fontFamily: "Outfit, sans-serif" }}>
-              Detalle de cosechas
+          {/* Section 1: Workers with check-in */}
+          <div className="field-card p-4 sm:p-5" data-testid="checked-in-section">
+            <h3 className="text-base font-bold text-[#1A2210] mb-3 flex items-center gap-2" style={{ fontFamily: "Outfit, sans-serif" }}>
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+              Con entrada <span className="text-sm font-semibold text-[#556047]">· {attendance.length}</span>
             </h3>
-            {(data?.harvests || []).length === 0 ? (
-              <p className="text-sm text-[#556047] font-semibold py-4 text-center" data-testid="empty-harvests">
-                No hay cosechas registradas en esta fecha
+            {attendance.length === 0 ? (
+              <p className="text-sm text-[#556047] font-semibold py-4 text-center" data-testid="empty-checked-in">
+                Nadie tiene entrada registrada en esta fecha
               </p>
             ) : (
-              <div className="space-y-2">
-                {data.harvests.map((h) => (
+              <div className="divide-y divide-[#E2DDD0]">
+                {attendance.map((a) => (
                   <div
-                    key={h.id}
-                    className="p-3 bg-white border border-[#E2DDD0] rounded-xl flex items-start justify-between gap-3"
-                    data-testid={`harvest-row-${h.id}`}
+                    key={a.id || a._id || a.worker_id}
+                    className="flex items-center justify-between py-3 gap-3"
+                    data-testid={`attendance-row-${a.worker_id}`}
                   >
-                    <div className="flex-1 min-w-0">
-                      <div className="font-bold text-[#1A2210]">
-                        {h.worker_name} <span className="text-[#889078] font-semibold text-sm">• {h.product_name}</span>
-                      </div>
-                      <div className="text-xs text-[#556047] font-semibold mt-0.5">
-                        {h.parcel_name} • {formatNumber(h.kilos, 2)} Kg • {formatNumber(h.units, 0)} u.
-                      </div>
-                      {h.notes ? (
-                        <div className="text-xs text-[#889078] italic mt-1 truncate">{h.notes}</div>
-                      ) : null}
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-[#1A2210] truncate">{a.worker_name}</div>
+                      <div className="text-xs text-[#556047] font-semibold">{date}</div>
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <div className="font-mono-stat text-base text-[#1D4ED8]">{formatCurrency(h.payment)}</div>
-                      <button
-                        onClick={() => onDelete(h.id)}
-                        className="text-red-600 hover:bg-red-50 w-8 h-8 rounded-lg flex items-center justify-center"
-                        data-testid={`harvest-delete-${h.id}`}
-                        aria-label="Eliminar"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                    <div className="text-right shrink-0">
+                      <div className="flex items-center gap-1.5 text-sm font-extrabold text-[#1A2210]">
+                        <Clock className="w-3.5 h-3.5 text-[#556047]" />
+                        <span className="font-mono-stat">{a.check_in_hhmm || "--:--"}</span>
+                        {a.check_out_hhmm ? (
+                          <>
+                            <span className="text-[#889078]">→</span>
+                            <span className="font-mono-stat">{a.check_out_hhmm}</span>
+                          </>
+                        ) : null}
+                      </div>
+                      {a.hours ? (
+                        <div className="text-[11px] text-[#556047] font-semibold font-mono-stat">
+                          {formatNumber(a.hours, 2)} h
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
+
+          {/* Section 2: Workers in harvests but WITHOUT check-in */}
+          {missingCheckIn.length > 0 && (
+            <div className="field-card p-4 sm:p-5 border-2 border-red-200 bg-red-50/40" data-testid="missing-checkin-section">
+              <h3 className="text-base font-bold text-red-900 mb-1 flex items-center gap-2" style={{ fontFamily: "Outfit, sans-serif" }}>
+                <AlertCircle className="w-4 h-4" />
+                Sin entrada <span className="text-sm font-semibold text-red-800/80">· {missingCheckIn.length}</span>
+              </h3>
+              <p className="text-xs text-red-800/80 font-semibold mb-3">
+                Están trabajando pero no tienen entrada. Toca para registrarla.
+              </p>
+              <div className="divide-y divide-red-200/70">
+                {missingCheckIn.map((w) => (
+                  <button
+                    key={w.worker_id}
+                    onClick={() => addCheckIn(w.worker_id, w.worker_name)}
+                    disabled={addingId === w.worker_id}
+                    className="w-full flex items-center justify-between py-3 gap-3 text-left hover:bg-red-100/40 rounded-lg px-2 -mx-2 transition disabled:opacity-60"
+                    data-testid={`missing-checkin-${w.worker_id}`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0 animate-pulse" />
+                      <div className="min-w-0">
+                        <div className="font-bold text-[#1A2210] truncate">{w.worker_name}</div>
+                        <div className="text-xs text-[#556047] font-semibold truncate">
+                          {date} · {formatNumber(w.units, 0)} u. · {w.count} registro{w.count !== 1 ? "s" : ""}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-xs font-extrabold text-red-700 shrink-0">
+                      {addingId === w.worker_id ? <Loader2 className="w-4 h-4 animate-spin" /> : "+ Entrada"}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

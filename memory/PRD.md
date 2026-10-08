@@ -31,6 +31,7 @@ Agricultural harvest tracking web app (PickTrace-style). Register harvest (Worke
 - [2026-02-08k] **Lista del día: eliminado "Resumen por trabajador"**: Removida la card "Resumen por trabajador" (`by_worker`) de `ListaDia.jsx`. Queda sólo la tarjeta Unidades + "Detalle de cosechas".
 - [2026-02-08l] **Reportes: aviso "Empezar temporada nueva" removido**: La caja roja con ícono + título "Empezar temporada nueva" y descripción fue eliminada en `Reportes.jsx`. Queda solo el botón "Borrar todo" alineado a la derecha, que sigue abriendo el modal de confirmación.
 - [2026-02-08m] **Reportes: card Fecha eliminada + Compartir reporte eliminado**: Removido el wrapper `field-card` del bloque Fecha (ahora los campos quedan sueltos sin fondo), removido el botón "Compartir reporte" y su texto de ayuda ("Abre tu bandeja de compartir..."). Queda: input Hasta + fila Aplicar filtros / Exportar a Excel.
+- [2026-02-08n] **Lista del día rediseñada**: Reescrita por completo `ListaDia.jsx`. Ya no muestra totales/detalle de cosechas. Ahora carga en paralelo `/attendance?date=` + `/harvests/daily?date=` y presenta dos secciones: **Con entrada** (verde, lista los trabajadores con check-in, hora de entrada→salida y horas trabajadas) y **Sin entrada** (rojo, muestra con punto rojo pulsando a los trabajadores con cosechas pero sin check-in; al tocar la fila dispara `POST /attendance/scan` con el worker_id y les registra la entrada automáticamente). Se removió card Unidades, Resumen por trabajador y Detalle de cosechas.
 
 ## Backlog (P1/P2)
 - P1 — Export por trabajador (Nómina)
