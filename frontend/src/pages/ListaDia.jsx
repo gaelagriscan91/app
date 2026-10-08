@@ -58,22 +58,8 @@ export default function ListaDia() {
       </div>
 
       {/* Totals */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-        <div className="rounded-2xl bg-[#1D4ED8] text-white p-4 border-2 border-[#1E3A8A] shadow-sm" data-testid="daily-total-kilos">
-          <div className="flex items-center justify-between">
-            <div className="text-[11px] font-bold uppercase tracking-wider opacity-90">Total kilos</div>
-            <Wheat className="w-5 h-5 opacity-85" />
-          </div>
-          <div className="font-mono-stat text-2xl sm:text-3xl mt-1">{formatNumber(data?.total_kilos || 0, 2)} <span className="text-base">Kg</span></div>
-        </div>
-        <div className="rounded-2xl bg-[#DC2626] text-white p-4 border-2 border-[#B91C1C] shadow-sm" data-testid="daily-total-payment">
-          <div className="flex items-center justify-between">
-            <div className="text-[11px] font-bold uppercase tracking-wider opacity-90">Total a pagar</div>
-            <DollarSign className="w-5 h-5 opacity-85" />
-          </div>
-          <div className="font-mono-stat text-2xl sm:text-3xl mt-1">{formatCurrency(data?.total_payment || 0)}</div>
-        </div>
-        <div className="rounded-2xl bg-white border-2 border-[#E2DDD0] p-4 shadow-sm col-span-2 lg:col-span-1" data-testid="daily-total-units">
+      <div className="grid grid-cols-1 gap-3">
+        <div className="rounded-2xl bg-white border-2 border-[#E2DDD0] p-4 shadow-sm" data-testid="daily-total-units">
           <div className="flex items-center justify-between">
             <div className="text-[11px] font-bold uppercase tracking-wider text-[#556047]">Unidades</div>
             <Calendar className="w-5 h-5 text-[#889078]" />
