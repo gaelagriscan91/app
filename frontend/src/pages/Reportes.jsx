@@ -325,7 +325,7 @@ export default function Reportes() {
             <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="field-input !h-12 !text-base" data-testid="filter-date-to" />
           </div>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex flex-row gap-2">
           <button onClick={load} className="field-btn-secondary flex-1" data-testid="apply-filters-button">
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Aplicar filtros"}
           </button>

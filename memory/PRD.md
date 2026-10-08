@@ -26,6 +26,7 @@ Agricultural harvest tracking web app (PickTrace-style). Register harvest (Worke
 - [2026-02-08f] **Barra inferior oscura con SCAN redondo**: El bottom bar del scanner se rediseñó completo. Fila única en gris oscuro `#1F2937` con 3 columnas: (izq) label "EMPLEADOS" + chips rojos 3/4·1/2·1/4; (centro) botón redondo rojo grande SCAN que hace +1 al último trabajador o abre picker manual si no hay; (der) contador "unidad N" + tarjeta roja del último trabajador (nombre, count, pago) + botón blanco SAVE. Reemplaza los antiguos controles azules con totals de jornada, botones +/-, y el Guardar separado.
 - [2026-02-08g] **Día: eliminar cards Total Kilos y Total a Pagar**: En la pantalla "Día" (`ListaDia.jsx`) se removieron las tarjetas azul "Total kilos" y roja "Total a pagar". Queda únicamente la tarjeta "Unidades" en una sola columna.
 - [2026-02-08h] **Reportes: filtros y totales simplificados**: Removidos filtros "Desde", "Trabajador", "Parcela" y "Producto" (queda solo "Hasta"). Removidas tarjetas totales (Kilos/Unidades/Total Pago). En su lugar se agregó bloque "Resumen por trabajador" en `Reportes.jsx` con nombre, kilos, unidades, # registros y pago por trabajador agregado desde `rows`.
+- [2026-02-08i] **Reportes: layout mobile = desktop**: Título "Filtros" → "Fecha". Botones Aplicar filtros / Exportar a Excel ahora quedan lado a lado en mobile (removido `flex-col sm:flex-row`, ahora siempre `flex-row`). Mantiene Compartir reporte full-width debajo.
 
 ## Backlog (P1/P2)
 - P1 — Export por trabajador (Nómina)
