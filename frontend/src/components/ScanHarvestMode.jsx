@@ -143,7 +143,10 @@ export default function ScanHarvestMode() {
         setParcelName(parcel.name || "");
         setProductId(product.id);
         setUnitLabel(product.unit_label || "pieza");
-        const pu = Number(product.price_per_unit) || 0;
+        // Prefer price from Check-In session (localStorage) over the product's default
+        const sessionPrice = session.pricePerUnit;
+        const hasSessionPrice = sessionPrice !== undefined && sessionPrice !== null && sessionPrice !== "" && !Number.isNaN(Number(sessionPrice));
+        const pu = hasSessionPrice ? Number(sessionPrice) : (Number(product.price_per_unit) || 0);
         if (pu > 0) setPricePerUnit(String(pu));
         setReady(true);
         // Load today's attendance so we can gate scans by check-in
