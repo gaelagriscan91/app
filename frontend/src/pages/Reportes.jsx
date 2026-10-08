@@ -287,16 +287,7 @@ export default function Reportes() {
 
       {tab === "recibos" ? <RecibosTab /> : (
       <>
-      {/* Danger zone — reset history (admin only) */}
-      <div className="flex justify-end">
-        <button
-          onClick={() => setShowReset(true)}
-          className="h-10 px-3 bg-red-600 hover:bg-red-700 text-white font-extrabold rounded-xl flex items-center gap-1.5 shadow-sm"
-          data-testid="open-reset-modal"
-        >
-          <Trash2 className="w-4 h-4" /> Borrar todo
-        </button>
-      </div>
+      {/* Danger zone — reset button now lives inline in the filter row below */}
 
       {/* Filters — standalone, no card wrapper */}
       <div className="space-y-3">
@@ -311,10 +302,17 @@ export default function Reportes() {
           <button
             onClick={exportExcel}
             disabled={exporting || rows.length === 0}
-            className="field-btn-accent flex-1 disabled:opacity-60 !rounded-l-none"
+            className="field-btn-accent flex-1 disabled:opacity-60 !rounded-none !border-r-0"
             data-testid="export-excel-button"
           >
             {exporting ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Download className="w-5 h-5" /> Exportar a Excel</>}
+          </button>
+          <button
+            onClick={() => setShowReset(true)}
+            className="h-12 px-4 bg-red-600 hover:bg-red-700 text-white font-extrabold rounded-xl !rounded-l-none flex items-center justify-center gap-1.5 shadow-sm shrink-0"
+            data-testid="open-reset-modal"
+          >
+            <Trash2 className="w-4 h-4" /> Borrar
           </button>
         </div>
       </div>
