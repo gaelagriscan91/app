@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Loader2, Plus, ScanLine, Moon, RefreshCw, Cloud,
   SlidersHorizontal, Search, Trash2, LogOut,
@@ -9,6 +9,8 @@ import api, { formatCurrency, formatNumber } from "@/lib/api";
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [showSavePrompt, setShowSavePrompt] = useState(false);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState("");
@@ -27,6 +29,16 @@ export default function Dashboard() {
   };
 
   useEffect(() => { load(); }, []);
+
+  // Show save prompt sheet when the scanner returns with ?prompt=save
+  useEffect(() => {
+    if (searchParams.get("prompt") === "save") {
+      setShowSavePrompt(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete("prompt");
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const deleteHarvest = async (id, workerName) => {
     if (!window.confirm(`¿Borrar las piezas de ${workerName}?`)) return;
@@ -99,6 +111,7 @@ export default function Dashboard() {
       const now = new Date().toISOString();
       try { localStorage.setItem("agriscan.lastSavedAt", now); } catch (_) {}
       setSavedAt(now);
+      setShowSavePrompt(false);
       toast.success("Recibo guardado");
       await load();
     } catch (e) {
@@ -330,6 +343,67 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Save prompt bottom-sheet — shown after a scan returns via ?prompt=save */}
+      {showSavePrompt && (
+        <div
+          className="fixed inset-0 z-50 flex items-end bg-black/60 backdrop-blur-sm"
+          onClick={() => setShowSavePrompt(false)}
+          data-testid="save-prompt-sheet"
+        >
+          <div
+            className="w-full bg-[#1A1A1A] text-white rounded-t-3xl p-5 pb-[max(env(safe-area-inset-bottom),20px)] shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-10 h-1.5 bg-white/20 rounded-full mx-auto mb-4" />
+            {lastEntry ? (
+              <>
+                <h3 className="text-xl font-extrabold text-center" style={{ fontFamily: "Outfit, sans-serif" }}>
+                  ¿Guardar recibo?
+                </h3>
+                <p className="text-sm text-gray-300 text-center mt-1">
+                  Último escaneo: <span className="font-bold text-white">{lastEntry.worker_name}</span>
+                </p>
+                <div className="mt-5 space-y-2">
+                  <button
+                    onClick={saveReceipt}
+                    disabled={savingReceipt}
+                    className="w-full h-14 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-extrabold text-lg flex items-center justify-center gap-2 shadow-lg disabled:opacity-60"
+                    data-testid="save-prompt-save-btn"
+                    style={{ fontFamily: "Outfit, sans-serif" }}
+                  >
+                    {savingReceipt ? <Loader2 className="w-5 h-5 animate-spin" /> : "SAVE"}
+                  </button>
+                  <button
+                    onClick={() => { setShowSavePrompt(false); navigate("/registrar?mode=qr"); }}
+                    className="w-full h-12 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm flex items-center justify-center gap-2"
+                    data-testid="save-prompt-continue-btn"
+                  >
+                    Seguir escaneando
+                  </button>
+                  <button
+                    onClick={() => setShowSavePrompt(false)}
+                    className="w-full h-11 text-gray-400 hover:text-white font-semibold text-sm"
+                    data-testid="save-prompt-close-btn"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-6">
+                <p className="text-sm text-gray-300">No hay escaneos pendientes</p>
+                <button
+                  onClick={() => setShowSavePrompt(false)}
+                  className="mt-4 h-11 px-6 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm"
+                >
+                  Cerrar
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

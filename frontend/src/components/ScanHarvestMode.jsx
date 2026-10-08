@@ -328,9 +328,9 @@ export default function ScanHarvestMode() {
       return { ...prev, [w.id]: { name: w.name, count: cur.count + 1 } };
     });
     logScan(w, "qr");
-    // Auto-return to Dashboard so the user sees the scan in the list and can save
+    // Auto-return to Dashboard and prompt the user to save
     toast.success(`${w.name} escaneado`, { duration: 1500 });
-    setTimeout(() => navigate("/"), 350);
+    setTimeout(() => navigate("/?prompt=save"), 350);
   };
 
   const addManual = (workerId) => {
