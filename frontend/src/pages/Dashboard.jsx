@@ -13,6 +13,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState("");
   const [search, setSearch] = useState("");
+  const [savingReceipt, setSavingReceipt] = useState(false);
+  const [applyingFrac, setApplyingFrac] = useState(null);
 
   const load = async () => {
     try {
@@ -60,6 +62,45 @@ export default function Dashboard() {
     const nonPending = (data?.month_records || []).filter((r) => !r.pending);
     return nonPending[0] || null;
   }, [data]);
+
+  // Apply fraction (1/4, 1/2, 3/4) to the LAST scanned harvest — replaces its units value
+  const applyFractionToLast = async (frac) => {
+    if (!lastEntry) { toast.error("Escanea primero a un trabajador"); return; }
+    setApplyingFrac(frac);
+    try {
+      await api.put(`/harvests/${lastEntry.id}`, {
+        worker_id: lastEntry.worker_id,
+        parcel_id: lastEntry.parcel_id,
+        product_id: lastEntry.product_id,
+        kilos: 0,
+        units: frac,
+        price_per_kg: lastEntry.price_per_kg || 0,
+        price_per_unit: lastEntry.price_per_unit || 0,
+        date: lastEntry.date,
+      });
+      toast.success(`${lastEntry.worker_name}: ${frac === 0.25 ? "1/4" : frac === 0.5 ? "1/2" : "3/4"}`);
+      await load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "No se pudo aplicar la fracción");
+    } finally {
+      setApplyingFrac(null);
+    }
+  };
+
+  // SAVE — snapshot today's receipts into history
+  const saveReceipt = async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    setSavingReceipt(true);
+    try {
+      await api.post("/receipts/history", { date_from: today, date_to: today });
+      toast.success("Recibo guardado");
+      await load();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "No hay actividad para guardar");
+    } finally {
+      setSavingReceipt(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -211,11 +252,12 @@ export default function Dashboard() {
                 {[{ f: 0.25, l: "1/4" }, { f: 0.5, l: "1/2" }, { f: 0.75, l: "3/4" }].map(({ f, l }) => (
                   <button
                     key={l}
-                    onClick={() => navigate(`/registrar?fraction=${f}`)}
-                    className="h-7 rounded-md bg-[#DC2626] hover:bg-[#B91C1C] text-white text-[10px] font-extrabold"
+                    onClick={() => applyFractionToLast(f)}
+                    disabled={!lastEntry || applyingFrac !== null}
+                    className="h-7 rounded-md bg-[#DC2626] hover:bg-[#B91C1C] text-white text-[10px] font-extrabold disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
                     data-testid={`home-frac-${l.replace("/", "-")}`}
                   >
-                    {l}
+                    {applyingFrac === f ? <Loader2 className="w-3 h-3 animate-spin" /> : l}
                   </button>
                 ))}
               </div>
@@ -240,17 +282,22 @@ export default function Dashboard() {
                 Pieza {todayCount}
               </div>
               {lastEntry ? (
-                <button
-                  onClick={() => navigate("/reportes")}
-                  className="w-full rounded-md bg-[#DC2626] text-white px-1.5 py-1 flex items-center gap-1.5 text-[10px] font-extrabold shadow"
-                  data-testid="home-last-entry"
-                >
-                  <span className="truncate flex-1 text-left">{lastEntry.worker_name}</span>
-                  <span className="font-mono-stat text-sm leading-none">
-                    {formatNumber(lastEntry.units, lastEntry.units % 1 === 0 ? 0 : 2)}
-                  </span>
-                  <span className="bg-white/20 rounded px-1 py-0.5 text-[9px]">SAVE</span>
-                </button>
+                <div className="flex items-center gap-1">
+                  <div className="flex-1 min-w-0 rounded-md bg-[#2A2A2A] text-white px-1.5 py-1 flex items-center gap-1.5 text-[10px] font-extrabold">
+                    <span className="truncate flex-1 text-left">{lastEntry.worker_name}</span>
+                    <span className="font-mono-stat text-sm leading-none">
+                      {formatNumber(lastEntry.units, lastEntry.units % 1 === 0 ? 0 : 2)}
+                    </span>
+                  </div>
+                  <button
+                    onClick={saveReceipt}
+                    disabled={savingReceipt || !lastEntry}
+                    className="h-7 px-2 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-extrabold disabled:opacity-50 flex items-center"
+                    data-testid="home-save-button"
+                  >
+                    {savingReceipt ? <Loader2 className="w-3 h-3 animate-spin" /> : "SAVE"}
+                  </button>
+                </div>
               ) : (
                 <div className="h-6" />
               )}
