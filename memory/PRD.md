@@ -1,62 +1,43 @@
 # AgriScan — PRD
 
-## Original problem statement
-Agricultural harvest tracking web app (PickTrace-style). Register harvest (Worker, Parcel, Product, Kilos, Date, Photo), auto-calc pay by price/kilo or price/unit, daily list with totals, Excel export, modules for Workers / Parcels / Harvests, offline/online sync, thermal printer. Spanish UI.
+## Problema original
+Crear una app de registro de cosecha estilo PickTrace para equipos agrícolas:
+- Registrar cosecha (Trabajador, Parcela, Producto, Kilos/Piezas, Fecha, Foto)
+- Calcular pago automáticamente por kilo/pieza/hora
+- Lista del día con totales
+- Reportes con exportación Excel
+- Módulos de Trabajadores, Parcelas, Cosechas
+- Sincronización offline/online e impresión térmica (ESC/POS)
+- Multi-tenancy (Admin vs Mayordomos) y empaquetado Android vía Capacitor
 
-## Core architecture
-- React + Tailwind + Shadcn UI (frontend)
-- FastAPI + Motor + MongoDB (backend, multi-tenant via `owner_id` scope)
-- JWT auth; Admin creates Mayordomo sub-accounts
-- HTML5-QRCode for camera scanning; Web Bluetooth ESC/POS thermal printing
+## Arquitectura
+- Frontend: React + Tailwind + Shadcn (en `/app/frontend`)
+- Backend: FastAPI + MongoDB Motor (en `/app/backend/server.py`)
+- Android: Capacitor (en `/app/frontend/android`) con CI vía GitHub Actions
 
-## Implemented
-- [2026-02] Hub PickTrace (Check In / Picking / Check Out)
-- [2026-02] Pre-session modal (Rancho / Mayordomo / Trabajo)
-- [2026-02] Picking modes: Por Pieza, Por Hora, Compartir pieza
-- [2026-02] QR anti-fraud cooldown + beep + camera auto-pause + scan history
-- [2026-02] Multi-tenancy (Admin oversees all, Mayordomos isolated)
-- [2026-02] Product price lock + override
-- [2026-02] End-Day modal (summary + session reset)
-- [2026-10-04] **Minimalist Cosechar screen**: Both Manual and Escanear tabs now only show Price + Scan/Manual + Save. Parcel/Product/Date resolved automatically (session → first available → auto-create "Rancho General" + "Cosecha"). Removed setup form, pay-mode toggle, share toggle, scan-mode toggle, photo + notes.
-- [2026-02-08] **Check In header rediseño inline**: El header azul de la pantalla Check In ahora muestra Rancho/Block (izq) + Trabajo/Variedad (der) lado a lado + fila Precio por unidad / Precio por hora. Todos los campos abren el modal "Antes de empezar" al tocarlos. El modal fue extendido con 4 nuevos inputs: Block, Variedad, Precio por unidad, Precio por hora. Persisten en localStorage por día. Botones Pieza/Libra/Horas del header son independientes del selector del escáner.
-- [2026-02-08b] **Modal "Antes de empezar" eliminado**: Reemplazado por completo con inputs editables inline directamente dentro del header azul del Check In. Al tocar la tile "Check in" entra directo a la vista. Cada input persiste via `saveSession` en el blur. Rancho y Trabajo crean la entidad en backend (`/parcels`, `/products`) automáticamente si el nombre no existe. Componente `SessionModal` + estado `sessionModalOpen` removidos de Asistencia.jsx (284 líneas menos).
-- [2026-02-08c] **Scanner (Cosechar) limpieza top controls**: Removido del scanner QR el card "PRECIO · 1 unidad" (top-left), el toggle de unidad pza/hr/lb, el botón de pausar/reanudar cámara (top-right) y el pill "Compartir" (debajo). Ya están en Check In. Las fracciones (1/4·1/2·3/4) siguen apareciendo solo después de escanear un trabajador.
-- [2026-02-08d] **Scanner hereda el precio del Check-In**: Al abrir Cosechar, el `pricePerUnit` se lee primero de `localStorage['agriscan.session.<fecha>'].pricePerUnit` (configurado desde el header del Check In) y solo cae al `product.price_per_unit` como respaldo. Ya no muestra el toast "Pon el precio antes de guardar" si el usuario ya puso el precio en Check In.
-- [2026-02-08e] **Toggle Pieza/Libra/Horas persistido**: El selector del header Check In ahora guarda `session.unitMode` en localStorage. El scanner (Cosechar) lo lee en el `init` y mapea a `unitLabel` (`pieza`→`pieza`, `libra`→`libra`, `horas`→`hora`). Cuando `unitMode='libra'`, al escanear un trabajador se abre automáticamente el modal numérico `lbPrompt` para capturar el peso en libras. Cuando `unitMode='horas'`, el precio usa `session.pricePerHour` en vez de `pricePerUnit`.
-- [2026-02-08f] **Barra inferior oscura con SCAN redondo**: El bottom bar del scanner se rediseñó completo. Fila única en gris oscuro `#1F2937` con 3 columnas: (izq) label "EMPLEADOS" + chips rojos 3/4·1/2·1/4; (centro) botón redondo rojo grande SCAN que hace +1 al último trabajador o abre picker manual si no hay; (der) contador "unidad N" + tarjeta roja del último trabajador (nombre, count, pago) + botón blanco SAVE. Reemplaza los antiguos controles azules con totals de jornada, botones +/-, y el Guardar separado.
-- [2026-02-08g] **Día: eliminar cards Total Kilos y Total a Pagar**: En la pantalla "Día" (`ListaDia.jsx`) se removieron las tarjetas azul "Total kilos" y roja "Total a pagar". Queda únicamente la tarjeta "Unidades" en una sola columna.
-- [2026-02-08h] **Reportes: filtros y totales simplificados**: Removidos filtros "Desde", "Trabajador", "Parcela" y "Producto" (queda solo "Hasta"). Removidas tarjetas totales (Kilos/Unidades/Total Pago). En su lugar se agregó bloque "Resumen por trabajador" en `Reportes.jsx` con nombre, kilos, unidades, # registros y pago por trabajador agregado desde `rows`.
-- [2026-02-08i] **Reportes: layout mobile = desktop**: Título "Filtros" → "Fecha". Botones Aplicar filtros / Exportar a Excel ahora quedan lado a lado en mobile (removido `flex-col sm:flex-row`, ahora siempre `flex-row`). Mantiene Compartir reporte full-width debajo.
-- [2026-02-08j] **Reportes: eliminada tabla de Detalle de cosechas**: Removida la tabla desktop + la lista mobile stacked (`field-card overflow-hidden` con rows[]) al final de Reportes porque el detalle ya existe en el Registro del escáner. Queda únicamente el bloque "Resumen por trabajador".
-- [2026-02-08k] **Lista del día: eliminado "Resumen por trabajador"**: Removida la card "Resumen por trabajador" (`by_worker`) de `ListaDia.jsx`. Queda sólo la tarjeta Unidades + "Detalle de cosechas".
-- [2026-02-08l] **Reportes: aviso "Empezar temporada nueva" removido**: La caja roja con ícono + título "Empezar temporada nueva" y descripción fue eliminada en `Reportes.jsx`. Queda solo el botón "Borrar todo" alineado a la derecha, que sigue abriendo el modal de confirmación.
-- [2026-02-08m] **Reportes: card Fecha eliminada + Compartir reporte eliminado**: Removido el wrapper `field-card` del bloque Fecha (ahora los campos quedan sueltos sin fondo), removido el botón "Compartir reporte" y su texto de ayuda ("Abre tu bandeja de compartir..."). Queda: input Hasta + fila Aplicar filtros / Exportar a Excel.
-- [2026-02-08n] **Lista del día rediseñada**: Reescrita por completo `ListaDia.jsx`. Ya no muestra totales/detalle de cosechas. Ahora carga en paralelo `/attendance?date=` + `/harvests/daily?date=` y presenta dos secciones: **Con entrada** (verde, lista los trabajadores con check-in, hora de entrada→salida y horas trabajadas) y **Sin entrada** (rojo, muestra con punto rojo pulsando a los trabajadores con cosechas pero sin check-in; al tocar la fila dispara `POST /attendance/scan` con el worker_id y les registra la entrada automáticamente). Se removió card Unidades, Resumen por trabajador y Detalle de cosechas.
-- [2026-02-08o] **Reportes: grid 2x2 compacto**: Los botones se reorganizaron en una grilla 2×2: fila 1 = `[Aplicar filtros][Exportar a Excel]`, fila 2 = `[input Hasta][Borrar todo]`. Removido el label "HASTA" visible y el stack vertical.
-- [2026-02-08p] **Reportes: Resumen por trabajador expandible con detalle**: El bloque Resumen ahora llama `/api/receipts?date_from&date_to` (ya existente en backend) y por cada trabajador muestra fila compacta (unidades · horas · registros · total $) con flecha. Al tocar expande sub-secciones: Cosechas (fecha, rancho=parcel_name, trabajo=product_name, unidades, precio/u, pago) y Horas (fecha, entrada→salida, horas por día, total horas). Block/Variedad están pendientes de persistir en harvests para poder mostrarse históricamente.
-- [2026-02-08q] **Módulos: Cuadrilla ahora muestra Recibos por mayordomo**: Creado `MayordomoReceiptsTab.jsx` que llama `/receipts/history`, agrupa por `saved_by_name`+`saved_by_role` y lista cada mayordomo (y admin) con contador de recibos, trabajadores, horas y total. Al tocar expande para ver cada recibo individual con fecha, workers_count, horas y pago. En `Modulos.jsx` se reemplazó `<CrewsTab />` por `<MayordomoReceiptsTab />` y el label "Cuadrillas" por "Cuadrilla".
-- [2026-02-08r] **Cuadrilla: excluir recibos de admin**: Ajustado el filtro de `MayordomoReceiptsTab` para excluir `saved_by_role === "admin"` (default de usuarios normales es `"user"`, no `"mayordomo"`). Ahora solo aparecen los recibos guardados por mayordomos/usuarios no-admin.
-- [2026-02-08s] **Módulos: eliminados Parcelas y Productos**: Removidos los tabs "Parcelas" y "Productos" + sus imports de `Modulos.jsx`. Queda: Trabajadores · Cuadrilla · Registro (+ Mayordomos para admin).
-- [2026-02-08t] **Mayordomos: botones Bloquear/Desbloquear**: Agregado botón amarillo "Bloquear" (verde "Desbloquear" si inactivo) en cada card de mayordomo. Dispara `PATCH /admin/mayordomos/{id}` con `active: !current`. Editar y Eliminar quedan como íconos aparte.
-- [2026-02-08u] **Backend: Mayordomos pueden borrar su historial**: Removido el check `role != "admin"` del endpoint `POST /harvests/reset`. El `scope_filter(user)` ya aisla datos por usuario, así que cada mayordomo solo borra su propio historial de cosechas y asistencias.
-- [2026-02-08v] **Mayordomos: acceso con fecha de expiración automática**: Agregado campo `access_days` opcional a `MayordomoCreate` + `MayordomoUpdate`. Backend calcula `access_expires_at = now + N días` al guardar. El login (no-admin) chequea `access_expires_at < now` → auto marca `active=False` y rechaza con "Acceso vencido…". También bloquea cuentas `active=False` con mensaje "Cuenta bloqueada…". Frontend form: chips rápidos 7/14/30/60/90 + input personalizado + botón "Sin límite". Cards: badge "Faltan N días" ámbar o "Expiró el DD mmm" rojo.
-- [2026-02-08w] **Scanner ultra-limpio**: Eliminados botón "Lista", título "Cosechar", FAB rojo +trabajador, FAB reiniciar, label "Empleados", chips 3/4·1/2·1/4, placeholder "Enfoca el QR", tarjeta de último trabajador escaneado y botón SAVE. Queda únicamente: header COSECHANDO · <rancho> + X cerrar, cámara con viewfinder, botón redondo rojo SCAN y contador "UNIDAD N". El SCAN solo hace +1 al último trabajador escaneado (si hay).
-- [2026-02-08x] **Scanner totalmente limpio + auto-return**: Eliminada toda la barra inferior oscura (`#1F2937`) incluyendo botón SCAN y contador UNIDAD. Al escanear un QR exitosamente, muestra toast "{Nombre} escaneado" y auto-navega a `/` (Dashboard) después de 350ms para que el usuario vea la fila nueva en la lista y pueda tocar SAVE desde allí.
-- [2026-02-08y] **Scanner estilo iOS/nativo**: Rediseñado el scanner completo. Removido header azul. Agregados: X floating top-right, texto "Desliza hacia arriba/abajo para hacer zoom", viewfinder blanco con 4 esquinas + línea de escaneo amarilla, botón pill "Introducir código de barras manualmente", fila inferior con 3 controles redondos: Flash (`torch` via applyVideoConstraints), Zoom cíclico 1→2→3 (via `zoom` constraint) y Flip camera (alterna environment/user facingMode).
-- [2026-02-08z] **Dashboard: fracciones + SAVE funcionales**: Las fracciones 1/4·1/2·3/4 ahora llaman `PUT /harvests/{lastEntry.id}` reemplazando `units=frac` (antes solo navegaban). El pill derecho se separó en: tarjeta gris con `worker · units` + botón verde "SAVE" que dispara `POST /receipts/history` con `date_from=date_to=today`. Toast "Recibo guardado" al éxito. Fracciones y SAVE deshabilitados cuando no hay `lastEntry`.
-- [2026-02-09a] **Dashboard: barra inferior condicional + hora en registros**: La barra con fracciones + SCAN + SAVE ahora solo aparece cuando hay un escaneo NUEVO sin guardar (`lastEntry.created_at > savedAt` guardado en localStorage). Al presionar SAVE se guarda el timestamp y la barra desaparece hasta el próximo escaneo. Cada fila del listado ahora muestra `fecha · HH:MM` (hora del `created_at`) debajo del nombre del trabajador.
-- [2026-02-09b] **Dashboard: pill del trabajador reciente removida**: Eliminada la pill gris "`<trabajador> <units>`" del bottom bar (duplicaba el registro de la lista). Ahora el bottom bar derecho muestra solo PIEZA # y botón SAVE. El trabajador recién escaneado aparece ya en el registro superior con fecha + hora.
-- [2026-02-09c] **Dashboard: SCAN siempre visible**: El botón SCAN ya no desaparece después de guardar. Solo las fracciones (1/4·1/2·3/4) y la columna derecha (PIEZA + SAVE) se ocultan cuando no hay escaneo pendiente. Así el usuario puede seguir escaneando sin tener que buscar el botón.
+## Lo implementado hasta ahora
+- Autenticación JWT con cookies; roles admin/user (mayordomo)
+- Mayordomos con fecha de expiración y bloqueo manual
+- Pantalla Check-In (Asistencia.jsx) con campos editables inline que persisten en `localStorage`
+- Escáner QR fullscreen (ScanHarvestMode.jsx) estilo nativo (flash/zoom/flip)
+- Dashboard (Inicio) con botón SCAN central siempre visible
+- Barra inferior dinámica con fracciones (1/4, 1/2, 3/4) y SAVE cuando hay escaneo pendiente
+- Bottom-sheet "¿Guardar recibo?" al volver del escáner
+- Reportes y Lista del Día simplificados
+- Módulos: Trabajadores, Cuadrilla, Registro, Mayordomos (Parcelas y Productos removidos)
+- **(Nuevo 10/2026)** Inicio muestra únicamente los registros de escaneo; los check-ins (En campo) solo aparecen en Día/Registro
 
-## Backlog (P1/P2)
-- P1 — Export por trabajador (Nómina)
-- P2 — Generación de QR por pieza/canasta
-- P2 — Modo Revisión (bloqueo de jornadas auditadas)
-- P3 — Refactor backend/server.py (>1200 líneas → routers)
-- P3 — Refactor ScanHarvestMode (ya reducido con última simplificación)
+## Backlog priorizado
+### P1
+- Guardar Block y Variedad en el schema `harvests` para que aparezcan históricamente en Reportes
 
-## Known fragile points
-- `AudioContext` beep may not play on iOS Safari without initial user tap (frontend only).
+### P2
+- Generación de QR por pieza/canasta para modo "Escanear piezas"
+- Modo "Review" para bloquear jornada auditada
 
-## Test credentials
-See `/app/memory/test_credentials.md`.
+### P3
+- Refactor `server.py` (~1900 líneas) en routers (auth, workers, harvests, attendance)
+- Refactor `Dashboard.jsx` y `ScanHarvestMode.jsx` modularizando componentes
+
+## Credenciales de prueba
+Ver `/app/memory/test_credentials.md`

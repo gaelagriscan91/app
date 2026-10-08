@@ -62,7 +62,8 @@ export default function Dashboard() {
   };
 
   const rows = useMemo(() => {
-    const list = data?.month_records || [];
+    // Only show scan records in Inicio — check-ins live in Día/Registro
+    const list = (data?.month_records || []).filter((r) => !r.pending);
     const q = (search || "").trim().toLowerCase();
     if (!q) return list;
     return list.filter((r) => (r.worker_name || "").toLowerCase().includes(q));
