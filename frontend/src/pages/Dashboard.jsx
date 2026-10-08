@@ -62,12 +62,18 @@ export default function Dashboard() {
   };
 
   const rows = useMemo(() => {
-    // Only show scan records in Inicio — check-ins live in Día/Registro
-    const list = (data?.month_records || []).filter((r) => !r.pending);
+    const today = new Date().toISOString().slice(0, 10);
+    // Only show today's scan records that were already SAVEd (created_at <= savedAt)
+    const list = (data?.month_records || []).filter((r) => {
+      if (r.pending) return false;
+      if (r.date !== today) return false;
+      if (!savedAt) return false;
+      return (r.created_at || "") <= savedAt;
+    });
     const q = (search || "").trim().toLowerCase();
     if (!q) return list;
     return list.filter((r) => (r.worker_name || "").toLowerCase().includes(q));
-  }, [data, search]);
+  }, [data, search, savedAt]);
 
   const todayCount = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -212,7 +218,7 @@ export default function Dashboard() {
       <div className="px-4 mt-3 flex-1 overflow-y-auto">
         {rows.length === 0 ? (
           <div className="py-10 text-center text-sm text-gray-400 font-semibold">
-            {search ? "Sin coincidencias" : "Sin registros este mes aún"}
+            {search ? "Sin coincidencias" : "Sin registros guardados hoy"}
           </div>
         ) : (
           <ul className="space-y-2">
