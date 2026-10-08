@@ -716,8 +716,8 @@ export default function ScanHarvestMode() {
         )}
       </div>
 
-      {/* Blue bottom bar — last worker + totals (or shared-basket panel when active) */}
-      <div className="bg-[#2B55D1] text-white pb-[env(safe-area-inset-bottom)]" data-testid="scan-bottom-bar">
+      {/* Dark bottom action bar — Empleados · fractions · SCAN · last-worker card · SAVE */}
+      <div className="bg-[#1F2937] text-white pb-[env(safe-area-inset-bottom)]" data-testid="scan-bottom-bar">
         {shareMode && shareBuffer.length > 0 ? (
           <div className="px-4 pt-3 pb-2" data-testid="scan-share-panel">
             <div className="text-sm font-bold opacity-95 truncate" data-testid="scan-share-names">
@@ -755,112 +755,119 @@ export default function ScanHarvestMode() {
               </div>
             </div>
           </div>
-        ) : lastWorkerStats ? (
-          <div className="px-4 pt-3 pb-2">
-            <div className="text-sm font-bold opacity-90 truncate" data-testid="scan-last-worker-name">
-              {lastWorkerStats.name}
-            </div>
-            <div className="flex items-end gap-3 mt-1">
-              <div className="font-mono-stat text-5xl leading-none" data-testid="scan-last-worker-count">
-                {formatNumber(lastWorkerStats.count, lastWorkerStats.count % 1 === 0 ? 0 : 2)}
-              </div>
-              <div className="pb-1">
-                <div className="text-sm font-bold leading-tight">
-                  {unitLabel}{lastWorkerStats.count !== 1 ? "s" : ""}
-                </div>
-                <div className="text-xs opacity-85 leading-tight">
-                  {formatCurrency(lastWorkerStats.payment)}
-                </div>
-              </div>
-              <div className="ml-auto flex items-center gap-1">
-                <button
-                  onClick={() => bump(lastWorker.id, -1)}
-                  className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center"
-                  data-testid="scan-last-dec"
-                  aria-label="Restar"
-                >
-                  <Minus className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => bump(lastWorker.id, 1)}
-                  className="w-10 h-10 rounded-full bg-white text-[#2B55D1] hover:bg-white/90 flex items-center justify-center"
-                  data-testid="scan-last-inc"
-                  aria-label="Sumar"
-                >
-                  <Plus className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-            {/* Quick fraction selector — adjusts the last added piece */}
-            <div className="grid grid-cols-4 gap-1.5 mt-2">
-              {[
-                { frac: 1, label: "Completo", testid: "frac-full" },
-                { frac: 0.75, label: "3/4", testid: "frac-three-quarter" },
-                { frac: 0.5, label: "1/2", testid: "frac-half" },
-                { frac: 0.25, label: "1/4", testid: "frac-quarter" },
-              ].map(({ frac, label, testid }) => (
-                <button
-                  key={testid}
-                  onClick={() => markLastAs(frac)}
-                  className="h-9 rounded-lg bg-white/15 hover:bg-white/25 active:scale-[0.97] text-white font-extrabold text-xs flex items-center justify-center transition"
-                  data-testid={testid}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
         ) : (
-          <div className="px-4 py-5 text-center text-sm font-bold opacity-85" data-testid="scan-bottom-empty">
-            {shareMode ? "Escanea trabajadores para compartir la canasta…" : "Enfoca el QR del trabajador…"}
+          <div className="px-3 pt-3 pb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+            {/* LEFT: Empleados label + fractions */}
+            <div className="min-w-0">
+              <div className="text-[11px] font-bold opacity-80 uppercase tracking-wider mb-1.5">Empleados</div>
+              <div className="flex items-center gap-1">
+                {[
+                  { frac: 0.75, label: "3/4", testid: "frac-three-quarter" },
+                  { frac: 0.5, label: "1/2", testid: "frac-half" },
+                  { frac: 0.25, label: "1/4", testid: "frac-quarter" },
+                ].map(({ frac, label, testid }) => (
+                  <button
+                    key={testid}
+                    onClick={() => markLastAs(frac)}
+                    disabled={!lastWorker}
+                    className="h-9 min-w-[42px] px-1 rounded-lg bg-[#DC2626] hover:bg-[#B91C1C] active:scale-[0.97] text-white font-extrabold text-xs disabled:opacity-40 disabled:cursor-not-allowed transition"
+                    data-testid={testid}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* CENTER: Big round SCAN button */}
+            <button
+              onClick={() => {
+                // Tap to bump +1 for last worker, or open manual picker if no last worker yet
+                if (lastWorker) {
+                  bump(lastWorker.id, 1);
+                  logScan({ id: lastWorker.id, name: lastWorker.name }, "manual");
+                  playBeep();
+                } else {
+                  setShowManual(true);
+                }
+              }}
+              className="w-20 h-20 rounded-full bg-[#DC2626] hover:bg-[#B91C1C] active:scale-[0.96] text-white font-extrabold text-base flex items-center justify-center shadow-lg border-4 border-white/10"
+              data-testid="scan-big-button"
+              aria-label="Escanear"
+              style={{ fontFamily: "Outfit, sans-serif" }}
+            >
+              SCAN
+            </button>
+
+            {/* RIGHT: Pieza count + worker card + SAVE */}
+            <div className="min-w-0 flex flex-col items-end gap-1">
+              <div className="text-[11px] font-bold opacity-85 uppercase tracking-wider">
+                {unitLabel.charAt(0).toUpperCase() + unitLabel.slice(1)}{" "}
+                <span className="font-mono-stat opacity-100">{Math.round(totals.units)}</span>
+              </div>
+              <div className="flex items-stretch gap-1 w-full">
+                {lastWorkerStats ? (
+                  <div className="flex-1 bg-[#DC2626] rounded-lg px-2 py-1 min-w-0" data-testid="scan-last-worker-card">
+                    <div className="text-[10px] font-extrabold text-white truncate leading-tight" data-testid="scan-last-worker-name">
+                      {lastWorkerStats.name}
+                    </div>
+                    <div className="flex items-baseline gap-1 mt-0.5">
+                      <span className="font-mono-stat text-lg text-white leading-none" data-testid="scan-last-worker-count">
+                        {formatNumber(lastWorkerStats.count, lastWorkerStats.count % 1 === 0 ? 0 : 2)}
+                      </span>
+                      <span className="text-[9px] font-bold text-white/90 leading-none">
+                        {unitLabel}{lastWorkerStats.count !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+                    <div className="text-[10px] font-bold text-white/90 leading-tight">
+                      {formatCurrency(lastWorkerStats.payment)}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex-1 bg-white/10 rounded-lg px-2 py-2 min-w-0 flex items-center justify-center">
+                    <span className="text-[10px] font-bold opacity-70 text-center leading-tight">
+                      Enfoca el QR…
+                    </span>
+                  </div>
+                )}
+                <button
+                  onClick={save}
+                  disabled={saving || (Object.keys(tally).length === 0 && !(shareMode && shareBuffer.length > 0 && shareBaskets > 0))}
+                  className="h-auto px-2 rounded-lg bg-white text-[#DC2626] hover:bg-white/90 active:scale-[0.97] font-extrabold text-xs flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                  data-testid="scan-save-button"
+                  style={{ fontFamily: "Outfit, sans-serif" }}
+                >
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "SAVE"}
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Totals strip + Save */}
-        <div className="px-3 pb-3 flex items-center gap-2">
-          <div className="flex-1 bg-black/20 rounded-xl px-3 py-2">
-            {shareMode && shareBuffer.length > 0 ? (
-              <>
-                <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">Pago por trabajador</div>
-                <div className="flex items-center gap-3 mt-0.5">
-                  <div className="font-mono-stat text-lg leading-none">
-                    {shareBuffer.length}👤
-                  </div>
-                  <div className="font-mono-stat text-lg leading-none">
-                    {shareBaskets}🧺
-                  </div>
-                  <div className="font-mono-stat text-lg leading-none ml-auto">
-                    {formatCurrency(shareBuffer.length > 0 ? (shareBaskets * (parseFloat(pricePerUnit) || 0)) / shareBuffer.length : 0)} c/u
-                  </div>
+        {/* Share-mode totals + save (kept for shared basket flow) */}
+        {shareMode && shareBuffer.length > 0 && (
+          <div className="px-3 pb-3 flex items-center gap-2">
+            <div className="flex-1 bg-black/20 rounded-xl px-3 py-2">
+              <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">Pago por trabajador</div>
+              <div className="flex items-center gap-3 mt-0.5">
+                <div className="font-mono-stat text-lg leading-none">{shareBuffer.length}👤</div>
+                <div className="font-mono-stat text-lg leading-none">{shareBaskets}🧺</div>
+                <div className="font-mono-stat text-lg leading-none ml-auto">
+                  {formatCurrency(shareBuffer.length > 0 ? (shareBaskets * (parseFloat(pricePerUnit) || 0)) / shareBuffer.length : 0)} c/u
                 </div>
-              </>
-            ) : (
-              <>
-                <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">Jornada</div>
-                <div className="flex items-center gap-3 mt-0.5">
-                  <div className="font-mono-stat text-lg leading-none">
-                    {totals.workers}👤
-                  </div>
-                  <div className="font-mono-stat text-lg leading-none">
-                    {formatNumber(totals.units, totals.units % 1 === 0 ? 0 : 2)}🧺
-                  </div>
-                  <div className="font-mono-stat text-lg leading-none ml-auto">
-                    {formatCurrency(totals.payment)}
-                  </div>
-                </div>
-              </>
-            )}
+              </div>
+            </div>
+            <button
+              onClick={save}
+              disabled={saving}
+              className="h-[52px] px-4 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] active:scale-[0.98] text-white font-extrabold flex items-center gap-1.5 shadow-md disabled:opacity-50"
+              data-testid="scan-share-save-button"
+              style={{ fontFamily: "Outfit, sans-serif" }}
+            >
+              {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Save className="w-5 h-5" /> Guardar</>}
+            </button>
           </div>
-          <button
-            onClick={save}
-            disabled={saving || (Object.keys(tally).length === 0 && !(shareMode && shareBuffer.length > 0 && shareBaskets > 0))}
-            className="h-[52px] px-4 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] active:scale-[0.98] text-white font-extrabold flex items-center gap-1.5 shadow-md disabled:opacity-50"
-            data-testid="scan-save-button"
-            style={{ fontFamily: "Outfit, sans-serif" }}
-          >
-            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Save className="w-5 h-5" /> Guardar</>}
-          </button>
-        </div>
+        )}
       </div>
 
       {/* Edit price modal */}
