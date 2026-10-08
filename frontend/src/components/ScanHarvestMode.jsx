@@ -4,6 +4,7 @@ import { Html5Qrcode } from "html5-qrcode";
 import {
   Camera, CameraOff, Minus, Plus, Save, Loader2, RotateCcw,
   DollarSign, X, UserPlus, ListChecks, Users, Check, Trash2,
+  Zap, ZapOff, Keyboard, SwitchCamera,
 } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatCurrency, formatNumber, formatApiErrorDetail, todayISO } from "@/lib/api";
@@ -53,6 +54,9 @@ export default function ScanHarvestMode() {
   const [lbPrompt, setLbPrompt] = useState(null); // {id, name, source} when unit=libra awaiting weight input
   const [lbValue, setLbValue] = useState("");
   const [saving, setSaving] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [facingMode, setFacingMode] = useState("environment");
 
   const [showList, setShowList] = useState(false); // detailed per-worker tally sheet
   const [showManual, setShowManual] = useState(false);
@@ -201,7 +205,7 @@ export default function ScanHarvestMode() {
       const s = new Html5Qrcode(containerId, { verbose: false });
       qrRef.current = s;
       await s.start(
-        { facingMode: "environment" },
+        { facingMode },
         { fps: 10, qrbox: { width: 260, height: 260 }, aspectRatio: 1.0 },
         (text) => handleScan(text),
         () => {}
@@ -211,6 +215,36 @@ export default function ScanHarvestMode() {
       toast.error("No se pudo abrir la cámara. Revisa permisos.");
       setScannerOn(false);
     }
+  };
+
+  // === Flash / Zoom / Flip camera controls ===
+  const toggleTorch = async () => {
+    const s = qrRef.current;
+    if (!s) return;
+    try {
+      await s.applyVideoConstraints({ advanced: [{ torch: !torchOn }] });
+      setTorchOn((v) => !v);
+    } catch (_) {
+      toast.error("Flash no soportado en este dispositivo");
+    }
+  };
+  const cycleZoom = async () => {
+    const s = qrRef.current;
+    if (!s) return;
+    const next = zoomLevel >= 3 ? 1 : zoomLevel + 1;
+    try {
+      await s.applyVideoConstraints({ advanced: [{ zoom: next }] });
+      setZoomLevel(next);
+    } catch (_) {
+      setZoomLevel(next); // still cycle the badge even if hw rejects
+    }
+  };
+  const flipCamera = async () => {
+    const next = facingMode === "environment" ? "user" : "environment";
+    setFacingMode(next);
+    await stopCamera();
+    // Will auto-restart via scannerOn useEffect — nudge:
+    setTimeout(() => { if (scannerOn) startCamera(); }, 150);
   };
   const pauseCamera = () => {
     const s = qrRef.current;
@@ -649,38 +683,76 @@ export default function ScanHarvestMode() {
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col select-none" data-testid="scan-harvest-mode">
-      {/* Blue top bar */}
-      <div className="bg-[#2B55D1] text-white pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-between px-3 h-14">
-          <div className="min-w-0 flex-1">
-            <div className="text-[10px] font-bold uppercase tracking-wider opacity-80 flex items-center gap-1.5">
-              <span className="inline-block w-2 h-2 rounded-full bg-blue-300" />
-              Cosechando · {parcelName || "—"}
-            </div>
-          </div>
-          <button
-            onClick={() => navigate("/registrar")}
-            className="w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center"
-            data-testid="scan-close-fullscreen"
-            aria-label="Cerrar"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Camera body */}
+      {/* Camera body — full-bleed */}
       <div className="relative flex-1 overflow-hidden bg-black">
         <div id={containerId} className="absolute inset-0" />
 
-        {/* QR targeting frame */}
+        {/* Floating X close button (top-right) */}
+        <button
+          onClick={() => navigate("/")}
+          className="absolute top-[max(env(safe-area-inset-top),16px)] right-4 w-11 h-11 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center backdrop-blur-sm z-10"
+          data-testid="scan-close-fullscreen"
+          aria-label="Cerrar"
+        >
+          <X className="w-6 h-6" />
+        </button>
+
+        {/* Top hint text */}
+        <div className="pointer-events-none absolute top-[max(env(safe-area-inset-top),20px)] left-0 right-16 flex justify-center">
+          <p className="text-white text-base font-semibold text-center px-4 drop-shadow-lg mt-16" style={{ fontFamily: "Outfit, sans-serif" }}>
+            Desliza hacia arriba/abajo<br />para hacer zoom
+          </p>
+        </div>
+
+        {/* QR targeting frame — clean white square with scanning line */}
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="relative w-[72%] max-w-sm aspect-square border-2 border-red-500/80 rounded-xl">
-            <span className="absolute -top-0.5 -left-0.5 w-10 h-10 border-t-4 border-l-4 border-red-500 rounded-tl-xl" />
-            <span className="absolute -top-0.5 -right-0.5 w-10 h-10 border-t-4 border-r-4 border-red-500 rounded-tr-xl" />
-            <span className="absolute -bottom-0.5 -left-0.5 w-10 h-10 border-b-4 border-l-4 border-red-500 rounded-bl-xl" />
-            <span className="absolute -bottom-0.5 -right-0.5 w-10 h-10 border-b-4 border-r-4 border-red-500 rounded-br-xl" />
+          <div className="relative w-[75%] max-w-sm aspect-square">
+            <span className="absolute top-0 left-0 w-10 h-10 border-t-[3px] border-l-[3px] border-white rounded-tl-md" />
+            <span className="absolute top-0 right-0 w-10 h-10 border-t-[3px] border-r-[3px] border-white rounded-tr-md" />
+            <span className="absolute bottom-0 left-0 w-10 h-10 border-b-[3px] border-l-[3px] border-white rounded-bl-md" />
+            <span className="absolute bottom-0 right-0 w-10 h-10 border-b-[3px] border-r-[3px] border-white rounded-br-md" />
+            {/* Scanning line */}
+            <div className="absolute left-2 right-2 top-1/2 h-[2px] bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.9)]" />
           </div>
+        </div>
+
+        {/* Manual barcode entry button */}
+        <button
+          onClick={() => setShowManual(true)}
+          className="absolute left-1/2 -translate-x-1/2 bottom-[110px] px-6 py-3 rounded-full border-2 border-white text-white font-semibold text-sm bg-transparent hover:bg-white/10 active:scale-[0.98] whitespace-nowrap"
+          data-testid="scan-manual-entry"
+          style={{ fontFamily: "Outfit, sans-serif" }}
+        >
+          Introducir código de barras manualmente
+        </button>
+
+        {/* Bottom row: Flash · Zoom · Flip camera */}
+        <div className="absolute left-0 right-0 bottom-[max(env(safe-area-inset-bottom),20px)] flex items-center justify-around px-10">
+          <button
+            onClick={toggleTorch}
+            className={`w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-sm ${torchOn ? "bg-amber-400 text-black" : "bg-black/40 text-white hover:bg-black/60"}`}
+            data-testid="scan-torch-btn"
+            aria-label="Flash"
+          >
+            {torchOn ? <Zap className="w-5 h-5" /> : <ZapOff className="w-5 h-5" />}
+          </button>
+          <button
+            onClick={cycleZoom}
+            className="w-12 h-12 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center backdrop-blur-sm font-extrabold"
+            data-testid="scan-zoom-btn"
+            aria-label="Zoom"
+            style={{ fontFamily: "Outfit, sans-serif" }}
+          >
+            {zoomLevel}
+          </button>
+          <button
+            onClick={flipCamera}
+            className="w-12 h-12 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center backdrop-blur-sm"
+            data-testid="scan-flip-btn"
+            aria-label="Cambiar cámara"
+          >
+            <SwitchCamera className="w-5 h-5" />
+          </button>
         </div>
       </div>
 
