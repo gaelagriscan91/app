@@ -37,12 +37,13 @@ export default function MayordomoReceiptsTab() {
     })();
   }, []);
 
-  // Group receipts by mayordomo (saved_by). Admin receipts in a separate "Admin" bucket.
+  // Group receipts by mayordomo (saved_by). Exclude admin receipts.
   const grouped = useMemo(() => {
     const map = {};
     for (const r of rows) {
-      const name = r.saved_by_name || "Sin usuario";
       const role = r.saved_by_role || "admin";
+      if (role === "admin") continue; // exclude admin receipts — only mayordomos / users
+      const name = r.saved_by_name || "Sin usuario";
       const key = `${role}::${name}`;
       if (!map[key]) map[key] = { key, name, role, receipts: [], total: 0, totalHours: 0, totalWorkers: 0 };
       map[key].receipts.push(r);
@@ -50,11 +51,7 @@ export default function MayordomoReceiptsTab() {
       map[key].totalHours += Number(r.total_hours || 0);
       map[key].totalWorkers += Number(r.workers_count || 0);
     }
-    // Sort: mayordomos first, then admin; within each by total desc
-    return Object.values(map).sort((a, b) => {
-      if (a.role !== b.role) return a.role === "mayordomo" ? -1 : 1;
-      return b.total - a.total;
-    });
+    return Object.values(map).sort((a, b) => b.total - a.total);
   }, [rows]);
 
   if (loading) {
@@ -108,7 +105,7 @@ export default function MayordomoReceiptsTab() {
                       <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-full ${
                         isAdmin ? "bg-[#EFF6FF] text-[#1D4ED8]" : "bg-emerald-100 text-emerald-700"
                       }`}>
-                        {isAdmin ? "ADMIN" : "MAYORDOMO"}
+                        MAYORDOMO
                       </span>
                     </div>
                     <div className="flex items-center gap-3 mt-1 text-[11px] text-[#889078] font-semibold flex-wrap">
