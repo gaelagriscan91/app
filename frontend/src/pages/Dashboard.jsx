@@ -309,18 +309,12 @@ export default function Dashboard() {
               <div className="text-[11px] font-extrabold uppercase tracking-wider text-gray-300 mb-1">
                 Pieza {todayCount}
               </div>
-              {lastEntry ? (
-                <div className="flex items-center gap-1">
-                  <div className="flex-1 min-w-0 rounded-md bg-[#2A2A2A] text-white px-1.5 py-1 flex items-center gap-1.5 text-[10px] font-extrabold">
-                    <span className="truncate flex-1 text-left">{lastEntry.worker_name}</span>
-                    <span className="font-mono-stat text-sm leading-none">
-                      {formatNumber(lastEntry.units, lastEntry.units % 1 === 0 ? 0 : 2)}
-                    </span>
-                  </div>
+              {hasUnsavedScan ? (
+                <div className="flex items-center justify-end">
                   <button
                     onClick={saveReceipt}
-                    disabled={savingReceipt || !lastEntry}
-                    className="h-7 px-2 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-extrabold disabled:opacity-50 flex items-center"
+                    disabled={savingReceipt}
+                    className="h-7 px-4 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-extrabold disabled:opacity-50 flex items-center"
                     data-testid="home-save-button"
                   >
                     {savingReceipt ? <Loader2 className="w-3 h-3 animate-spin" /> : "SAVE"}
