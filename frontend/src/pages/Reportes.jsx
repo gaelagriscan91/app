@@ -376,60 +376,6 @@ export default function Reportes() {
         )}
       </div>
 
-      {/* Table */}
-      <div className="field-card overflow-hidden">
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-[#F0EDE1] text-[#1A2210] text-left">
-              <tr>
-                <th className="px-4 py-3 font-bold">Fecha</th>
-                <th className="px-4 py-3 font-bold">Trabajador</th>
-                <th className="px-4 py-3 font-bold">Parcela</th>
-                <th className="px-4 py-3 font-bold">Producto</th>
-                <th className="px-4 py-3 font-bold text-right">Kg</th>
-                <th className="px-4 py-3 font-bold text-right">Unid.</th>
-                <th className="px-4 py-3 font-bold text-right">Pago</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 && (
-                <tr><td colSpan={7} className="text-center py-6 text-[#556047] font-semibold">Sin resultados</td></tr>
-              )}
-              {rows.map((r) => (
-                <tr key={r.id} className="border-t border-[#E2DDD0]" data-testid={`report-row-${r.id}`}>
-                  <td className="px-4 py-2.5 font-semibold">{r.date}</td>
-                  <td className="px-4 py-2.5">{r.worker_name}</td>
-                  <td className="px-4 py-2.5">{r.parcel_name}</td>
-                  <td className="px-4 py-2.5">{r.product_name}</td>
-                  <td className="px-4 py-2.5 text-right font-mono-stat">{formatNumber(r.kilos, 2)}</td>
-                  <td className="px-4 py-2.5 text-right font-mono-stat">{formatNumber(r.units, 0)}</td>
-                  <td className="px-4 py-2.5 text-right font-mono-stat text-[#1D4ED8]">{formatCurrency(r.payment)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mobile stacked list */}
-        <div className="md:hidden divide-y divide-[#E2DDD0]">
-          {rows.length === 0 ? (
-            <div className="p-6 text-center text-[#556047] font-semibold">Sin resultados</div>
-          ) : (
-            rows.map((r) => (
-              <div key={r.id} className="p-3" data-testid={`report-row-m-${r.id}`}>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="font-bold text-[#1A2210]">{r.worker_name}</div>
-                    <div className="text-xs text-[#556047] font-semibold">{r.date} • {r.parcel_name}</div>
-                    <div className="text-xs text-[#556047] font-semibold">{r.product_name} • {formatNumber(r.kilos, 2)} Kg • {formatNumber(r.units, 0)} u.</div>
-                  </div>
-                  <div className="font-mono-stat text-base text-[#1D4ED8]">{formatCurrency(r.payment)}</div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
       </>
       )}
 

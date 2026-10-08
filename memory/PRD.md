@@ -27,6 +27,7 @@ Agricultural harvest tracking web app (PickTrace-style). Register harvest (Worke
 - [2026-02-08g] **Día: eliminar cards Total Kilos y Total a Pagar**: En la pantalla "Día" (`ListaDia.jsx`) se removieron las tarjetas azul "Total kilos" y roja "Total a pagar". Queda únicamente la tarjeta "Unidades" en una sola columna.
 - [2026-02-08h] **Reportes: filtros y totales simplificados**: Removidos filtros "Desde", "Trabajador", "Parcela" y "Producto" (queda solo "Hasta"). Removidas tarjetas totales (Kilos/Unidades/Total Pago). En su lugar se agregó bloque "Resumen por trabajador" en `Reportes.jsx` con nombre, kilos, unidades, # registros y pago por trabajador agregado desde `rows`.
 - [2026-02-08i] **Reportes: layout mobile = desktop**: Título "Filtros" → "Fecha". Botones Aplicar filtros / Exportar a Excel ahora quedan lado a lado en mobile (removido `flex-col sm:flex-row`, ahora siempre `flex-row`). Mantiene Compartir reporte full-width debajo.
+- [2026-02-08j] **Reportes: eliminada tabla de Detalle de cosechas**: Removida la tabla desktop + la lista mobile stacked (`field-card overflow-hidden` con rows[]) al final de Reportes porque el detalle ya existe en el Registro del escáner. Queda únicamente el bloque "Resumen por trabajador".
 
 ## Backlog (P1/P2)
 - P1 — Export por trabajador (Nómina)
