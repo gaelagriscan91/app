@@ -343,39 +343,6 @@ export default function Asistencia() {
         {/* Date */}
         <div className="mt-4 text-sm text-white/70 font-semibold capitalize">{prettyDate}</div>
 
-        {/* Greeting */}
-        <h1
-          className="mt-1 text-[26px] sm:text-3xl font-extrabold leading-tight"
-          style={{ fontFamily: "Outfit, sans-serif" }}
-          data-testid="hub-greeting"
-        >
-          {nowGreeting()}, hoy trabajas en{" "}
-          <span className="text-[#2563EB]">{selectedParcel?.name || "—"}</span>
-          {" "}y{" "}
-          <span className="text-[#2563EB]">{selectedProduct?.name || "—"}</span> picking.
-        </h1>
-
-        {/* Rancho / Mayordomo chip-row */}
-        <button
-          onClick={() => setSessionModalOpen(true)}
-          className="mt-4 w-full bg-white/10 hover:bg-white/15 border border-white/15 rounded-2xl px-4 py-3 flex items-center justify-between text-left"
-          data-testid="open-session-modal"
-        >
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 text-xs text-white/60 font-bold uppercase tracking-wider">
-              <MapPin className="w-3.5 h-3.5" /> Rancho
-              <span className="mx-2 opacity-30">•</span>
-              <UserCircle2 className="w-3.5 h-3.5" /> Mayordomo
-            </div>
-            <div className="font-bold text-base truncate mt-0.5">
-              {selectedParcel?.name || "Elige rancho"}
-              <span className="text-white/50 mx-2">•</span>
-              {mayordomoName}
-            </div>
-          </div>
-          <ChevronRight className="w-5 h-5 text-white/60" />
-        </button>
-
         {/* Three Tiles */}
         <div className="mt-6 grid grid-cols-3 gap-3 sm:gap-4">
           <Tile
