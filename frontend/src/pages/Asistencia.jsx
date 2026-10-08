@@ -863,114 +863,184 @@ function CheckInView(props) {
     manualSubmitting, setManualSubmitting,
     showCheckoutMenu, setShowCheckoutMenu, openCount, setConfirmCheckout, setView,
   } = props;
+  const [unitMode, setUnitMode] = useState("pieza"); // "pieza" | "libra" | "horas"
+  const mayordomoName = session?.mayordomo || "Mayordomo";
+  const price = selectedProduct?.price_per_unit || 0;
 
   return (
     <div className="-mx-4 -my-5 sm:-mx-0 sm:-my-0" data-testid="asistencia-checkin">
-      {/* Orange header card */}
-      <div className="bg-[#2563EB] px-5 pt-4 pb-5 rounded-b-2xl">
-        <div className="flex items-center justify-between text-[#1A2210] mb-3">
+      {/* Blue header */}
+      <div className="bg-[#2563EB] px-5 pt-4 pb-5 rounded-b-2xl text-white">
+        {/* Top row: Atrás · Check in · Resumen */}
+        <div className="flex items-center justify-between mb-4">
           <button onClick={goBack} className="flex items-center gap-1 font-semibold" data-testid="checkin-back-button">
             <ArrowLeft className="w-5 h-5" /> Atrás
           </button>
-          <h1 className="text-lg font-extrabold" style={{ fontFamily: "Outfit, sans-serif" }}>Check in</h1>
-          <button onClick={openSummary} data-testid="open-summary-button" className="text-sm font-bold text-[#1A2210]">
+          <h1 className="text-xl font-extrabold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>Check in</h1>
+          <button onClick={openSummary} data-testid="open-summary-button" className="text-base font-bold">
             Resumen
           </button>
         </div>
 
-        <div className="flex items-end justify-between mb-4">
-          <div>
-            <div className="text-xs font-bold text-[#5A4017] uppercase tracking-wider">Checked in</div>
-            <div className="font-mono-stat text-5xl text-[#1A2210] leading-none mt-1">{data.rows.length}</div>
+        {/* Row: CHECKED IN counter + controls */}
+        <div className="flex items-start gap-3 mb-4">
+          {/* Left: CHECKED IN counter */}
+          <div className="shrink-0">
+            <div className="text-[11px] font-extrabold uppercase tracking-wider text-[#1A2210]/70">Checked in</div>
+            <div className="font-mono-stat text-5xl text-[#1A2210] leading-none mt-1" data-testid="checkin-count">{data.rows.length}</div>
           </div>
-          <div className="flex items-center gap-2">
+
+          {/* Mayordomo pill + keyboard + camera */}
+          <div className="flex items-center gap-2 flex-1 min-w-0">
             <button
-              onClick={() => crews.length > 0 ? setShowCrewPicker(true) : toast.info("Primero crea una cuadrilla en Módulos")}
-              className="bg-white text-[#1A2210] px-4 h-10 rounded-full text-sm font-bold flex items-center gap-1.5 shadow-sm"
-              data-testid="move-crew-button"
+              onClick={() => setView("hub")}
+              className="h-11 flex-1 min-w-0 bg-white text-[#1A2210] px-4 rounded-full text-sm font-extrabold shadow-sm truncate text-left"
+              data-testid="checkin-mayordomo-button"
+              title={mayordomoName}
             >
-              <Users className="w-4 h-4" /> Move Crew
+              {mayordomoName}
             </button>
             <button
               onClick={() => setManualOpen(true)}
-              className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm text-[#1A2210]"
-              title="Manual"
+              className="w-11 h-11 bg-white rounded-full flex items-center justify-center shadow-sm text-[#1A2210] shrink-0"
+              title="Teclado"
               data-testid="manual-open-button"
             >
               <Keyboard className="w-5 h-5" />
             </button>
-            <div className="relative">
-              <button
-                onClick={() => setShowCheckoutMenu((v) => !v)}
-                className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm text-[#DC2626]"
-                title="Salida"
-                data-testid="checkout-menu-button"
-              >
-                <LogOut className="w-5 h-5" />
-              </button>
-              {showCheckoutMenu && (
-                <>
-                  <div
-                    className="fixed inset-0 z-20"
-                    onClick={() => setShowCheckoutMenu(false)}
-                  />
-                  <div className="absolute right-0 top-12 w-56 bg-white rounded-2xl shadow-xl border border-[#E2DDD0] overflow-hidden z-30">
-                    <button
-                      onClick={() => {
-                        setShowCheckoutMenu(false);
-                        if (openCount === 0) { toast.info("No hay trabajadores con jornada abierta"); return; }
-                        setConfirmCheckout(true);
-                      }}
-                      className="w-full text-left px-4 py-3 text-sm font-bold text-[#1A2210] hover:bg-[#F7F5EE] flex items-center gap-2 border-b border-[#F0EDE1]"
-                      data-testid="checkout-all-option"
-                    >
-                      <Moon className="w-4 h-4 text-[#5A4A98]" /> Salida a todos
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowCheckoutMenu(false);
-                        if (openCount === 0) { toast.info("No hay trabajadores con jornada abierta"); return; }
-                        // Go back to list (hub view) where each row has an individual "Salida" button
-                        setView("hub");
-                        setTimeout(() => {
-                          document.querySelector('[data-testid^="hub-checkout-"]')?.scrollIntoView({ behavior: "smooth", block: "center" });
-                        }, 100);
-                      }}
-                      className="w-full text-left px-4 py-3 text-sm font-bold text-[#1A2210] hover:bg-[#F7F5EE] flex items-center gap-2"
-                      data-testid="checkout-individual-option"
-                    >
-                      <UserCircle2 className="w-4 h-4 text-[#DC2626]" /> Salida individual
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
             <button
               onClick={() => setScannerOn((v) => !v)}
-              className={`w-10 h-10 rounded-full flex items-center justify-center shadow-sm ${scannerOn ? "bg-red-100 text-red-700" : "bg-white text-[#1A2210]"}`}
+              className={`w-11 h-11 rounded-full flex items-center justify-center shadow-sm shrink-0 ${scannerOn ? "bg-red-100 text-red-700" : "bg-white text-[#1A2210]"}`}
               title={scannerOn ? "Detener" : "Escanear"}
               data-testid="toggle-scanner-button"
             >
               {scannerOn ? <CameraOff className="w-5 h-5" /> : <Camera className="w-5 h-5" />}
             </button>
           </div>
+
+          {/* Right: Pieza / libra / Horas unit toggle */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {[
+              { k: "pieza", l: "Pieza" },
+              { k: "libra", l: "libra" },
+              { k: "horas", l: "Horas" },
+            ].map(({ k, l }) => (
+              <button
+                key={k}
+                onClick={() => setUnitMode(k)}
+                className={`h-11 px-3 rounded-full text-sm font-extrabold transition shadow-sm ${
+                  unitMode === k ? "bg-[#1A2210] text-white" : "bg-white text-[#1A2210] hover:bg-[#F0F0F0]"
+                }`}
+                data-testid={`checkin-unit-${k}`}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Session summary chips */}
-        <div className="bg-white rounded-xl p-3 grid grid-cols-2 gap-2">
-          <div className="bg-[#EFF6FF] rounded-lg px-3 py-2">
+        {/* Checkout menu + Move crew */}
+        <div className="flex items-center gap-2 mb-4">
+          <button
+            onClick={() => crews.length > 0 ? setShowCrewPicker(true) : toast.info("Primero crea una cuadrilla en Módulos")}
+            className="h-10 bg-white text-[#1A2210] px-4 rounded-full text-sm font-bold flex items-center gap-1.5 shadow-sm"
+            data-testid="move-crew-button"
+          >
+            <Users className="w-4 h-4" /> Move Crew
+          </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowCheckoutMenu((v) => !v)}
+              className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm text-[#DC2626]"
+              title="Salida"
+              data-testid="checkout-menu-button"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
+            {showCheckoutMenu && (
+              <>
+                <div className="fixed inset-0 z-20" onClick={() => setShowCheckoutMenu(false)} />
+                <div className="absolute left-0 top-12 w-56 bg-white rounded-2xl shadow-xl border border-[#E2DDD0] overflow-hidden z-30">
+                  <button
+                    onClick={() => {
+                      setShowCheckoutMenu(false);
+                      if (openCount === 0) { toast.info("No hay trabajadores con jornada abierta"); return; }
+                      setConfirmCheckout(true);
+                    }}
+                    className="w-full text-left px-4 py-3 text-sm font-bold text-[#1A2210] hover:bg-[#F7F5EE] flex items-center gap-2 border-b border-[#F0EDE1]"
+                    data-testid="checkout-all-option"
+                  >
+                    <Moon className="w-4 h-4 text-[#5A4A98]" /> Salida a todos
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowCheckoutMenu(false);
+                      if (openCount === 0) { toast.info("No hay trabajadores con jornada abierta"); return; }
+                      setView("hub");
+                      setTimeout(() => {
+                        document.querySelector('[data-testid^="hub-checkout-"]')?.scrollIntoView({ behavior: "smooth", block: "center" });
+                      }, 100);
+                    }}
+                    className="w-full text-left px-4 py-3 text-sm font-bold text-[#1A2210] hover:bg-[#F7F5EE] flex items-center gap-2"
+                    data-testid="checkout-individual-option"
+                  >
+                    <UserCircle2 className="w-4 h-4 text-[#DC2626]" /> Salida individual
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* RANCHO / Block */}
+        <button
+          onClick={() => setView("hub")}
+          className="w-full bg-white rounded-2xl p-3 grid grid-cols-2 gap-2 mb-2 text-left"
+          data-testid="checkin-rancho-row"
+        >
+          <div className="bg-[#F3F4F6] rounded-lg px-3 py-2">
             <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Rancho</div>
             <div className="font-bold text-[#1A2210] text-sm truncate">{selectedParcel?.name || "—"}</div>
           </div>
-          <div className="bg-[#EFF6FF] rounded-lg px-3 py-2">
-            <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Trabajo</div>
-            <div className="font-bold text-[#1A2210] text-sm truncate">{selectedProduct?.name || "—"} — Picking</div>
+          <div className="bg-[#F3F4F6] rounded-lg px-3 py-2">
+            <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Block</div>
+            <div className="font-bold text-[#1A2210] text-sm truncate">{selectedParcel?.block || "—"}</div>
           </div>
-        </div>
+        </button>
 
-        <div className="text-center text-[#5A4017] text-sm font-semibold mt-4">
-          Escanea el QR del trabajador para registrar su entrada.
-        </div>
+        {/* Trabajo / Variedad */}
+        <button
+          onClick={() => setView("hub")}
+          className="w-full bg-white rounded-2xl p-3 grid grid-cols-2 gap-2 mb-2 text-left"
+          data-testid="checkin-trabajo-row"
+        >
+          <div className="bg-[#F3F4F6] rounded-lg px-3 py-2">
+            <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Trabajo</div>
+            <div className="font-bold text-[#1A2210] text-sm truncate">{selectedProduct?.name || "—"}</div>
+          </div>
+          <div className="bg-[#F3F4F6] rounded-lg px-3 py-2">
+            <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Variedad</div>
+            <div className="font-bold text-[#1A2210] text-sm truncate">{selectedProduct?.variety || "—"}</div>
+          </div>
+        </button>
+
+        {/* Precio */}
+        <button
+          onClick={() => setView("hub")}
+          className="w-full bg-white rounded-2xl p-3 grid grid-cols-2 gap-2 text-left"
+          data-testid="checkin-precio-row"
+        >
+          <div className="bg-[#F3F4F6] rounded-lg px-3 py-2">
+            <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Precio</div>
+            <div className="font-mono-stat font-bold text-[#1A2210] text-sm">
+              {price > 0 ? `$${price.toFixed(2)}` : "—"}
+            </div>
+          </div>
+          <div className="bg-[#F3F4F6] rounded-lg px-3 py-2">
+            <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">por</div>
+            <div className="font-bold text-[#1A2210] text-sm capitalize">{unitMode}</div>
+          </div>
+        </button>
       </div>
 
       {/* Scanner area */}
