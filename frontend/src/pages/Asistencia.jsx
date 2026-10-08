@@ -605,7 +605,7 @@ function CheckInView(props) {
     manualSubmitting, setManualSubmitting,
     showCheckoutMenu, setShowCheckoutMenu, openCount, setConfirmCheckout, setView,
   } = props;
-  const [unitMode, setUnitMode] = useState("pieza"); // "pieza" | "libra" | "horas"
+  const [unitMode, setUnitMode] = useState(session?.unitMode || "pieza"); // "pieza" | "libra" | "horas"
 
   // Inline draft state for every editable field in the header
   const [draftMayordomo, setDraftMayordomo] = useState(session?.mayordomo || "");
@@ -748,7 +748,7 @@ function CheckInView(props) {
             ].map(({ k, l }) => (
               <button
                 key={k}
-                onClick={() => setUnitMode(k)}
+                onClick={() => { setUnitMode(k); saveSession?.({ unitMode: k }); }}
                 className={`h-11 px-3 rounded-full text-sm font-extrabold transition shadow-sm ${
                   unitMode === k ? "bg-[#1A2210] text-white" : "bg-white text-[#1A2210] hover:bg-[#F0F0F0]"
                 }`}

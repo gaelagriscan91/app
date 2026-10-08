@@ -142,9 +142,13 @@ export default function ScanHarvestMode() {
         setParcelId(parcel.id);
         setParcelName(parcel.name || "");
         setProductId(product.id);
-        setUnitLabel(product.unit_label || "pieza");
+        // Prefer unit from Check-In session (Pieza/Libra/Horas toggle) over product default
+        const sessionUnit = session.unitMode;
+        const mappedUnit = sessionUnit === "libra" ? "libra" : sessionUnit === "horas" ? "hora" : sessionUnit === "pieza" ? "pieza" : null;
+        setUnitLabel(mappedUnit || product.unit_label || "pieza");
         // Prefer price from Check-In session (localStorage) over the product's default
-        const sessionPrice = session.pricePerUnit;
+        // When unit is "horas", use pricePerHour; otherwise use pricePerUnit
+        const sessionPrice = sessionUnit === "horas" ? session.pricePerHour : session.pricePerUnit;
         const hasSessionPrice = sessionPrice !== undefined && sessionPrice !== null && sessionPrice !== "" && !Number.isNaN(Number(sessionPrice));
         const pu = hasSessionPrice ? Number(sessionPrice) : (Number(product.price_per_unit) || 0);
         if (pu > 0) setPricePerUnit(String(pu));
