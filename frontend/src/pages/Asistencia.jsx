@@ -318,6 +318,7 @@ export default function Asistencia() {
       openCount={openCount}
       setConfirmCheckout={setConfirmCheckout}
       setView={setView}
+      setSessionModalOpen={setSessionModalOpen}
     />
   );
 
@@ -625,6 +626,14 @@ function SessionModal({ session, saveSession, parcels, products, crews, setParce
     const p = products.find((x) => x.id === session.productId);
     return p?.name || session.trabajoName || "";
   });
+  const [block, setBlock] = useState(session.block || "");
+  const [variedad, setVariedad] = useState(session.variedad || "");
+  const [pricePerUnit, setPricePerUnit] = useState(
+    session.pricePerUnit != null && session.pricePerUnit !== "" ? String(session.pricePerUnit) : ""
+  );
+  const [pricePerHour, setPricePerHour] = useState(
+    session.pricePerHour != null && session.pricePerHour !== "" ? String(session.pricePerHour) : ""
+  );
   const [saving, setSaving] = useState(false);
   const canSave = rancho.trim() && mayordomo.trim() && trabajo.trim();
 
@@ -670,6 +679,10 @@ function SessionModal({ session, saveSession, parcels, products, crews, setParce
         crewId: matchedCrew?.id || "",
         productId: product.id,
         trabajoName: product.name,
+        block: block.trim(),
+        variedad: variedad.trim(),
+        pricePerUnit: pricePerUnit.trim() === "" ? "" : Number(pricePerUnit),
+        pricePerHour: pricePerHour.trim() === "" ? "" : Number(pricePerHour),
       });
       toast.success("Sesión guardada");
       onClose();
@@ -721,6 +734,21 @@ function SessionModal({ session, saveSession, parcels, products, crews, setParce
                 ))}
               </div>
             )}
+          </div>
+
+          <div>
+            <label className="flex items-center gap-1.5 text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">
+              <MapPin className="w-4 h-4 text-[#2563EB]" /> Block
+            </label>
+            <input
+              type="text"
+              value={block}
+              onChange={(e) => setBlock(e.target.value)}
+              placeholder="Escribe el block (opcional)"
+              className="field-input w-full"
+              data-testid="session-block-input"
+              autoComplete="off"
+            />
           </div>
 
           <div>
@@ -792,6 +820,62 @@ function SessionModal({ session, saveSession, parcels, products, crews, setParce
               </div>
             )}
           </div>
+
+          <div>
+            <label className="flex items-center gap-1.5 text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">
+              <ShoppingBasket className="w-4 h-4 text-[#2563EB]" /> Variedad
+            </label>
+            <input
+              type="text"
+              value={variedad}
+              onChange={(e) => setVariedad(e.target.value)}
+              placeholder="Variedad (opcional)"
+              className="field-input w-full"
+              data-testid="session-variedad-input"
+              autoComplete="off"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">
+                Precio por unidad
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#889078] font-bold">$</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  value={pricePerUnit}
+                  onChange={(e) => setPricePerUnit(e.target.value)}
+                  placeholder="0.00"
+                  className="field-input w-full pl-7"
+                  data-testid="session-price-unit-input"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">
+                Precio por hora
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#889078] font-bold">$</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  value={pricePerHour}
+                  onChange={(e) => setPricePerHour(e.target.value)}
+                  placeholder="0.00"
+                  className="field-input w-full pl-7"
+                  data-testid="session-price-hour-input"
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-2">
@@ -829,10 +913,17 @@ function CheckInView(props) {
     manualSelected, setManualSelected, manualSearch, setManualSearch,
     manualSubmitting, setManualSubmitting,
     showCheckoutMenu, setShowCheckoutMenu, openCount, setConfirmCheckout, setView,
+    setSessionModalOpen,
   } = props;
   const [unitMode, setUnitMode] = useState("pieza"); // "pieza" | "libra" | "horas"
   const mayordomoName = session?.mayordomo || "Mayordomo";
-  const price = selectedProduct?.price_per_unit || 0;
+  const ranchoName = selectedParcel?.name || session?.ranchoName || "—";
+  const trabajoName = selectedProduct?.name || session?.trabajoName || "—";
+  const blockName = session?.block || "—";
+  const variedadName = session?.variedad || "—";
+  const pricePerUnit = session?.pricePerUnit;
+  const pricePerHour = session?.pricePerHour;
+  const openSession = () => setSessionModalOpen?.(true);
 
   return (
     <div className="-mx-4 -my-5 sm:-mx-0 sm:-my-0" data-testid="asistencia-checkin">
@@ -860,7 +951,7 @@ function CheckInView(props) {
           {/* Mayordomo pill + keyboard + camera */}
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <button
-              onClick={() => setView("hub")}
+              onClick={openSession}
               className="h-11 flex-1 min-w-0 bg-white text-[#1A2210] px-4 rounded-full text-sm font-extrabold shadow-sm truncate text-left"
               data-testid="checkin-mayordomo-button"
               title={mayordomoName}
@@ -959,53 +1050,56 @@ function CheckInView(props) {
           </div>
         </div>
 
-        {/* RANCHO / Block */}
-        <button
-          onClick={() => setView("hub")}
-          className="w-full bg-white rounded-2xl p-3 grid grid-cols-2 gap-2 mb-2 text-left"
-          data-testid="checkin-rancho-row"
-        >
-          <div className="bg-[#F3F4F6] rounded-lg px-3 py-2">
-            <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Rancho</div>
-            <div className="font-bold text-[#1A2210] text-sm truncate">{selectedParcel?.name || "—"}</div>
-          </div>
-          <div className="bg-[#F3F4F6] rounded-lg px-3 py-2">
-            <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Block</div>
-            <div className="font-bold text-[#1A2210] text-sm truncate">{selectedParcel?.block || "—"}</div>
-          </div>
-        </button>
+        {/* Rancho+Block (left) / Trabajo+Variedad (right) — side by side as per mockup */}
+        <div className="grid grid-cols-2 gap-2 mb-2">
+          <button
+            onClick={openSession}
+            className="bg-white rounded-2xl p-2 grid grid-cols-2 gap-1.5 text-left"
+            data-testid="checkin-rancho-row"
+          >
+            <div className="bg-[#F3F4F6] rounded-lg px-2.5 py-2 min-w-0">
+              <div className="text-[9px] text-[#889078] font-bold uppercase tracking-wider">Rancho</div>
+              <div className="font-bold text-[#1A2210] text-xs truncate">{ranchoName}</div>
+            </div>
+            <div className="bg-[#F3F4F6] rounded-lg px-2.5 py-2 min-w-0">
+              <div className="text-[9px] text-[#889078] font-bold uppercase tracking-wider">Block</div>
+              <div className="font-bold text-[#1A2210] text-xs truncate">{blockName}</div>
+            </div>
+          </button>
 
-        {/* Trabajo / Variedad */}
-        <button
-          onClick={() => setView("hub")}
-          className="w-full bg-white rounded-2xl p-3 grid grid-cols-2 gap-2 mb-2 text-left"
-          data-testid="checkin-trabajo-row"
-        >
-          <div className="bg-[#F3F4F6] rounded-lg px-3 py-2">
-            <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Trabajo</div>
-            <div className="font-bold text-[#1A2210] text-sm truncate">{selectedProduct?.name || "—"}</div>
-          </div>
-          <div className="bg-[#F3F4F6] rounded-lg px-3 py-2">
-            <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Variedad</div>
-            <div className="font-bold text-[#1A2210] text-sm truncate">{selectedProduct?.variety || "—"}</div>
-          </div>
-        </button>
+          <button
+            onClick={openSession}
+            className="bg-white rounded-2xl p-2 grid grid-cols-2 gap-1.5 text-left"
+            data-testid="checkin-trabajo-row"
+          >
+            <div className="bg-[#F3F4F6] rounded-lg px-2.5 py-2 min-w-0">
+              <div className="text-[9px] text-[#889078] font-bold uppercase tracking-wider">Trabajo</div>
+              <div className="font-bold text-[#1A2210] text-xs truncate">{trabajoName}</div>
+            </div>
+            <div className="bg-[#F3F4F6] rounded-lg px-2.5 py-2 min-w-0">
+              <div className="text-[9px] text-[#889078] font-bold uppercase tracking-wider">Variedad</div>
+              <div className="font-bold text-[#1A2210] text-xs truncate">{variedadName}</div>
+            </div>
+          </button>
+        </div>
 
-        {/* Precio */}
+        {/* Precio: por unidad / por hora */}
         <button
-          onClick={() => setView("hub")}
-          className="w-full bg-white rounded-2xl p-3 grid grid-cols-2 gap-2 text-left"
+          onClick={openSession}
+          className="w-full bg-white rounded-2xl p-2 grid grid-cols-2 gap-1.5 text-left"
           data-testid="checkin-precio-row"
         >
-          <div className="bg-[#F3F4F6] rounded-lg px-3 py-2">
-            <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Precio</div>
-            <div className="font-mono-stat font-bold text-[#1A2210] text-sm">
-              {price > 0 ? `$${price.toFixed(2)}` : "—"}
+          <div className="bg-[#F3F4F6] rounded-lg px-2.5 py-2 min-w-0">
+            <div className="text-[9px] text-[#889078] font-bold uppercase tracking-wider">Precio</div>
+            <div className="font-mono-stat font-bold text-[#1A2210] text-xs truncate">
+              {pricePerUnit !== "" && pricePerUnit != null ? `$${Number(pricePerUnit).toFixed(2)} / ${unitMode}` : "—"}
             </div>
           </div>
-          <div className="bg-[#F3F4F6] rounded-lg px-3 py-2">
-            <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">por</div>
-            <div className="font-bold text-[#1A2210] text-sm capitalize">{unitMode}</div>
+          <div className="bg-[#F3F4F6] rounded-lg px-2.5 py-2 min-w-0">
+            <div className="text-[9px] text-[#889078] font-bold uppercase tracking-wider">Precio / hora</div>
+            <div className="font-mono-stat font-bold text-[#1A2210] text-xs truncate">
+              {pricePerHour !== "" && pricePerHour != null ? `$${Number(pricePerHour).toFixed(2)}` : "—"}
+            </div>
           </div>
         </button>
       </div>

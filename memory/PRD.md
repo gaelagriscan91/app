@@ -18,6 +18,7 @@ Agricultural harvest tracking web app (PickTrace-style). Register harvest (Worke
 - [2026-02] Product price lock + override
 - [2026-02] End-Day modal (summary + session reset)
 - [2026-10-04] **Minimalist Cosechar screen**: Both Manual and Escanear tabs now only show Price + Scan/Manual + Save. Parcel/Product/Date resolved automatically (session → first available → auto-create "Rancho General" + "Cosecha"). Removed setup form, pay-mode toggle, share toggle, scan-mode toggle, photo + notes.
+- [2026-02-08] **Check In header rediseño inline**: El header azul de la pantalla Check In ahora muestra Rancho/Block (izq) + Trabajo/Variedad (der) lado a lado + fila Precio por unidad / Precio por hora. Todos los campos abren el modal "Antes de empezar" al tocarlos. El modal fue extendido con 4 nuevos inputs: Block, Variedad, Precio por unidad, Precio por hora. Persisten en localStorage por día. Botones Pieza/Libra/Horas del header son independientes del selector del escáner.
 
 ## Backlog (P1/P2)
 - P1 — Export por trabajador (Nómina)
