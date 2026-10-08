@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   UserPlus, Loader2, Mail, Lock, User as UserIcon, Shield,
   Edit3, Trash2, X, KeyRound, Eye, EyeOff, Users, MapPin, Package,
+  Ban, CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatApiErrorDetail } from "@/lib/api";
@@ -33,6 +34,19 @@ export default function MayordomosTab() {
       load();
     } catch (e) {
       toast.error(formatApiErrorDetail(e.response?.data?.detail) || "No se pudo eliminar");
+    }
+  };
+
+  const onToggleBlock = async (u) => {
+    const willBlock = u.active !== false;
+    const verb = willBlock ? "bloquear" : "desbloquear";
+    if (!window.confirm(`¿${verb[0].toUpperCase() + verb.slice(1)} a ${u.name}?`)) return;
+    try {
+      await api.patch(`/admin/mayordomos/${u.id}`, { active: !willBlock, name: u.name });
+      toast.success(willBlock ? `${u.name} bloqueado` : `${u.name} desbloqueado`);
+      load();
+    } catch (e) {
+      toast.error(formatApiErrorDetail(e.response?.data?.detail) || `No se pudo ${verb}`);
     }
   };
 
@@ -112,16 +126,29 @@ export default function MayordomosTab() {
                 {!isAdmin && (
                   <div className="flex gap-2 mt-3">
                     <button
-                      onClick={() => { setEditing(u); setShowForm(true); }}
-                      className="flex-1 h-9 bg-white border-2 border-[#E2DDD0] hover:bg-[#F7F5EE] text-[#556047] font-bold rounded-lg text-xs flex items-center justify-center gap-1"
-                      data-testid={`mayordomo-edit-${u.id}`}
+                      onClick={() => onToggleBlock(u)}
+                      className={`flex-1 h-9 border-2 font-bold rounded-lg text-xs flex items-center justify-center gap-1 ${
+                        isInactive
+                          ? "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                          : "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
+                      }`}
+                      data-testid={`mayordomo-toggle-block-${u.id}`}
                     >
-                      <Edit3 className="w-3.5 h-3.5" /> Editar
+                      {isInactive ? <><CheckCircle2 className="w-3.5 h-3.5" /> Desbloquear</> : <><Ban className="w-3.5 h-3.5" /> Bloquear</>}
+                    </button>
+                    <button
+                      onClick={() => { setEditing(u); setShowForm(true); }}
+                      className="h-9 px-3 bg-white border-2 border-[#E2DDD0] hover:bg-[#F7F5EE] text-[#556047] font-bold rounded-lg text-xs flex items-center justify-center"
+                      data-testid={`mayordomo-edit-${u.id}`}
+                      title="Editar"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => onDelete(u)}
                       className="h-9 px-3 bg-white border-2 border-red-100 hover:bg-red-50 text-red-600 font-bold rounded-lg text-xs flex items-center justify-center"
                       data-testid={`mayordomo-delete-${u.id}`}
+                      title="Eliminar"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>

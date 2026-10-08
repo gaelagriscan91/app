@@ -1,9 +1,7 @@
 import { useState } from "react";
-import { Users, Map, Package, UserCog, Shield, FileText } from "lucide-react";
+import { Users, UserCog, Shield, FileText } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import WorkersTab from "@/components/modules/WorkersTab";
-import ParcelsTab from "@/components/modules/ParcelsTab";
-import ProductsTab from "@/components/modules/ProductsTab";
 import MayordomoReceiptsTab from "@/components/modules/MayordomoReceiptsTab";
 import MayordomosTab from "@/components/modules/MayordomosTab";
 import RegistroTab from "@/components/modules/RegistroTab";
@@ -11,9 +9,7 @@ import RegistroTab from "@/components/modules/RegistroTab";
 const baseTabs = [
   { id: "workers", label: "Trabajadores", Icon: Users, testid: "tab-workers" },
   { id: "crews", label: "Cuadrilla", Icon: UserCog, testid: "tab-crews" },
-  { id: "parcels", label: "Parcelas", Icon: Map, testid: "tab-parcels" },
   { id: "registro", label: "Registro", Icon: FileText, testid: "tab-registro" },
-  { id: "products", label: "Productos", Icon: Package, testid: "tab-products" },
 ];
 
 export default function Modulos() {
@@ -51,9 +47,7 @@ export default function Modulos() {
 
       {tab === "workers" && <WorkersTab />}
       {tab === "crews" && <MayordomoReceiptsTab />}
-      {tab === "parcels" && <ParcelsTab />}
       {tab === "registro" && <RegistroTab />}
-      {tab === "products" && <ProductsTab />}
       {tab === "mayordomos" && isAdmin && <MayordomosTab />}
     </div>
   );

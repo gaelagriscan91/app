@@ -915,10 +915,9 @@ async def delete_harvest(hid: str, user: CurrentUser):
 
 @api_router.post("/harvests/reset")
 async def reset_all_harvests(user: CurrentUser, include_attendance: bool = True):
-    """Danger: deletes ALL harvests (and optionally attendance) for the current tenant.
-    Admin-only. Used to start the season fresh."""
-    if user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Solo administrador puede borrar todo")
+    """Deletes ALL harvests (and optionally attendance) for the current tenant.
+    `scope_filter(user)` ensures mayordomos only delete their own data; admins delete their tenant's data.
+    Used to start the season fresh."""
     scope = scope_filter(user)
     h_del = await db.harvests.delete_many(scope)
     a_del = {"deleted_count": 0}
