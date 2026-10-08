@@ -19,6 +19,7 @@ Agricultural harvest tracking web app (PickTrace-style). Register harvest (Worke
 - [2026-02] End-Day modal (summary + session reset)
 - [2026-10-04] **Minimalist Cosechar screen**: Both Manual and Escanear tabs now only show Price + Scan/Manual + Save. Parcel/Product/Date resolved automatically (session → first available → auto-create "Rancho General" + "Cosecha"). Removed setup form, pay-mode toggle, share toggle, scan-mode toggle, photo + notes.
 - [2026-02-08] **Check In header rediseño inline**: El header azul de la pantalla Check In ahora muestra Rancho/Block (izq) + Trabajo/Variedad (der) lado a lado + fila Precio por unidad / Precio por hora. Todos los campos abren el modal "Antes de empezar" al tocarlos. El modal fue extendido con 4 nuevos inputs: Block, Variedad, Precio por unidad, Precio por hora. Persisten en localStorage por día. Botones Pieza/Libra/Horas del header son independientes del selector del escáner.
+- [2026-02-08b] **Modal "Antes de empezar" eliminado**: Reemplazado por completo con inputs editables inline directamente dentro del header azul del Check In. Al tocar la tile "Check in" entra directo a la vista. Cada input persiste via `saveSession` en el blur. Rancho y Trabajo crean la entidad en backend (`/parcels`, `/products`) automáticamente si el nombre no existe. Componente `SessionModal` + estado `sessionModalOpen` removidos de Asistencia.jsx (284 líneas menos).
 
 ## Backlog (P1/P2)
 - P1 — Export por trabajador (Nómina)

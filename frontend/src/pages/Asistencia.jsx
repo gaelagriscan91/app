@@ -40,7 +40,6 @@ export default function Asistencia() {
 
   // Session (persisted in localStorage per-date)
   const [session, setSession] = useState(() => loadSession(todayISO()));
-  const [sessionModalOpen, setSessionModalOpen] = useState(false);
 
   // Check-in sub-view state
   const [scannerOn, setScannerOn] = useState(false);
@@ -175,22 +174,10 @@ export default function Asistencia() {
 
   // ============== Tile Click Handlers ==============
   const onCheckIn = () => {
-    // If there are already workers checked in today, skip the session gate
-    if (presentCount === 0 && (!session.parcelId || !session.mayordomo)) {
-      toast.info("Primero elige Rancho y Mayordomo");
-      setSessionModalOpen(true);
-      return;
-    }
     setView("checkin");
   };
 
   const onPicking = () => {
-    // If there are already workers checked in today, skip the session gate
-    if (presentCount === 0 && (!session.parcelId || !session.productId)) {
-      toast.info("Primero elige Rancho y Trabajo");
-      setSessionModalOpen(true);
-      return;
-    }
     if (presentCount === 0) {
       toast.error("No puedes empezar a cosechar: aún no hay trabajadores con entrada registrada");
       return;
@@ -318,7 +305,8 @@ export default function Asistencia() {
       openCount={openCount}
       setConfirmCheckout={setConfirmCheckout}
       setView={setView}
-      setSessionModalOpen={setSessionModalOpen}
+      setParcels={setParcels}
+      setProducts={setProducts}
     />
   );
 
@@ -521,20 +509,6 @@ export default function Asistencia() {
         </div>
       )}
 
-      {/* Session modal */}
-      {sessionModalOpen && (
-        <SessionModal
-          session={session}
-          saveSession={saveSession}
-          parcels={parcels}
-          products={products}
-          crews={crews}
-          setParcels={setParcels}
-          setProducts={setProducts}
-          onClose={() => setSessionModalOpen(false)}
-        />
-      )}
-
       {/* Check-out confirm modal */}
       {confirmCheckout && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => !checkingOutAll && setConfirmCheckout(false)}>
@@ -616,295 +590,12 @@ function SummaryCell({ label, value }) {
   );
 }
 
-function SessionModal({ session, saveSession, parcels, products, crews, setParcels, setProducts, onClose }) {
-  const [rancho, setRancho] = useState(() => {
-    const p = parcels.find((x) => x.id === session.parcelId);
-    return p?.name || session.ranchoName || "";
-  });
-  const [mayordomo, setMayordomo] = useState(session.mayordomo || "");
-  const [trabajo, setTrabajo] = useState(() => {
-    const p = products.find((x) => x.id === session.productId);
-    return p?.name || session.trabajoName || "";
-  });
-  const [block, setBlock] = useState(session.block || "");
-  const [variedad, setVariedad] = useState(session.variedad || "");
-  const [pricePerUnit, setPricePerUnit] = useState(
-    session.pricePerUnit != null && session.pricePerUnit !== "" ? String(session.pricePerUnit) : ""
-  );
-  const [pricePerHour, setPricePerHour] = useState(
-    session.pricePerHour != null && session.pricePerHour !== "" ? String(session.pricePerHour) : ""
-  );
-  const [saving, setSaving] = useState(false);
-  const canSave = rancho.trim() && mayordomo.trim() && trabajo.trim();
-
-  const mayordomoSuggestions = Array.from(new Set([
-    ...crews.map((c) => c.name).filter(Boolean),
-    ...crews.map((c) => c.boss?.name).filter(Boolean),
-  ]));
-
-  const confirm = async () => {
-    if (!canSave || saving) return;
-    setSaving(true);
-    try {
-      // Resolve or create parcel
-      let parcel = parcels.find(
-        (p) => p.name?.toLowerCase() === rancho.trim().toLowerCase()
-      );
-      if (!parcel) {
-        const { data } = await api.post("/parcels", { name: rancho.trim() });
-        parcel = data;
-        setParcels?.((prev) => [...prev, data]);
-      }
-
-      // Resolve or create product
-      let product = products.find(
-        (p) => p.name?.toLowerCase() === trabajo.trim().toLowerCase()
-      );
-      if (!product) {
-        const { data } = await api.post("/products", { name: trabajo.trim() });
-        product = data;
-        setProducts?.((prev) => [...prev, data]);
-      }
-
-      // Match crew if mayordomo name matches
-      const matchedCrew = crews.find(
-        (c) => c.name?.toLowerCase() === mayordomo.trim().toLowerCase() ||
-               c.boss?.name?.toLowerCase() === mayordomo.trim().toLowerCase()
-      );
-
-      saveSession({
-        parcelId: parcel.id,
-        ranchoName: parcel.name,
-        mayordomo: mayordomo.trim(),
-        crewId: matchedCrew?.id || "",
-        productId: product.id,
-        trabajoName: product.name,
-        block: block.trim(),
-        variedad: variedad.trim(),
-        pricePerUnit: pricePerUnit.trim() === "" ? "" : Number(pricePerUnit),
-        pricePerHour: pricePerHour.trim() === "" ? "" : Number(pricePerHour),
-      });
-      toast.success("Sesión guardada");
-      onClose();
-    } catch (e) {
-      toast.error(formatApiErrorDetail(e.response?.data?.detail) || "No se pudo guardar");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose} data-testid="session-modal">
-      <div className="bg-white rounded-t-3xl sm:rounded-3xl p-6 w-full sm:max-w-md shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-extrabold text-xl" style={{ fontFamily: "Outfit, sans-serif" }}>Antes de empezar</h3>
-          <button onClick={onClose}><X className="w-5 h-5" /></button>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <label className="flex items-center gap-1.5 text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">
-              <MapPin className="w-4 h-4 text-[#2563EB]" /> Rancho
-            </label>
-            <input
-              type="text"
-              value={rancho}
-              onChange={(e) => setRancho(e.target.value)}
-              list="rancho-suggestions"
-              placeholder="Escribe o elige un rancho"
-              className="field-input w-full"
-              data-testid="session-rancho-input"
-              autoComplete="off"
-            />
-            <datalist id="rancho-suggestions">
-              {parcels.map((p) => <option key={p.id} value={p.name} />)}
-            </datalist>
-            {parcels.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {parcels.slice(0, 6).map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setRancho(p.name)}
-                    className="h-8 px-3 text-xs font-bold rounded-full bg-[#F0EDE1] border border-[#E2DDD0] hover:bg-[#E2DDD0] text-[#1A2210]"
-                    data-testid={`rancho-suggestion-${p.id}`}
-                  >
-                    {p.name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div>
-            <label className="flex items-center gap-1.5 text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">
-              <MapPin className="w-4 h-4 text-[#2563EB]" /> Block
-            </label>
-            <input
-              type="text"
-              value={block}
-              onChange={(e) => setBlock(e.target.value)}
-              placeholder="Escribe el block (opcional)"
-              className="field-input w-full"
-              data-testid="session-block-input"
-              autoComplete="off"
-            />
-          </div>
-
-          <div>
-            <label className="flex items-center gap-1.5 text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">
-              <UserCircle2 className="w-4 h-4 text-[#2563EB]" /> Mayordomo / Cuadrilla
-            </label>
-            <input
-              type="text"
-              value={mayordomo}
-              onChange={(e) => setMayordomo(e.target.value)}
-              list="mayordomo-suggestions"
-              placeholder="Escribe el nombre del mayordomo"
-              className="field-input w-full"
-              data-testid="session-mayordomo-input"
-              autoComplete="off"
-            />
-            <datalist id="mayordomo-suggestions">
-              {mayordomoSuggestions.map((name) => (
-                <option key={name} value={name} />
-              ))}
-            </datalist>
-            {crews.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {crews.slice(0, 6).map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => setMayordomo(c.boss?.name || c.name)}
-                    className="h-8 px-3 text-xs font-bold rounded-full bg-[#F0EDE1] border border-[#E2DDD0] hover:bg-[#E2DDD0] text-[#1A2210]"
-                    data-testid={`crew-suggestion-${c.id}`}
-                  >
-                    {c.boss?.name || c.name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div>
-            <label className="flex items-center gap-1.5 text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">
-              <ShoppingBasket className="w-4 h-4 text-[#2563EB]" /> Trabajo / Producto
-            </label>
-            <input
-              type="text"
-              value={trabajo}
-              onChange={(e) => setTrabajo(e.target.value)}
-              list="trabajo-suggestions"
-              placeholder="Escribe o elige un trabajo"
-              className="field-input w-full"
-              data-testid="session-trabajo-input"
-              autoComplete="off"
-            />
-            <datalist id="trabajo-suggestions">
-              {products.map((p) => <option key={p.id} value={p.name} />)}
-            </datalist>
-            {products.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {products.slice(0, 6).map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setTrabajo(p.name)}
-                    className="h-8 px-3 text-xs font-bold rounded-full bg-[#F0EDE1] border border-[#E2DDD0] hover:bg-[#E2DDD0] text-[#1A2210]"
-                    data-testid={`trabajo-suggestion-${p.id}`}
-                  >
-                    {p.name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div>
-            <label className="flex items-center gap-1.5 text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">
-              <ShoppingBasket className="w-4 h-4 text-[#2563EB]" /> Variedad
-            </label>
-            <input
-              type="text"
-              value={variedad}
-              onChange={(e) => setVariedad(e.target.value)}
-              placeholder="Variedad (opcional)"
-              className="field-input w-full"
-              data-testid="session-variedad-input"
-              autoComplete="off"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="flex items-center gap-1.5 text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">
-                Precio por unidad
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#889078] font-bold">$</span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  step="0.01"
-                  min="0"
-                  value={pricePerUnit}
-                  onChange={(e) => setPricePerUnit(e.target.value)}
-                  placeholder="0.00"
-                  className="field-input w-full pl-7"
-                  data-testid="session-price-unit-input"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="flex items-center gap-1.5 text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">
-                Precio por hora
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#889078] font-bold">$</span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  step="0.01"
-                  min="0"
-                  value={pricePerHour}
-                  onChange={(e) => setPricePerHour(e.target.value)}
-                  placeholder="0.00"
-                  className="field-input w-full pl-7"
-                  data-testid="session-price-hour-input"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-5 grid grid-cols-2 gap-2">
-          <button
-            onClick={onClose}
-            disabled={saving}
-            className="h-12 rounded-xl bg-white border-2 border-[#E2DDD0] text-[#556047] font-bold"
-            data-testid="session-cancel-button"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={confirm}
-            disabled={!canSave || saving}
-            className="h-12 rounded-xl bg-[#1D4ED8] hover:bg-[#1E3A8A] text-white font-bold disabled:opacity-50 flex items-center justify-center gap-2"
-            data-testid="session-save-button"
-          >
-            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : "Guardar"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /* ======================= Check-In Sub-View (Orange) ======================= */
 function CheckInView(props) {
   const {
-    data, loading, scannerOn, setScannerOn, selectedParcel, selectedProduct, session,
+    data, loading, scannerOn, setScannerOn, selectedParcel, selectedProduct, session, saveSession,
+    parcels, products, setParcels, setProducts,
     crews, handleScan, removeAttendance, setManualOpen, setShowCrewPicker,
     goBack, openSummary,
     manualOpen, manualCode, setManualCode, workers, setWorkers, setManualOpen2,
@@ -913,17 +604,87 @@ function CheckInView(props) {
     manualSelected, setManualSelected, manualSearch, setManualSearch,
     manualSubmitting, setManualSubmitting,
     showCheckoutMenu, setShowCheckoutMenu, openCount, setConfirmCheckout, setView,
-    setSessionModalOpen,
   } = props;
   const [unitMode, setUnitMode] = useState("pieza"); // "pieza" | "libra" | "horas"
-  const mayordomoName = session?.mayordomo || "Mayordomo";
-  const ranchoName = selectedParcel?.name || session?.ranchoName || "—";
-  const trabajoName = selectedProduct?.name || session?.trabajoName || "—";
-  const blockName = session?.block || "—";
-  const variedadName = session?.variedad || "—";
-  const pricePerUnit = session?.pricePerUnit;
-  const pricePerHour = session?.pricePerHour;
-  const openSession = () => setSessionModalOpen?.(true);
+
+  // Inline draft state for every editable field in the header
+  const [draftMayordomo, setDraftMayordomo] = useState(session?.mayordomo || "");
+  const [draftRancho, setDraftRancho] = useState(
+    (parcels || []).find((p) => p.id === session?.parcelId)?.name || session?.ranchoName || ""
+  );
+  const [draftBlock, setDraftBlock] = useState(session?.block || "");
+  const [draftTrabajo, setDraftTrabajo] = useState(
+    (products || []).find((p) => p.id === session?.productId)?.name || session?.trabajoName || ""
+  );
+  const [draftVariedad, setDraftVariedad] = useState(session?.variedad || "");
+  const [draftPricePerUnit, setDraftPricePerUnit] = useState(
+    session?.pricePerUnit != null && session?.pricePerUnit !== "" ? String(session.pricePerUnit) : ""
+  );
+  const [draftPricePerHour, setDraftPricePerHour] = useState(
+    session?.pricePerHour != null && session?.pricePerHour !== "" ? String(session.pricePerHour) : ""
+  );
+
+  // Persist helpers (localStorage via saveSession prop)
+  const commitMayordomo = () => {
+    const name = (draftMayordomo || "").trim();
+    const matched = (crews || []).find(
+      (c) => c.name?.toLowerCase() === name.toLowerCase() ||
+             c.boss?.name?.toLowerCase() === name.toLowerCase()
+    );
+    saveSession?.({ mayordomo: name, crewId: matched?.id || "" });
+  };
+  const commitBlock = () => {
+    saveSession?.({ block: (draftBlock || "").trim() });
+  };
+  const commitVariedad = () => {
+    saveSession?.({ variedad: (draftVariedad || "").trim() });
+  };
+  const commitPricePerUnit = () => {
+    const raw = (draftPricePerUnit || "").trim();
+    saveSession?.({ pricePerUnit: raw === "" ? "" : Number(raw) });
+  };
+  const commitPricePerHour = () => {
+    const raw = (draftPricePerHour || "").trim();
+    saveSession?.({ pricePerHour: raw === "" ? "" : Number(raw) });
+  };
+  const commitRancho = async () => {
+    const name = (draftRancho || "").trim();
+    if (!name) { saveSession?.({ parcelId: "", ranchoName: "" }); return; }
+    let parcel = (parcels || []).find((p) => p.name?.toLowerCase() === name.toLowerCase());
+    if (!parcel) {
+      try {
+        const { data } = await api.post("/parcels", { name });
+        parcel = data;
+        setParcels?.((prev) => [...(prev || []), data]);
+      } catch (e) {
+        toast.error(formatApiErrorDetail(e.response?.data?.detail) || "No se pudo guardar el rancho");
+        return;
+      }
+    }
+    saveSession?.({ parcelId: parcel.id, ranchoName: parcel.name });
+  };
+  const commitTrabajo = async () => {
+    const name = (draftTrabajo || "").trim();
+    if (!name) { saveSession?.({ productId: "", trabajoName: "" }); return; }
+    let product = (products || []).find((p) => p.name?.toLowerCase() === name.toLowerCase());
+    if (!product) {
+      try {
+        const { data } = await api.post("/products", { name });
+        product = data;
+        setProducts?.((prev) => [...(prev || []), data]);
+      } catch (e) {
+        toast.error(formatApiErrorDetail(e.response?.data?.detail) || "No se pudo guardar el trabajo");
+        return;
+      }
+    }
+    saveSession?.({ productId: product.id, trabajoName: product.name });
+  };
+
+  // Shared classes for the inline field cards
+  const cardCls = "bg-white rounded-2xl p-2 grid grid-cols-2 gap-1.5";
+  const cellCls = "bg-[#F3F4F6] rounded-lg px-2.5 py-1.5 min-w-0";
+  const labelCls = "text-[9px] text-[#889078] font-bold uppercase tracking-wider";
+  const inputCls = "w-full bg-transparent border-0 outline-none font-bold text-[#1A2210] text-xs truncate p-0 focus:ring-0";
 
   return (
     <div className="-mx-4 -my-5 sm:-mx-0 sm:-my-0" data-testid="asistencia-checkin">
@@ -950,14 +711,16 @@ function CheckInView(props) {
 
           {/* Mayordomo pill + keyboard + camera */}
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <button
-              onClick={openSession}
-              className="h-11 flex-1 min-w-0 bg-white text-[#1A2210] px-4 rounded-full text-sm font-extrabold shadow-sm truncate text-left"
-              data-testid="checkin-mayordomo-button"
-              title={mayordomoName}
-            >
-              {mayordomoName}
-            </button>
+            <input
+              type="text"
+              value={draftMayordomo}
+              onChange={(e) => setDraftMayordomo(e.target.value)}
+              onBlur={commitMayordomo}
+              placeholder="Mayordomo"
+              className="h-11 flex-1 min-w-0 bg-white text-[#1A2210] px-4 rounded-full text-sm font-extrabold shadow-sm truncate placeholder-[#889078] outline-none border-0 focus:ring-2 focus:ring-white/60"
+              data-testid="checkin-mayordomo-input"
+              autoComplete="off"
+            />
             <button
               onClick={() => setManualOpen(true)}
               className="w-11 h-11 bg-white rounded-full flex items-center justify-center shadow-sm text-[#1A2210] shrink-0"
@@ -1050,59 +813,115 @@ function CheckInView(props) {
           </div>
         </div>
 
-        {/* Row of cards: Left=Rancho/Block, Right=Trabajo/Variedad + Precio stacked */}
+        {/* Row of cards: Left=Rancho/Block, Right=Trabajo/Variedad + Precio stacked — all inline editable */}
         <div className="grid grid-cols-2 gap-2 items-start">
           {/* Left column: Rancho + Block */}
-          <button
-            onClick={openSession}
-            className="bg-white rounded-2xl p-2 grid grid-cols-2 gap-1.5 text-left"
-            data-testid="checkin-rancho-row"
-          >
-            <div className="bg-[#F3F4F6] rounded-lg px-2.5 py-2 min-w-0">
-              <div className="text-[9px] text-[#889078] font-bold uppercase tracking-wider">Rancho</div>
-              <div className="font-bold text-[#1A2210] text-xs truncate">{ranchoName}</div>
+          <div className={cardCls} data-testid="checkin-rancho-row">
+            <div className={cellCls}>
+              <div className={labelCls}>Rancho</div>
+              <input
+                type="text"
+                value={draftRancho}
+                onChange={(e) => setDraftRancho(e.target.value)}
+                onBlur={commitRancho}
+                list="checkin-rancho-list"
+                placeholder="—"
+                className={inputCls}
+                data-testid="checkin-rancho-input"
+                autoComplete="off"
+              />
+              <datalist id="checkin-rancho-list">
+                {(parcels || []).map((p) => <option key={p.id} value={p.name} />)}
+              </datalist>
             </div>
-            <div className="bg-[#F3F4F6] rounded-lg px-2.5 py-2 min-w-0">
-              <div className="text-[9px] text-[#889078] font-bold uppercase tracking-wider">Block</div>
-              <div className="font-bold text-[#1A2210] text-xs truncate">{blockName}</div>
+            <div className={cellCls}>
+              <div className={labelCls}>Block</div>
+              <input
+                type="text"
+                value={draftBlock}
+                onChange={(e) => setDraftBlock(e.target.value)}
+                onBlur={commitBlock}
+                placeholder="—"
+                className={inputCls}
+                data-testid="checkin-block-input"
+                autoComplete="off"
+              />
             </div>
-          </button>
+          </div>
 
           {/* Right column: Trabajo/Variedad + Precio stacked */}
           <div className="flex flex-col gap-2">
-            <button
-              onClick={openSession}
-              className="bg-white rounded-2xl p-2 grid grid-cols-2 gap-1.5 text-left"
-              data-testid="checkin-trabajo-row"
-            >
-              <div className="bg-[#F3F4F6] rounded-lg px-2.5 py-2 min-w-0">
-                <div className="text-[9px] text-[#889078] font-bold uppercase tracking-wider">Trabajo</div>
-                <div className="font-bold text-[#1A2210] text-xs truncate">{trabajoName}</div>
+            <div className={cardCls} data-testid="checkin-trabajo-row">
+              <div className={cellCls}>
+                <div className={labelCls}>Trabajo</div>
+                <input
+                  type="text"
+                  value={draftTrabajo}
+                  onChange={(e) => setDraftTrabajo(e.target.value)}
+                  onBlur={commitTrabajo}
+                  list="checkin-trabajo-list"
+                  placeholder="—"
+                  className={inputCls}
+                  data-testid="checkin-trabajo-input"
+                  autoComplete="off"
+                />
+                <datalist id="checkin-trabajo-list">
+                  {(products || []).map((p) => <option key={p.id} value={p.name} />)}
+                </datalist>
               </div>
-              <div className="bg-[#F3F4F6] rounded-lg px-2.5 py-2 min-w-0">
-                <div className="text-[9px] text-[#889078] font-bold uppercase tracking-wider">Variedad</div>
-                <div className="font-bold text-[#1A2210] text-xs truncate">{variedadName}</div>
+              <div className={cellCls}>
+                <div className={labelCls}>Variedad</div>
+                <input
+                  type="text"
+                  value={draftVariedad}
+                  onChange={(e) => setDraftVariedad(e.target.value)}
+                  onBlur={commitVariedad}
+                  placeholder="—"
+                  className={inputCls}
+                  data-testid="checkin-variedad-input"
+                  autoComplete="off"
+                />
               </div>
-            </button>
+            </div>
 
-            <button
-              onClick={openSession}
-              className="bg-white rounded-2xl p-2 grid grid-cols-2 gap-1.5 text-left"
-              data-testid="checkin-precio-row"
-            >
-              <div className="bg-[#F3F4F6] rounded-lg px-2.5 py-2 min-w-0">
-                <div className="text-[9px] text-[#889078] font-bold uppercase tracking-wider">Precio</div>
-                <div className="font-mono-stat font-bold text-[#1A2210] text-xs truncate">
-                  {pricePerUnit !== "" && pricePerUnit != null ? `$${Number(pricePerUnit).toFixed(2)}` : "—"}
+            <div className={cardCls} data-testid="checkin-precio-row">
+              <div className={cellCls}>
+                <div className={labelCls}>Precio</div>
+                <div className="flex items-center">
+                  <span className="text-[#889078] font-bold text-xs mr-0.5">$</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    min="0"
+                    value={draftPricePerUnit}
+                    onChange={(e) => setDraftPricePerUnit(e.target.value)}
+                    onBlur={commitPricePerUnit}
+                    placeholder="0.00"
+                    className={`${inputCls} font-mono-stat`}
+                    data-testid="checkin-price-unit-input"
+                  />
                 </div>
               </div>
-              <div className="bg-[#F3F4F6] rounded-lg px-2.5 py-2 min-w-0">
-                <div className="text-[9px] text-[#889078] font-bold uppercase tracking-wider">Precio / hora</div>
-                <div className="font-mono-stat font-bold text-[#1A2210] text-xs truncate">
-                  {pricePerHour !== "" && pricePerHour != null ? `$${Number(pricePerHour).toFixed(2)}` : "—"}
+              <div className={cellCls}>
+                <div className={labelCls}>Precio / hora</div>
+                <div className="flex items-center">
+                  <span className="text-[#889078] font-bold text-xs mr-0.5">$</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    min="0"
+                    value={draftPricePerHour}
+                    onChange={(e) => setDraftPricePerHour(e.target.value)}
+                    onBlur={commitPricePerHour}
+                    placeholder="0.00"
+                    className={`${inputCls} font-mono-stat`}
+                    data-testid="checkin-price-hour-input"
+                  />
                 </div>
               </div>
-            </button>
+            </div>
           </div>
         </div>
       </div>
