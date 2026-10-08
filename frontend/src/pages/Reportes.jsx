@@ -298,19 +298,11 @@ export default function Reportes() {
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="field-card p-4 sm:p-5 space-y-4">
-        <div className="flex items-center gap-2">
-          <Filter className="w-5 h-5 text-[#1D4ED8]" />
-          <h3 className="text-base font-bold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>
-            Fecha
-          </h3>
-        </div>
-        <div className="grid grid-cols-1 gap-3">
-          <div>
-            <label className="block text-xs font-bold text-[#1A2210] mb-1 uppercase tracking-wider">Hasta</label>
-            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="field-input !h-12 !text-base" data-testid="filter-date-to" />
-          </div>
+      {/* Filters — standalone, no card wrapper */}
+      <div className="space-y-3">
+        <div>
+          <label className="block text-xs font-bold text-[#1A2210] mb-1 uppercase tracking-wider">Hasta</label>
+          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="field-input !h-12 !text-base" data-testid="filter-date-to" />
         </div>
         <div className="flex flex-row gap-2">
           <button onClick={load} className="field-btn-secondary flex-1" data-testid="apply-filters-button">
@@ -325,18 +317,6 @@ export default function Reportes() {
             {exporting ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Download className="w-5 h-5" /> Exportar a Excel</>}
           </button>
         </div>
-        <button
-          onClick={shareReport}
-          disabled={sharing || rows.length === 0}
-          className="w-full h-12 rounded-xl bg-[#1E2746] hover:bg-[#172038] active:scale-[0.99] text-white font-extrabold flex items-center justify-center gap-2 shadow-md disabled:opacity-60 border-2 border-[#111A2E]"
-          data-testid="share-report-button"
-          style={{ fontFamily: "Outfit, sans-serif" }}
-        >
-          {sharing ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Share2 className="w-5 h-5" /> Compartir reporte</>}
-        </button>
-        <p className="text-[11px] text-[#889078] font-semibold text-center -mt-1">
-          Abre tu bandeja de compartir: WhatsApp, Mensajes, Gmail, Correo, Telegram…
-        </p>
       </div>
 
       {/* Resumen por trabajador */}
