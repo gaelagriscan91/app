@@ -1050,8 +1050,9 @@ function CheckInView(props) {
           </div>
         </div>
 
-        {/* Rancho+Block (left) / Trabajo+Variedad (right) — side by side as per mockup */}
-        <div className="grid grid-cols-2 gap-2 mb-2">
+        {/* Row of cards: Left=Rancho/Block, Right=Trabajo/Variedad + Precio stacked */}
+        <div className="grid grid-cols-2 gap-2 items-start">
+          {/* Left column: Rancho + Block */}
           <button
             onClick={openSession}
             className="bg-white rounded-2xl p-2 grid grid-cols-2 gap-1.5 text-left"
@@ -1067,41 +1068,43 @@ function CheckInView(props) {
             </div>
           </button>
 
-          <button
-            onClick={openSession}
-            className="bg-white rounded-2xl p-2 grid grid-cols-2 gap-1.5 text-left"
-            data-testid="checkin-trabajo-row"
-          >
-            <div className="bg-[#F3F4F6] rounded-lg px-2.5 py-2 min-w-0">
-              <div className="text-[9px] text-[#889078] font-bold uppercase tracking-wider">Trabajo</div>
-              <div className="font-bold text-[#1A2210] text-xs truncate">{trabajoName}</div>
-            </div>
-            <div className="bg-[#F3F4F6] rounded-lg px-2.5 py-2 min-w-0">
-              <div className="text-[9px] text-[#889078] font-bold uppercase tracking-wider">Variedad</div>
-              <div className="font-bold text-[#1A2210] text-xs truncate">{variedadName}</div>
-            </div>
-          </button>
-        </div>
+          {/* Right column: Trabajo/Variedad + Precio stacked */}
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={openSession}
+              className="bg-white rounded-2xl p-2 grid grid-cols-2 gap-1.5 text-left"
+              data-testid="checkin-trabajo-row"
+            >
+              <div className="bg-[#F3F4F6] rounded-lg px-2.5 py-2 min-w-0">
+                <div className="text-[9px] text-[#889078] font-bold uppercase tracking-wider">Trabajo</div>
+                <div className="font-bold text-[#1A2210] text-xs truncate">{trabajoName}</div>
+              </div>
+              <div className="bg-[#F3F4F6] rounded-lg px-2.5 py-2 min-w-0">
+                <div className="text-[9px] text-[#889078] font-bold uppercase tracking-wider">Variedad</div>
+                <div className="font-bold text-[#1A2210] text-xs truncate">{variedadName}</div>
+              </div>
+            </button>
 
-        {/* Precio: por unidad / por hora */}
-        <button
-          onClick={openSession}
-          className="w-full bg-white rounded-2xl p-2 grid grid-cols-2 gap-1.5 text-left"
-          data-testid="checkin-precio-row"
-        >
-          <div className="bg-[#F3F4F6] rounded-lg px-2.5 py-2 min-w-0">
-            <div className="text-[9px] text-[#889078] font-bold uppercase tracking-wider">Precio</div>
-            <div className="font-mono-stat font-bold text-[#1A2210] text-xs truncate">
-              {pricePerUnit !== "" && pricePerUnit != null ? `$${Number(pricePerUnit).toFixed(2)} / ${unitMode}` : "—"}
-            </div>
+            <button
+              onClick={openSession}
+              className="bg-white rounded-2xl p-2 grid grid-cols-2 gap-1.5 text-left"
+              data-testid="checkin-precio-row"
+            >
+              <div className="bg-[#F3F4F6] rounded-lg px-2.5 py-2 min-w-0">
+                <div className="text-[9px] text-[#889078] font-bold uppercase tracking-wider">Precio</div>
+                <div className="font-mono-stat font-bold text-[#1A2210] text-xs truncate">
+                  {pricePerUnit !== "" && pricePerUnit != null ? `$${Number(pricePerUnit).toFixed(2)}` : "—"}
+                </div>
+              </div>
+              <div className="bg-[#F3F4F6] rounded-lg px-2.5 py-2 min-w-0">
+                <div className="text-[9px] text-[#889078] font-bold uppercase tracking-wider">Precio / hora</div>
+                <div className="font-mono-stat font-bold text-[#1A2210] text-xs truncate">
+                  {pricePerHour !== "" && pricePerHour != null ? `$${Number(pricePerHour).toFixed(2)}` : "—"}
+                </div>
+              </div>
+            </button>
           </div>
-          <div className="bg-[#F3F4F6] rounded-lg px-2.5 py-2 min-w-0">
-            <div className="text-[9px] text-[#889078] font-bold uppercase tracking-wider">Precio / hora</div>
-            <div className="font-mono-stat font-bold text-[#1A2210] text-xs truncate">
-              {pricePerHour !== "" && pricePerHour != null ? `$${Number(pricePerHour).toFixed(2)}` : "—"}
-            </div>
-          </div>
-        </button>
+        </div>
       </div>
 
       {/* Scanner area */}
