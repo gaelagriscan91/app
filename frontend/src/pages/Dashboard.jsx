@@ -284,29 +284,25 @@ export default function Dashboard() {
       <div className="fixed left-0 right-0 bottom-[70px] z-30 pointer-events-none">
         <div className="max-w-5xl mx-auto px-3 pointer-events-auto">
           <div className="bg-[#111] border-t border-[#2A2A2A] rounded-t-2xl grid grid-cols-3 items-end gap-2 px-3 pt-2 pb-3 shadow-2xl">
-            {/* LEFT — Empleados + fraction shortcuts (hidden until a new scan is pending) */}
-            {hasUnsavedScan ? (
-              <div>
-                <div className="text-[11px] font-extrabold uppercase tracking-wider text-gray-300 mb-1">
-                  Empleados
-                </div>
-                <div className="grid grid-cols-3 gap-1">
-                  {[{ f: 0.25, l: "1/4" }, { f: 0.5, l: "1/2" }, { f: 0.75, l: "3/4" }].map(({ f, l }) => (
-                    <button
-                      key={l}
-                      onClick={() => applyFractionToLast(f)}
-                      disabled={!lastEntry || applyingFrac !== null}
-                      className="h-7 rounded-md bg-[#DC2626] hover:bg-[#B91C1C] text-white text-[10px] font-extrabold disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
-                      data-testid={`home-frac-${l.replace("/", "-")}`}
-                    >
-                      {applyingFrac === f ? <Loader2 className="w-3 h-3 animate-spin" /> : l}
-                    </button>
-                  ))}
-                </div>
+            {/* LEFT — Empleados + fraction shortcuts */}
+            <div>
+              <div className="text-[11px] font-extrabold uppercase tracking-wider text-gray-300 mb-1">
+                Empleados
               </div>
-            ) : (
-              <div />
-            )}
+              <div className="grid grid-cols-3 gap-1">
+                {[{ f: 0.25, l: "1/4" }, { f: 0.5, l: "1/2" }, { f: 0.75, l: "3/4" }].map(({ f, l }) => (
+                  <button
+                    key={l}
+                    onClick={() => applyFractionToLast(f)}
+                    disabled={!lastEntry || applyingFrac !== null}
+                    className="h-7 rounded-md bg-[#DC2626] hover:bg-[#B91C1C] text-white text-[10px] font-extrabold disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
+                    data-testid={`home-frac-${l.replace("/", "-")}`}
+                  >
+                    {applyingFrac === f ? <Loader2 className="w-3 h-3 animate-spin" /> : l}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {/* CENTER — SCAN big circular */}
             <div className="flex items-center justify-center">
@@ -321,26 +317,22 @@ export default function Dashboard() {
               </button>
             </div>
 
-            {/* RIGHT — Pieza count + SAVE (only after a new scan is pending) */}
-            {hasUnsavedScan ? (
-              <div className="text-right">
-                <div className="text-[11px] font-extrabold uppercase tracking-wider text-gray-300 mb-1">
-                  Pieza {todayCount}
-                </div>
-                <div className="flex items-center justify-end">
-                  <button
-                    onClick={saveReceipt}
-                    disabled={savingReceipt}
-                    className="h-7 px-4 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-extrabold disabled:opacity-50 flex items-center"
-                    data-testid="home-save-button"
-                  >
-                    {savingReceipt ? <Loader2 className="w-3 h-3 animate-spin" /> : "SAVE"}
-                  </button>
-                </div>
+            {/* RIGHT — Pieza count + SAVE (siempre visible para registrar escaneo) */}
+            <div className="text-right">
+              <div className="text-[11px] font-extrabold uppercase tracking-wider text-gray-300 mb-1">
+                Pieza {todayCount}
               </div>
-            ) : (
-              <div />
-            )}
+              <div className="flex items-center justify-end">
+                <button
+                  onClick={saveReceipt}
+                  disabled={savingReceipt}
+                  className="h-7 px-4 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-extrabold disabled:opacity-50 flex items-center"
+                  data-testid="home-save-button"
+                >
+                  {savingReceipt ? <Loader2 className="w-3 h-3 animate-spin" /> : "SAVE"}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
