@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2, ScanLine, UserCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatCurrency, formatNumber } from "@/lib/api";
-import ScanHarvestMode from "@/components/ScanHarvestMode";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -62,8 +61,23 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-5 bg-white -mx-4 -my-5 sm:-my-7 px-4 py-5 sm:py-7 min-h-[calc(100vh-104px)]" data-testid="dashboard-page">
-      {/* Live scanner — the "home" IS the scanner */}
-      <ScanHarvestMode />
+      {/* Quick CTAs */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <button
+          onClick={() => navigate("/registrar?mode=qr")}
+          className="field-btn-primary"
+          data-testid="dashboard-cta-scan-harvest"
+        >
+          <ScanLine className="w-6 h-6" /> Cosechar por QR
+        </button>
+        <button
+          onClick={() => navigate("/asistencia")}
+          className="field-btn-secondary h-14 text-lg"
+          data-testid="dashboard-cta-asistencia"
+        >
+          <UserCheck className="w-5 h-5" /> Asistencia
+        </button>
+      </div>
 
       {/* Month records list */}
       <div className="field-card p-0 overflow-hidden" data-testid="dashboard-month-records">
