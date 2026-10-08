@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Loader2, Plus, ScanLine, Moon, RefreshCw, Cloud,
-  SlidersHorizontal, Search, Trash2,
+  SlidersHorizontal, Search, Trash2, LogOut,
 } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatCurrency, formatNumber } from "@/lib/api";
@@ -113,12 +113,12 @@ export default function Dashboard() {
         </button>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => navigate("/registrar?mode=qr")}
-            className="w-11 h-11 rounded-xl bg-[#1D4ED8] flex items-center justify-center text-white shadow"
-            data-testid="home-camera-button"
-            aria-label="Escanear"
+            onClick={() => navigate("/asistencia?action=checkout")}
+            className="w-11 h-11 rounded-xl bg-[#DC2626] flex items-center justify-center text-white shadow"
+            data-testid="home-checkout-button"
+            aria-label="Check out"
           >
-            <ScanLine className="w-5 h-5" />
+            <LogOut className="w-5 h-5" />
           </button>
           <button
             onClick={() => navigate("/asistencia")}
