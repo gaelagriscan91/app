@@ -294,6 +294,9 @@ export default function ScanHarvestMode() {
       return { ...prev, [w.id]: { name: w.name, count: cur.count + 1 } };
     });
     logScan(w, "qr");
+    // Auto-return to Dashboard so the user sees the scan in the list and can save
+    toast.success(`${w.name} escaneado`, { duration: 1500 });
+    setTimeout(() => navigate("/"), 350);
   };
 
   const addManual = (workerId) => {
@@ -681,101 +684,7 @@ export default function ScanHarvestMode() {
         </div>
       </div>
 
-      {/* Dark bottom action bar — Empleados · fractions · SCAN · last-worker card · SAVE */}
-      <div className="bg-[#1F2937] text-white pb-[env(safe-area-inset-bottom)]" data-testid="scan-bottom-bar">
-        {shareMode && shareBuffer.length > 0 ? (
-          <div className="px-4 pt-3 pb-2" data-testid="scan-share-panel">
-            <div className="text-sm font-bold opacity-95 truncate" data-testid="scan-share-names">
-              {shareBuffer.map((w) => w.name).join(", ")}
-            </div>
-            <div className="flex items-end gap-3 mt-1">
-              <div className="font-mono-stat text-5xl leading-none" data-testid="scan-share-baskets">
-                {shareBaskets}
-              </div>
-              <div className="pb-1">
-                <div className="text-sm font-bold leading-tight">
-                  canasta{shareBaskets !== 1 ? "s" : ""}
-                </div>
-                <div className="text-xs opacity-85 leading-tight">
-                  compartida{shareBaskets !== 1 ? "s" : ""}
-                </div>
-              </div>
-              <div className="ml-auto flex items-center gap-1">
-                <button
-                  onClick={() => setShareBaskets((n) => Math.max(0, n - 1))}
-                  className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center"
-                  data-testid="scan-share-dec"
-                  aria-label="Restar canasta"
-                >
-                  <Minus className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => setShareBaskets((n) => n + 1)}
-                  className="w-10 h-10 rounded-full bg-white text-[#2B55D1] hover:bg-white/90 flex items-center justify-center"
-                  data-testid="scan-share-inc"
-                  aria-label="Sumar canasta"
-                >
-                  <Plus className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="px-3 pt-3 pb-3 flex items-center justify-center gap-6">
-            {/* CENTER: Big round SCAN button */}
-            <button
-              onClick={() => {
-                if (lastWorker) {
-                  bump(lastWorker.id, 1);
-                  logScan({ id: lastWorker.id, name: lastWorker.name }, "manual");
-                  playBeep();
-                }
-              }}
-              className="w-20 h-20 rounded-full bg-[#DC2626] hover:bg-[#B91C1C] active:scale-[0.96] text-white font-extrabold text-base flex items-center justify-center shadow-lg border-4 border-white/10"
-              data-testid="scan-big-button"
-              aria-label="Escanear"
-              style={{ fontFamily: "Outfit, sans-serif" }}
-            >
-              SCAN
-            </button>
-
-            {/* Right: compact unit counter only */}
-            <div className="text-right">
-              <div className="text-[11px] font-bold opacity-85 uppercase tracking-wider">
-                {unitLabel.charAt(0).toUpperCase() + unitLabel.slice(1)}
-              </div>
-              <div className="font-mono-stat text-2xl leading-none mt-0.5">
-                {Math.round(totals.units)}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Share-mode totals + save (kept for shared basket flow) */}
-        {shareMode && shareBuffer.length > 0 && (
-          <div className="px-3 pb-3 flex items-center gap-2">
-            <div className="flex-1 bg-black/20 rounded-xl px-3 py-2">
-              <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">Pago por trabajador</div>
-              <div className="flex items-center gap-3 mt-0.5">
-                <div className="font-mono-stat text-lg leading-none">{shareBuffer.length}👤</div>
-                <div className="font-mono-stat text-lg leading-none">{shareBaskets}🧺</div>
-                <div className="font-mono-stat text-lg leading-none ml-auto">
-                  {formatCurrency(shareBuffer.length > 0 ? (shareBaskets * (parseFloat(pricePerUnit) || 0)) / shareBuffer.length : 0)} c/u
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={save}
-              disabled={saving}
-              className="h-[52px] px-4 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] active:scale-[0.98] text-white font-extrabold flex items-center gap-1.5 shadow-md disabled:opacity-50"
-              data-testid="scan-share-save-button"
-              style={{ fontFamily: "Outfit, sans-serif" }}
-            >
-              {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Save className="w-5 h-5" /> Guardar</>}
-            </button>
-          </div>
-        )}
-      </div>
+      {/* No bottom bar — scanner is minimal and auto-returns to Dashboard on successful scan */}
 
       {/* Edit price modal */}
       {editPrice && (
