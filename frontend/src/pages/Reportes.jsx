@@ -287,34 +287,33 @@ export default function Reportes() {
 
       {tab === "recibos" ? <RecibosTab /> : (
       <>
-      {/* Danger zone — reset button now lives inline in the filter row below */}
-
-      {/* Filters — standalone, no card wrapper */}
-      <div className="space-y-3">
-        <div>
-          <label className="block text-xs font-bold text-[#1A2210] mb-1 uppercase tracking-wider">Hasta</label>
-          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="field-input !h-12 !text-base" data-testid="filter-date-to" />
-        </div>
-        <div className="flex flex-row">
-          <button onClick={load} className="field-btn-secondary flex-1 !rounded-r-none !border-r-0" data-testid="apply-filters-button">
-            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Aplicar filtros"}
-          </button>
-          <button
-            onClick={exportExcel}
-            disabled={exporting || rows.length === 0}
-            className="field-btn-accent flex-1 disabled:opacity-60 !rounded-none !border-r-0"
-            data-testid="export-excel-button"
-          >
-            {exporting ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Download className="w-5 h-5" /> Exportar a Excel</>}
-          </button>
-          <button
-            onClick={() => setShowReset(true)}
-            className="h-12 px-4 bg-red-600 hover:bg-red-700 text-white font-extrabold rounded-xl !rounded-l-none flex items-center justify-center gap-1.5 shadow-sm shrink-0"
-            data-testid="open-reset-modal"
-          >
-            <Trash2 className="w-4 h-4" /> Borrar
-          </button>
-        </div>
+      {/* Filters — 2-column grid: Aplicar/Fecha on the left, Exportar/Borrar on the right */}
+      <div className="grid grid-cols-2 gap-3">
+        <button onClick={load} className="field-btn-secondary h-12" data-testid="apply-filters-button">
+          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Aplicar filtros"}
+        </button>
+        <button
+          onClick={exportExcel}
+          disabled={exporting || rows.length === 0}
+          className="field-btn-accent h-12 disabled:opacity-60"
+          data-testid="export-excel-button"
+        >
+          {exporting ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Download className="w-5 h-5" /> Exportar a Excel</>}
+        </button>
+        <input
+          type="date"
+          value={dateTo}
+          onChange={(e) => setDateTo(e.target.value)}
+          className="field-input !h-12 !text-base"
+          data-testid="filter-date-to"
+        />
+        <button
+          onClick={() => setShowReset(true)}
+          className="h-12 px-4 bg-red-600 hover:bg-red-700 text-white font-extrabold rounded-xl flex items-center justify-center gap-1.5 shadow-sm"
+          data-testid="open-reset-modal"
+        >
+          <Trash2 className="w-4 h-4" /> Borrar todo
+        </button>
       </div>
 
       {/* Resumen por trabajador */}
