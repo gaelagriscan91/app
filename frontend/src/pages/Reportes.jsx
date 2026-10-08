@@ -85,6 +85,20 @@ export default function Reportes() {
     );
   }, [rows]);
 
+  // Aggregate rows per worker for the "Resumen por trabajador" block
+  const workersSummary = useMemo(() => {
+    const agg = {};
+    for (const r of rows) {
+      const key = r.worker_id || r.worker_name || "—";
+      if (!agg[key]) agg[key] = { id: key, name: r.worker_name || "—", kilos: 0, units: 0, payment: 0, count: 0 };
+      agg[key].kilos += Number(r.kilos || 0);
+      agg[key].units += Number(r.units || 0);
+      agg[key].payment += Number(r.payment || 0);
+      agg[key].count += 1;
+    }
+    return Object.values(agg).sort((a, b) => b.payment - a.payment);
+  }, [rows]);
+
   const exportExcel = async () => {
     setExporting(true);
     try {
@@ -305,35 +319,10 @@ export default function Reportes() {
             Filtros
           </h3>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <div>
-            <label className="block text-xs font-bold text-[#1A2210] mb-1 uppercase tracking-wider">Desde</label>
-            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="field-input !h-12 !text-base" data-testid="filter-date-from" />
-          </div>
+        <div className="grid grid-cols-1 gap-3">
           <div>
             <label className="block text-xs font-bold text-[#1A2210] mb-1 uppercase tracking-wider">Hasta</label>
             <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="field-input !h-12 !text-base" data-testid="filter-date-to" />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-[#1A2210] mb-1 uppercase tracking-wider">Trabajador</label>
-            <select value={workerId} onChange={(e) => setWorkerId(e.target.value)} className="field-input !h-12 !text-base" data-testid="filter-worker">
-              <option value="">Todos</option>
-              {workers.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-[#1A2210] mb-1 uppercase tracking-wider">Parcela</label>
-            <select value={parcelId} onChange={(e) => setParcelId(e.target.value)} className="field-input !h-12 !text-base" data-testid="filter-parcel">
-              <option value="">Todas</option>
-              {parcels.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-[#1A2210] mb-1 uppercase tracking-wider">Producto</label>
-            <select value={productId} onChange={(e) => setProductId(e.target.value)} className="field-input !h-12 !text-base" data-testid="filter-product">
-              <option value="">Todos</option>
-              {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
           </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
@@ -363,20 +352,28 @@ export default function Reportes() {
         </p>
       </div>
 
-      {/* Totals */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-2xl bg-[#1D4ED8] text-white p-4 border-2 border-[#1E3A8A] shadow-sm" data-testid="report-total-kilos">
-          <div className="text-[11px] font-bold uppercase tracking-wider opacity-90 flex items-center gap-1"><Wheat className="w-3.5 h-3.5" /> Kilos</div>
-          <div className="font-mono-stat text-xl sm:text-2xl mt-1">{formatNumber(totals.kilos, 2)}</div>
-        </div>
-        <div className="rounded-2xl bg-white border-2 border-[#E2DDD0] text-[#1A2210] p-4 shadow-sm" data-testid="report-total-units">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-[#556047]">Unidades</div>
-          <div className="font-mono-stat text-xl sm:text-2xl mt-1">{formatNumber(totals.units, 0)}</div>
-        </div>
-        <div className="rounded-2xl bg-[#DC2626] text-white p-4 border-2 border-[#B91C1C] shadow-sm" data-testid="report-total-payment">
-          <div className="text-[11px] font-bold uppercase tracking-wider opacity-90 flex items-center gap-1"><DollarSign className="w-3.5 h-3.5" /> Total pago</div>
-          <div className="font-mono-stat text-xl sm:text-2xl mt-1">{formatCurrency(totals.payment)}</div>
-        </div>
+      {/* Resumen por trabajador */}
+      <div className="field-card p-4 sm:p-5" data-testid="report-workers-summary">
+        <h3 className="text-base font-bold text-[#1A2210] mb-3 flex items-center gap-2" style={{ fontFamily: "Outfit, sans-serif" }}>
+          <FileText className="w-5 h-5 text-[#1D4ED8]" /> Resumen por trabajador
+        </h3>
+        {workersSummary.length === 0 ? (
+          <div className="text-sm text-[#556047] font-semibold text-center py-4">Sin resultados</div>
+        ) : (
+          <div className="divide-y divide-[#E2DDD0]">
+            {workersSummary.map((w) => (
+              <div key={w.id} className="flex items-center justify-between py-3" data-testid={`worker-summary-${w.id}`}>
+                <div className="min-w-0 flex-1 pr-3">
+                  <div className="font-bold text-[#1A2210] truncate">{w.name}</div>
+                  <div className="text-xs text-[#556047] font-semibold truncate">
+                    {formatNumber(w.kilos, 2)} Kg · {formatNumber(w.units, 0)} u. · {w.count} registro{w.count !== 1 ? "s" : ""}
+                  </div>
+                </div>
+                <div className="font-mono-stat text-lg text-[#1D4ED8] font-extrabold">{formatCurrency(w.payment)}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Table */}
