@@ -304,14 +304,14 @@ export default function Reportes() {
           <label className="block text-xs font-bold text-[#1A2210] mb-1 uppercase tracking-wider">Hasta</label>
           <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="field-input !h-12 !text-base" data-testid="filter-date-to" />
         </div>
-        <div className="flex flex-row gap-2">
-          <button onClick={load} className="field-btn-secondary flex-1" data-testid="apply-filters-button">
+        <div className="flex flex-row">
+          <button onClick={load} className="field-btn-secondary flex-1 !rounded-r-none !border-r-0" data-testid="apply-filters-button">
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Aplicar filtros"}
           </button>
           <button
             onClick={exportExcel}
             disabled={exporting || rows.length === 0}
-            className="field-btn-accent flex-1 disabled:opacity-60"
+            className="field-btn-accent flex-1 disabled:opacity-60 !rounded-l-none"
             data-testid="export-excel-button"
           >
             {exporting ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Download className="w-5 h-5" /> Exportar a Excel</>}
