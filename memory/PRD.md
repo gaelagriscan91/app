@@ -29,6 +29,7 @@ Agricultural harvest tracking web app (PickTrace-style). Register harvest (Worke
 - [2026-02-08i] **Reportes: layout mobile = desktop**: Título "Filtros" → "Fecha". Botones Aplicar filtros / Exportar a Excel ahora quedan lado a lado en mobile (removido `flex-col sm:flex-row`, ahora siempre `flex-row`). Mantiene Compartir reporte full-width debajo.
 - [2026-02-08j] **Reportes: eliminada tabla de Detalle de cosechas**: Removida la tabla desktop + la lista mobile stacked (`field-card overflow-hidden` con rows[]) al final de Reportes porque el detalle ya existe en el Registro del escáner. Queda únicamente el bloque "Resumen por trabajador".
 - [2026-02-08k] **Lista del día: eliminado "Resumen por trabajador"**: Removida la card "Resumen por trabajador" (`by_worker`) de `ListaDia.jsx`. Queda sólo la tarjeta Unidades + "Detalle de cosechas".
+- [2026-02-08l] **Reportes: aviso "Empezar temporada nueva" removido**: La caja roja con ícono + título "Empezar temporada nueva" y descripción fue eliminada en `Reportes.jsx`. Queda solo el botón "Borrar todo" alineado a la derecha, que sigue abriendo el modal de confirmación.
 
 ## Backlog (P1/P2)
 - P1 — Export por trabajador (Nómina)

@@ -288,27 +288,14 @@ export default function Reportes() {
       {tab === "recibos" ? <RecibosTab /> : (
       <>
       {/* Danger zone — reset history (admin only) */}
-      <div className="field-card p-4 border-2 border-red-200 bg-red-50/60">
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-red-500 text-white flex items-center justify-center shrink-0">
-            <AlertTriangle className="w-5 h-5" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="font-extrabold text-red-900 text-sm" style={{ fontFamily: "Outfit, sans-serif" }}>
-              Empezar temporada nueva
-            </h3>
-            <p className="text-xs text-red-800/80 font-semibold mt-0.5">
-              Borra TODO el historial (cosechas y asistencias) para volver a usar la app desde cero.
-            </p>
-          </div>
-          <button
-            onClick={() => setShowReset(true)}
-            className="h-10 px-3 bg-red-600 hover:bg-red-700 text-white font-extrabold rounded-xl flex items-center gap-1.5 shadow-sm"
-            data-testid="open-reset-modal"
-          >
-            <Trash2 className="w-4 h-4" /> Borrar todo
-          </button>
-        </div>
+      <div className="flex justify-end">
+        <button
+          onClick={() => setShowReset(true)}
+          className="h-10 px-3 bg-red-600 hover:bg-red-700 text-white font-extrabold rounded-xl flex items-center gap-1.5 shadow-sm"
+          data-testid="open-reset-modal"
+        >
+          <Trash2 className="w-4 h-4" /> Borrar todo
+        </button>
       </div>
 
       {/* Filters */}
