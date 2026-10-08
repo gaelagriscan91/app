@@ -25,6 +25,8 @@ export default function Reportes() {
   const [parcels, setParcels] = useState([]);
   const [products, setProducts] = useState([]);
   const [rows, setRows] = useState([]);
+  const [receipts, setReceipts] = useState([]);
+  const [expandedWorker, setExpandedWorker] = useState(null);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [sharing, setSharing] = useState(false);
@@ -51,16 +53,24 @@ export default function Reportes() {
   const load = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get("/harvests", {
-        params: {
-          date_from: dateFrom || undefined,
-          date_to: dateTo || undefined,
-          worker_id: workerId || undefined,
-          parcel_id: parcelId || undefined,
-          product_id: productId || undefined,
-        },
-      });
-      setRows(data);
+      const dFrom = dateFrom || startOfMonthISO();
+      const dTo = dateTo || todayISO();
+      const [harvRes, recRes] = await Promise.all([
+        api.get("/harvests", {
+          params: {
+            date_from: dFrom,
+            date_to: dTo,
+            worker_id: workerId || undefined,
+            parcel_id: parcelId || undefined,
+            product_id: productId || undefined,
+          },
+        }),
+        api.get("/receipts", {
+          params: { date_from: dFrom, date_to: dTo },
+        }),
+      ]);
+      setRows(harvRes.data);
+      setReceipts(recRes.data || []);
     } catch (e) {
       toast.error("No se pudo cargar el reporte");
     } finally {
@@ -316,26 +326,90 @@ export default function Reportes() {
         </button>
       </div>
 
-      {/* Resumen por trabajador */}
+      {/* Resumen por trabajador — detailed */}
       <div className="field-card p-4 sm:p-5" data-testid="report-workers-summary">
         <h3 className="text-base font-bold text-[#1A2210] mb-3 flex items-center gap-2" style={{ fontFamily: "Outfit, sans-serif" }}>
           <FileText className="w-5 h-5 text-[#1D4ED8]" /> Resumen por trabajador
         </h3>
-        {workersSummary.length === 0 ? (
+        {receipts.length === 0 ? (
           <div className="text-sm text-[#556047] font-semibold text-center py-4">Sin resultados</div>
         ) : (
           <div className="divide-y divide-[#E2DDD0]">
-            {workersSummary.map((w) => (
-              <div key={w.id} className="flex items-center justify-between py-3" data-testid={`worker-summary-${w.id}`}>
-                <div className="min-w-0 flex-1 pr-3">
-                  <div className="font-bold text-[#1A2210] truncate">{w.name}</div>
-                  <div className="text-xs text-[#556047] font-semibold truncate">
-                    {formatNumber(w.kilos, 2)} Kg · {formatNumber(w.units, 0)} u. · {w.count} registro{w.count !== 1 ? "s" : ""}
-                  </div>
+            {receipts.map((r) => {
+              const open = expandedWorker === r.worker_id;
+              return (
+                <div key={r.worker_id} data-testid={`worker-summary-${r.worker_id}`}>
+                  <button
+                    onClick={() => setExpandedWorker(open ? null : r.worker_id)}
+                    className="w-full flex items-center justify-between py-3 text-left hover:bg-[#F7F5EE]/40 rounded-lg px-1 -mx-1 transition"
+                  >
+                    <div className="min-w-0 flex-1 pr-3">
+                      <div className="font-bold text-[#1A2210] truncate">{r.worker_name}</div>
+                      <div className="text-xs text-[#556047] font-semibold truncate">
+                        {formatNumber(r.total_units, 0)} u. · {formatNumber(r.total_hours, 2)} h · {r.harvests?.length || 0} registro{(r.harvests?.length || 0) !== 1 ? "s" : ""}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="font-mono-stat text-lg text-[#1D4ED8] font-extrabold">{formatCurrency(r.total_payment)}</div>
+                      <span className={`text-[#889078] transition-transform ${open ? "rotate-180" : ""}`}>▼</span>
+                    </div>
+                  </button>
+                  {open && (
+                    <div className="pb-3 space-y-3" data-testid={`worker-detail-${r.worker_id}`}>
+                      {/* Harvests breakdown */}
+                      {(r.harvests || []).length > 0 && (
+                        <div className="bg-[#F7F5EE] rounded-xl p-2.5">
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-[#556047] mb-1.5">Cosechas</div>
+                          <div className="divide-y divide-[#E2DDD0]">
+                            {r.harvests.map((h, idx) => {
+                              const price = h.price_per_unit || (h.units > 0 ? h.payment / h.units : 0);
+                              return (
+                                <div key={idx} className="py-1.5 flex items-start justify-between gap-2">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-xs font-extrabold text-[#1A2210]">{h.date}</div>
+                                    <div className="text-[11px] text-[#556047] font-semibold truncate">
+                                      {h.parcel_name} · {h.product_name}
+                                    </div>
+                                    <div className="text-[11px] text-[#556047] font-semibold">
+                                      {formatNumber(h.units, h.units % 1 === 0 ? 0 : 2)} {h.unit_label || "u"} · <span className="font-mono-stat">${formatNumber(price, 2)}</span> c/u
+                                    </div>
+                                  </div>
+                                  <div className="font-mono-stat text-sm text-[#1D4ED8] font-extrabold shrink-0">{formatCurrency(h.payment)}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Attendance breakdown */}
+                      {(r.attendance || []).length > 0 && (
+                        <div className="bg-[#F7F5EE] rounded-xl p-2.5">
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-[#556047] mb-1.5">Horas</div>
+                          <div className="divide-y divide-[#E2DDD0]">
+                            {r.attendance.map((a, idx) => (
+                              <div key={idx} className="py-1.5 flex items-center justify-between gap-2">
+                                <div className="text-xs font-extrabold text-[#1A2210]">{a.date}</div>
+                                <div className="text-[11px] font-mono-stat text-[#1A2210] font-semibold">
+                                  {a.check_in || "--:--"} → {a.check_out || "--:--"}
+                                </div>
+                                <div className="font-mono-stat text-xs text-[#1D4ED8] font-extrabold shrink-0">
+                                  {formatNumber(a.hours || 0, 2)} h
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex items-center justify-between pt-2 mt-1 border-t border-[#E2DDD0]">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#556047]">Total horas</span>
+                            <span className="font-mono-stat text-sm text-[#1D4ED8] font-extrabold">{formatNumber(r.total_hours, 2)} h</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <div className="font-mono-stat text-lg text-[#1D4ED8] font-extrabold">{formatCurrency(w.payment)}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
