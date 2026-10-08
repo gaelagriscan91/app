@@ -316,7 +316,7 @@ export default function Reportes() {
         <div className="flex items-center gap-2">
           <Filter className="w-5 h-5 text-[#1D4ED8]" />
           <h3 className="text-base font-bold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>
-            Filtros
+            Fecha
           </h3>
         </div>
         <div className="grid grid-cols-1 gap-3">
