@@ -74,39 +74,6 @@ export default function ListaDia() {
         </div>
       ) : (
         <>
-          {/* By worker */}
-          <div className="field-card p-4 sm:p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <Users className="w-5 h-5 text-[#1D4ED8]" />
-              <h3 className="text-lg font-bold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>
-                Resumen por trabajador
-              </h3>
-            </div>
-            {(data?.by_worker || []).length === 0 ? (
-              <p className="text-sm text-[#556047] font-semibold py-4 text-center">
-                Sin registros para esta fecha
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {data.by_worker.map((w) => (
-                  <div
-                    key={w.worker_id}
-                    className="flex items-center justify-between p-3 bg-[#F7F5EE] rounded-xl border border-[#E2DDD0]"
-                    data-testid={`worker-summary-${w.worker_id}`}
-                  >
-                    <div>
-                      <div className="font-bold text-[#1A2210]">{w.worker_name}</div>
-                      <div className="text-xs text-[#556047] font-semibold">
-                        {formatNumber(w.kilos, 2)} Kg • {formatNumber(w.units, 0)} u. • {w.count} registros
-                      </div>
-                    </div>
-                    <div className="font-mono-stat text-lg text-[#1D4ED8]">{formatCurrency(w.payment)}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
           {/* Harvests detail */}
           <div className="field-card p-4 sm:p-5">
             <h3 className="text-lg font-bold text-[#1A2210] mb-3" style={{ fontFamily: "Outfit, sans-serif" }}>
