@@ -60,7 +60,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6" data-testid="dashboard-page">
+    <div className="space-y-6 bg-white -mx-4 -my-5 sm:-my-7 px-4 py-5 sm:py-7 min-h-[calc(100vh-104px)]" data-testid="dashboard-page">
       {/* Quick CTAs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <button
