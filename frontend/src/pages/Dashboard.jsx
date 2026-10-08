@@ -15,6 +15,9 @@ export default function Dashboard() {
   const [search, setSearch] = useState("");
   const [savingReceipt, setSavingReceipt] = useState(false);
   const [applyingFrac, setApplyingFrac] = useState(null);
+  const [savedAt, setSavedAt] = useState(() => {
+    try { return localStorage.getItem("agriscan.lastSavedAt") || ""; } catch (_) { return ""; }
+  });
 
   const load = async () => {
     try {
@@ -93,6 +96,9 @@ export default function Dashboard() {
     setSavingReceipt(true);
     try {
       await api.post("/receipts/history", { date_from: today, date_to: today });
+      const now = new Date().toISOString();
+      try { localStorage.setItem("agriscan.lastSavedAt", now); } catch (_) {}
+      setSavedAt(now);
       toast.success("Recibo guardado");
       await load();
     } catch (e) {
@@ -101,6 +107,14 @@ export default function Dashboard() {
       setSavingReceipt(false);
     }
   };
+
+  // Show the action bar only when there's a NEW scan since last SAVE
+  const hasUnsavedScan = useMemo(() => {
+    if (!lastEntry) return false;
+    const scanAt = lastEntry.created_at || "";
+    if (!savedAt) return true;
+    return scanAt > savedAt;
+  }, [lastEntry, savedAt]);
 
   if (loading) {
     return (
@@ -191,6 +205,13 @@ export default function Dashboard() {
             {rows.map((r) => {
               const dt = new Date(r.date + "T00:00:00");
               const dateLabel = `${dt.getMonth() + 1}/${dt.getDate()}/${dt.getFullYear()}`;
+              let timeLabel = "";
+              if (r.created_at) {
+                try {
+                  const d = new Date(r.created_at);
+                  timeLabel = d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false });
+                } catch (_) {}
+              }
               return (
                 <li
                   key={r.id}
@@ -202,8 +223,14 @@ export default function Dashboard() {
                       {r.worker_name}
                       {r.pending && <span className="ml-2 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">En campo</span>}
                     </div>
-                    <div className="text-[11px] text-gray-400 font-semibold mt-0.5">
-                      {dateLabel}
+                    <div className="text-[11px] text-gray-400 font-semibold mt-0.5 flex items-center gap-1.5">
+                      <span>{dateLabel}</span>
+                      {timeLabel && (
+                        <>
+                          <span className="opacity-50">·</span>
+                          <span className="font-mono-stat">{timeLabel}</span>
+                        </>
+                      )}
                     </div>
                     {!r.pending && (r.parcel_name || r.product_name) && (
                       <div className="flex items-center gap-1.5 mt-1 flex-wrap">
@@ -239,7 +266,8 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Bottom action bar — Empleados · SCAN · Pieza · last entry */}
+      {/* Bottom action bar — only after a new scan (hidden after SAVE) */}
+      {hasUnsavedScan && (
       <div className="fixed left-0 right-0 bottom-[70px] z-30 pointer-events-none">
         <div className="max-w-5xl mx-auto px-3 pointer-events-auto">
           <div className="bg-[#111] border-t border-[#2A2A2A] rounded-t-2xl grid grid-cols-3 items-end gap-2 px-3 pt-2 pb-3 shadow-2xl">
@@ -305,6 +333,7 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }
