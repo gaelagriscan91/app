@@ -330,7 +330,7 @@ export default function ScanHarvestMode() {
       return { ...prev, [w.id]: { name: w.name, count: cur.count + 1 } };
     });
     logScan(w, "qr");
-    // AUTOSAVE each scan immediately so it shows in Cosecha, keep camera open
+    // Autosave the harvest + return to registry so the user can press GUARDAR
     toast.success(`${w.name} escaneado`, { duration: 1200 });
     const price = parseFloat(pricePerUnit) || 0;
     if (parcelId && productId) {
@@ -348,6 +348,7 @@ export default function ScanHarvestMode() {
         notes: "Cosecha escaneada",
       }).catch(() => { /* silent — logScan still tracks locally */ });
     }
+    setTimeout(() => navigate(returnPath), 400);
   };
 
   const addManual = (workerId) => {

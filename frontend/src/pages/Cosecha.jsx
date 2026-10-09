@@ -33,6 +33,7 @@ export default function Cosecha() {
     (async () => { await load(); setLoading(false); })();
   }, []);
 
+  // When returning from scanner without an explicit prompt, just refresh the list
   useEffect(() => {
     if (searchParams.get("prompt") === "save") {
       load().then(() => {
@@ -41,6 +42,9 @@ export default function Cosecha() {
         next.delete("prompt");
         setSearchParams(next, { replace: true });
       });
+    } else {
+      // Refresh silently every time the page gains focus (post-scan)
+      load();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
