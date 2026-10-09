@@ -100,17 +100,50 @@ export default function Cosecha() {
     return [...rows].sort((a, b) => (b.created_at || b.date || "").localeCompare(a.created_at || a.date || ""));
   }, [rows]);
 
+  // Merge saved rows + pending scans into a single list sorted by most recent.
+  // Pending entries carry source="pending" so the row can show a "SIN GUARDAR" badge.
+  const combined = useMemo(() => {
+    const today = todayStr();
+    const session = (() => {
+      try { return JSON.parse(localStorage.getItem(sessionKey(today)) || "{}"); } catch (_) { return {}; }
+    })();
+    const unitMode = (session.unitMode || "pieza").toLowerCase();
+    const unitShort = unitMode.startsWith("libra") ? "LB" : unitMode.startsWith("hora") ? "HR" : "PZA";
+    const unitLabel = unitShort === "LB" ? "libra" : unitShort === "HR" ? "hora" : "pieza";
+
+    const pendingRows = (pending || []).map((e) => {
+      const units = typeof e.fraction === "number" ? e.fraction : 1;
+      const price = Number(e.priceAt) || Number(session.pricePerUnit) || 0;
+      return {
+        id: `pending-${e.id}`,
+        worker_name: e.name,
+        worker_id: e.workerId,
+        date: today,
+        created_at: e.at,
+        units,
+        payment: units * price,
+        unit_label: unitLabel,
+        notes: "pending",
+        _pending: true,
+      };
+    });
+    const list = [...pendingRows, ...sorted];
+    return list.sort((a, b) => (b.created_at || b.date || "").localeCompare(a.created_at || a.date || ""));
+  }, [sorted, pending]);
+
   const todayCount = useMemo(() => {
     const t = todayStr();
-    return sorted.filter((r) => r.date === t).length;
-  }, [sorted]);
+    const saved = sorted.filter((r) => r.date === t).length;
+    return saved + pending.length;
+  }, [sorted, pending]);
 
   const activeWorkers = useMemo(() => {
     const t = todayStr();
     const set = new Set();
     sorted.forEach((r) => { if (r.date === t && r.worker_id) set.add(r.worker_id); });
+    pending.forEach((e) => { if (e.workerId) set.add(e.workerId); });
     return set.size;
-  }, [sorted]);
+  }, [sorted, pending]);
 
   if (loading) {
     return (
@@ -146,19 +179,19 @@ export default function Cosecha() {
               </span>
             )}
             <div className="font-mono-stat text-base font-bold text-[#889078]">
-              {sorted.length}
+              {combined.length}
             </div>
           </div>
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto">
-          {sorted.length === 0 ? (
+          {combined.length === 0 ? (
             <div className="py-10 text-center text-sm text-[#889078] font-semibold">
-              {pending.length > 0 ? "Pulsa GUARDAR para registrar los escaneos" : "Sin escaneos registrados aún"}
+              Sin escaneos registrados aún
             </div>
           ) : (
             <ul className="divide-y divide-[#EFEADA]">
-              {sorted.map((r) => {
+              {combined.map((r) => {
                 let timeLabel = "";
                 if (r.created_at) {
                   try {
@@ -169,7 +202,10 @@ export default function Cosecha() {
                   } catch (_) {}
                 }
                 const notes = (r.notes || "").toLowerCase();
-                const sourceLabel = notes.includes("manual") || notes.includes("ajuste")
+                const isPending = !!r._pending;
+                const sourceLabel = isPending
+                  ? "SIN GUARDAR"
+                  : notes.includes("manual") || notes.includes("ajuste")
                   ? "MANUAL"
                   : notes.includes("comparti") || notes.includes("shared")
                   ? "GRUPO"
@@ -179,15 +215,17 @@ export default function Cosecha() {
                 return (
                   <li
                     key={r.id}
-                    className="px-4 py-3 flex items-center justify-between gap-3"
-                    data-testid={`cosecha-row-${r.id}`}
+                    className={`px-4 py-3 flex items-center justify-between gap-3 ${isPending ? "bg-amber-50/60" : ""}`}
+                    data-testid={isPending ? `cosecha-pending-${r.id}` : `cosecha-row-${r.id}`}
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="font-extrabold text-[#0F1115] truncate text-xl leading-tight">
                           {r.worker_name}
                         </span>
-                        <span className="px-2 py-[2px] rounded-md bg-[#DBE4FF] text-[#1D4ED8] text-[10px] font-extrabold tracking-wider">
+                        <span
+                          className={`px-2 py-[2px] rounded-md text-[10px] font-extrabold tracking-wider ${isPending ? "bg-amber-100 text-amber-700" : "bg-[#DBE4FF] text-[#1D4ED8]"}`}
+                        >
                           {sourceLabel}
                         </span>
                       </div>
@@ -198,7 +236,7 @@ export default function Cosecha() {
                       )}
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="font-mono-stat text-xl font-extrabold text-[#1D4ED8] leading-tight">
+                      <div className={`font-mono-stat text-xl font-extrabold leading-tight ${isPending ? "text-amber-700" : "text-[#1D4ED8]"}`}>
                         {formatCurrency(r.payment)}
                       </div>
                       <div className="text-[11px] font-semibold text-[#889078] mt-0.5">

@@ -110,7 +110,9 @@ export default function ScanHarvestMode() {
 
   const lastRef = useRef({ code: "", at: 0 });
   const scannedCodesRef = useRef(new Map());
-  const SCAN_COOLDOWN_MS = 2 * 60 * 1000;
+  // Debounce only against double-reads of the same QR frame; allow the same
+  // worker to be scanned repeatedly so each tap produces a separate row.
+  const SCAN_COOLDOWN_MS = 1500;
 
   const normalizeCode = (s) => (s || "").toString().trim().toUpperCase();
   const extractCode = (raw) => {
@@ -277,12 +279,7 @@ export default function ScanHarvestMode() {
     const lastAt = scannedCodesRef.current.get(key) || 0;
     const elapsed = now - lastAt;
     if (lastAt > 0 && elapsed < SCAN_COOLDOWN_MS && !shareMode) {
-      // Cooldown applies only outside share mode (in share mode, re-scanning is intentional)
-      const remaining = Math.ceil((SCAN_COOLDOWN_MS - elapsed) / 1000);
-      const mins = Math.floor(remaining / 60);
-      const secs = remaining % 60;
-      const label = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
-      toast.error(`⏱️ Espera ${label} antes de volver a escanear.`, { duration: 2200 });
+      // Silent debounce — avoid double-registering the same QR frame.
       return;
     }
 
@@ -330,9 +327,10 @@ export default function ScanHarvestMode() {
       return { ...prev, [w.id]: { name: w.name, count: cur.count + 1 } };
     });
     logScan(w, "qr");
-    // No autosave — user will press GUARDAR in Cosecha to persist
-    toast.success(`${w.name} escaneado`, { duration: 1200 });
-    setTimeout(() => navigate(returnPath), 400);
+    // Keep the camera open — the user can scan the next worker right away.
+    // The pending scans are tracked locally and shown as "sin guardar" rows
+    // in the Cosecha list. GUARDAR button persists them to the backend.
+    toast.success(`${w.name} escaneado`, { duration: 1000 });
   };
 
   const addManual = (workerId) => {
