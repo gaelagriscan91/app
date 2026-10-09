@@ -530,7 +530,7 @@ export default function ScanHarvestMode() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col select-none" data-testid="scan-harvest-mode">
+    <div className="fixed inset-0 z-50 bg-black flex flex-col select-none" data-testid="scan-harvest-mode">
       {/* Transparent top bar (overlay) */}
       <div
         className="absolute top-0 left-0 right-0 z-20 text-white pt-[env(safe-area-inset-top)]"
@@ -569,26 +569,7 @@ export default function ScanHarvestMode() {
 
       {/* Camera body */}
       <div className="relative flex-1 overflow-hidden bg-black">
-        <div
-          id={containerId}
-          className="absolute inset-0"
-          style={{
-            // Force the html5-qrcode <video> to fill the container and crop
-            // uniformly so the red target frame is always at the optical center.
-            // eslint-disable-next-line
-            ["--qr-fit"]: "cover",
-          }}
-        />
-        <style>{`
-          #${containerId} video,
-          #${containerId} canvas {
-            width: 100% !important;
-            height: 100% !important;
-            object-fit: cover !important;
-            object-position: center !important;
-          }
-          #${containerId} > div { width: 100% !important; height: 100% !important; }
-        `}</style>
+        <div id={containerId} className="absolute inset-0" />
 
         {/* QR targeting frame */}
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
@@ -799,7 +780,7 @@ export default function ScanHarvestMode() {
 
         {/* Totals strip + Save */}
         <div className="px-3 pb-3 flex items-center gap-2">
-          <div className="flex-1 rounded-xl px-3 py-2">
+          <div className="flex-1 bg-black/20 rounded-xl px-3 py-2">
             {shareMode && shareBuffer.length > 0 ? (
               <>
                 <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">Pago por trabajador</div>
