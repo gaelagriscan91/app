@@ -1358,18 +1358,23 @@ async def receipts_export(
         return f"{hh}h {mm}min" if hh > 0 else f"{mm}min"
 
     same_day = date_from == date_to
-    session_price = float(price or 0)
+    sess = ((await db.checkin_sessions.find_one({"user_id": user["_id"]})) or {}).get("data", {}) or {}
+    sess_price = sess.get("pricePerHour") if sess.get("unitMode") == "horas" else sess.get("pricePerUnit")
+    try:
+        session_price = float(sess_price or price or 0)
+    except (TypeError, ValueError):
+        session_price = float(price or 0)
 
     def _pick(sess_val: Optional[str], key: str) -> str:
-        s = (sess_val or "").strip()
-        return s if (same_day and s) else (_uniq(key) or s)
+        s = str(sess_val or "").strip()
+        return s or _uniq(key)
 
     header_vals = {
-        "ranch": _pick(rancho, "parcel_name"),
-        "block": _pick(block, "block"),
-        "trabajo": _pick(trabajo, "product_name"),
-        "variety": _pick(variety, "variety"),
-        "mayordomo": _uniq("mayordomo") if not same_day else ((mayordomo or "").strip() or _uniq("mayordomo")),
+        "ranch": _pick(sess.get("ranchoName") or rancho, "parcel_name"),
+        "block": _pick(sess.get("block") or block, "block"),
+        "trabajo": _pick(sess.get("trabajoName") or trabajo, "product_name"),
+        "variety": _pick(sess.get("variedad") or variety, "variety"),
+        "mayordomo": _pick(sess.get("mayordomo") or mayordomo, "mayordomo"),
     }
 
     wb = Workbook()
