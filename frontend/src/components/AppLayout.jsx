@@ -1,11 +1,10 @@
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
-import { CalendarCheck, FileSpreadsheet, Boxes, LogOut, Home, Sprout } from "lucide-react";
+import { CalendarCheck, FileSpreadsheet, Boxes, LogOut, Home } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import LogoHandCherry from "@/components/LogoHandCherry";
 
 const navItems = [
   { to: "/", label: "Inicio", icon: Home, testid: "nav-dashboard" },
-  { to: "/cosecha", label: "Cosecha", icon: Sprout, testid: "nav-cosecha" },
   { to: "/dia", label: "Día", icon: CalendarCheck, testid: "nav-lista-dia" },
   { to: "/reportes", label: "Reportes", icon: FileSpreadsheet, testid: "nav-reportes" },
   { to: "/modulos", label: "Módulos", icon: Boxes, testid: "nav-modulos" },
@@ -73,7 +72,7 @@ export default function AppLayout() {
 
       {/* Bottom nav (mobile + desktop) */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-[#E2DDD0] shadow-[0_-6px_24px_rgba(30,70,32,0.08)] z-40">
-        <div className="max-w-5xl mx-auto grid grid-cols-5">
+        <div className="max-w-5xl mx-auto grid grid-cols-4">
           {navItems.map(({ to, label, icon: Icon, testid }) => (
             <NavLink
               key={to}

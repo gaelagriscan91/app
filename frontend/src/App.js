@@ -9,7 +9,6 @@ import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 import AppLayout from "@/components/AppLayout";
 import Dashboard from "@/pages/Dashboard";
-import Cosecha from "@/pages/Cosecha";
 import RegistrarCosecha from "@/pages/RegistrarCosecha";
 import ListaDia from "@/pages/ListaDia";
 import Reportes from "@/pages/Reportes";
@@ -51,7 +50,6 @@ function AppRoutes() {
         }
       >
         <Route path="/" element={<Dashboard />} />
-        <Route path="/cosecha" element={<Cosecha />} />
         <Route path="/registrar" element={<RegistrarCosecha />} />
         <Route path="/asistencia" element={<Asistencia />} />
         <Route path="/dia" element={<ListaDia />} />
