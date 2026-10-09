@@ -124,18 +124,23 @@ export default function Dashboard() {
     }
   };
 
-  // SAVE — mark today's scans as visible AND snapshot the receipt into history
+  // SAVE — snapshot today's receipts into history AND mark local scans as visible
   const saveReceipt = async () => {
     const today = new Date().toISOString().slice(0, 10);
-    // Always flag local savedIds first (so the records appear in Inicio even if the
-    // backend receipt snapshot is a no-op because it was already stored).
-    const todayIds = (data?.month_records || [])
+    setSavingReceipt(true);
+    // Refresh data first so we snapshot the latest harvests
+    let latest = data;
+    try {
+      const resp = await api.get("/dashboard");
+      latest = resp.data;
+      setData(latest);
+    } catch (_) { /* fallback to current data */ }
+
+    const todayIds = (latest?.month_records || [])
       .filter((r) => !r.pending && r.date === today)
       .map((r) => r.id);
-    if (todayIds.length === 0) {
-      toast.error("No hay escaneos para guardar");
-      return;
-    }
+
+    // Flag local savedIds so records show in Inicio
     const nextSet = new Set(savedIds);
     todayIds.forEach((id) => nextSet.add(id));
     setSavedIds(nextSet);
@@ -145,17 +150,17 @@ export default function Dashboard() {
       localStorage.setItem("agriscan.savedIds", JSON.stringify(raw));
     } catch (_) {}
 
-    setSavingReceipt(true);
+    // Snapshot receipt in backend (idempotent — may already exist, that's OK)
     try {
       await api.post("/receipts/history", { date_from: today, date_to: today });
-    } catch (_) { /* receipt already exists for today — ignore */ }
+    } catch (_) { /* ignore */ }
+
     const now = new Date().toISOString();
     try { localStorage.setItem("agriscan.lastSavedAt", now); } catch (_) {}
     setSavedAt(now);
     setShowSavePrompt(false);
-    toast.success("Registro guardado");
+    toast.success(todayIds.length ? "Registro guardado" : "Guardado");
     setSavingReceipt(false);
-    await load();
   };
 
   // Show the action bar only when there's a NEW scan since last SAVE
