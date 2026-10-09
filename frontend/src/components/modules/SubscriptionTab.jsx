@@ -1,13 +1,36 @@
 import { useEffect, useState } from "react";
-import { CreditCard, Loader2 } from "lucide-react";
+import { CreditCard, Loader2, Mail, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
+const SUPPORT_EMAIL = "gaelagriscan@gmail.com";
+const SUPPORT_PHONE = "5093173565";
+const WHATSAPP_URL = `https://wa.me/1${SUPPORT_PHONE}?text=${encodeURIComponent("Hola AgriScan, necesito ayuda con mi cuenta.")}`;
+
+function ContactCard() {
+  return (
+    <div className="field-card p-5 space-y-3" data-testid="support-contact-card">
+      <div>
+        <div className="font-extrabold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>Contactar AgriScan</div>
+        <div className="text-sm text-[#556047] font-semibold">¿Cómo te puedo ayudar?</div>
+      </div>
+      <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 rounded-xl bg-[#25D366] hover:bg-[#1EBE5A] text-white px-4 py-3 font-bold transition-colors" data-testid="support-whatsapp-link">
+        <MessageCircle className="w-5 h-5 shrink-0" />
+        <span className="flex-1">WhatsApp</span>
+        <span className="font-mono-stat">(509) 317-3565</span>
+      </a>
+      <a href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent("Ayuda con AgriScan")}`} className="flex items-center gap-3 rounded-xl border-2 border-[#E2DDD0] hover:bg-[#F7F5EE] text-[#1A2210] px-4 py-3 font-bold transition-colors break-all" data-testid="support-email-link">
+        <Mail className="w-5 h-5 shrink-0 text-[#1D4ED8]" /> {SUPPORT_EMAIL}
+      </a>
+    </div>
+  );
+}
+
 const STATUS = { ACTIVE: "Activa", CANCELLED: "Cancelada", SUSPENDED: "Suspendida", EXPIRED: "Vencida", APPROVAL_PENDING: "Pendiente de pago" };
 
 export default function SubscriptionTab() {
-  const { blocked, setPaywallOpen, refresh } = useAuth();
+  const { blocked, setPaywallOpen, refresh, user } = useAuth();
   const [billing, setBilling] = useState(null);
   const [cancelling, setCancelling] = useState(false);
 
@@ -33,13 +56,14 @@ export default function SubscriptionTab() {
   const until = billing.paid_until ? new Date(billing.paid_until).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" }) : "";
 
   return (
+    <div className="space-y-4">
     <div className="field-card p-5 space-y-4" data-testid="subscription-tab">
       <div className="flex items-center gap-3">
         <div className="w-11 h-11 rounded-xl bg-[#EEF2FF] flex items-center justify-center"><CreditCard className="w-5 h-5 text-[#1D4ED8]" /></div>
         <div>
           <div className="font-extrabold text-[#1A2210]">Plan AgriScan · ${billing.price || "29.99"} USD/mes</div>
           <div className="text-sm text-[#556047] font-semibold" data-testid="subscription-status">
-            Estado: {blocked ? "Bloqueada" : STATUS[billing.status] || (billing.status ? billing.status : "Activa por el administrador")}
+            Estado: {blocked ? "Bloqueada" : user?.trial_ends_at ? "Prueba gratis" : STATUS[billing.status] || (billing.status ? billing.status : "Activa por el administrador")}
             {until ? ` · Pagado hasta ${until}` : ""}
           </div>
         </div>
@@ -53,6 +77,8 @@ export default function SubscriptionTab() {
           Pagar $29.99/mes
         </button>
       ) : null}
+    </div>
+    <ContactCard />
     </div>
   );
 }
