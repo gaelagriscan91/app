@@ -559,7 +559,50 @@ export default function ScanHarvestMode() {
           </div>
         </div>
 
-        {/* Price auto-loaded from Check In session — chip removed from camera UI */}
+        {/* Floating PRECIO + unit toggle (top-left) */}
+        <div className="absolute top-4 left-3 flex items-stretch gap-1.5">
+          <button
+            onClick={() => setEditPrice(true)}
+            className="bg-white rounded-xl shadow-xl px-3 py-2 text-left border border-black/5 active:scale-[0.98]"
+            data-testid="scan-price-chip"
+          >
+            <div className="text-[10px] font-bold uppercase tracking-wider text-[#556047] leading-none">Precio</div>
+            <div className="font-mono-stat text-2xl text-[#1A2210] leading-tight mt-0.5">
+              {pricePerUnit ? `$${pricePerUnit}` : <span className="text-red-500">—</span>}
+            </div>
+            <div className="text-[10px] font-bold text-[#889078] leading-none">
+              / {unitLabel}
+            </div>
+          </button>
+          <div
+            className="flex flex-col justify-stretch bg-white rounded-xl shadow-xl p-1 border border-black/5"
+            data-testid="scan-unit-toggle"
+          >
+            {[
+              { v: "pieza", l: "PZA" },
+              { v: "libra", l: "LB" },
+              { v: "hora", l: "HR" },
+            ].map(({ v, l }) => (
+              <button
+                key={v}
+                onClick={() => {
+                  setUnitLabel(v);
+                  try {
+                    const k = `agriscan.session.${todayKey}`;
+                    const s = JSON.parse(localStorage.getItem(k) || "{}");
+                    s.unitMode = v;
+                    localStorage.setItem(k, JSON.stringify(s));
+                  } catch (_) {}
+                }}
+                className={`flex-1 px-2 rounded-md text-[11px] font-extrabold transition ${unitLabel === v ? "bg-[#1D4ED8] text-white" : "text-[#1A2210] hover:bg-black/5"}`}
+                data-testid={`scan-unit-${v}`}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Pause/Resume & Compartir buttons removed per user request */}
 
         {/* Side action: Manual add */}
@@ -660,56 +703,7 @@ export default function ScanHarvestMode() {
                 </button>
               </div>
             </div>
-            {/* Unit + price controls (persist to session so Check In stays in sync) */}
-            <div className="grid grid-cols-[1fr_1fr] gap-1.5 mt-2">
-              <div className="flex items-center bg-white/15 rounded-lg p-0.5" data-testid="scan-unit-toggle">
-                {[
-                  { v: "pieza", l: "PZA" },
-                  { v: "libra", l: "LB" },
-                  { v: "hora", l: "HR" },
-                ].map(({ v, l }) => (
-                  <button
-                    key={v}
-                    onClick={() => {
-                      setUnitLabel(v);
-                      try {
-                        const k = `agriscan.session.${todayKey}`;
-                        const s = JSON.parse(localStorage.getItem(k) || "{}");
-                        s.unitMode = v;
-                        localStorage.setItem(k, JSON.stringify(s));
-                      } catch (_) {}
-                    }}
-                    className={`flex-1 h-8 rounded-md text-[11px] font-extrabold transition ${unitLabel === v ? "bg-white text-[#2B55D1]" : "text-white/90 hover:bg-white/10"}`}
-                    data-testid={`scan-unit-${v}`}
-                  >
-                    {l}
-                  </button>
-                ))}
-              </div>
-              <div className="relative" data-testid="scan-price-field">
-                <DollarSign className="w-4 h-4 text-white/80 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  step="0.01"
-                  min="0"
-                  value={pricePerUnit}
-                  placeholder="0.00"
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setPricePerUnit(v);
-                    try {
-                      const k = `agriscan.session.${todayKey}`;
-                      const s = JSON.parse(localStorage.getItem(k) || "{}");
-                      s.pricePerUnit = parseFloat(v) || 0;
-                      localStorage.setItem(k, JSON.stringify(s));
-                    } catch (_) {}
-                  }}
-                  className="w-full h-8 pl-7 pr-2 rounded-lg bg-white/15 text-white font-mono-stat text-sm font-extrabold placeholder:text-white/50 focus:outline-none focus:bg-white/25 border border-white/10"
-                  data-testid="scan-price-input"
-                />
-              </div>
-            </div>
+            {/* Unit toggle and price field moved to top-left chip; keep only fraction row here */}
             {/* Quick fraction selector — adjusts the last added piece */}
             <div className="grid grid-cols-4 gap-1.5 mt-2">
               {[
