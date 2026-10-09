@@ -120,3 +120,9 @@ h4 {
 .qr-square-wrap canvas {
     display: none !important;
 }
+
+/* App shell fills the visible viewport (dvh accounts for mobile browser bars) */
+.app-shell {
+    height: 100vh;
+    height: 100dvh;
+}

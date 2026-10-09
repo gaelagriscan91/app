@@ -1,4 +1,4 @@
-import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { ClipboardList, CalendarCheck, FileSpreadsheet, Boxes, LogOut, Home, ScanLine } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import LogoHandCherry from "@/components/LogoHandCherry";
@@ -15,6 +15,8 @@ const navItems = [
 export default function AppLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  // Inicio is a full-bleed column (list scrolls inside, action panel pinned above the nav)
+  const fullBleed = useLocation().pathname === "/";
 
   const handleLogout = async () => {
     await logout();
@@ -22,9 +24,9 @@ export default function AppLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F7F5EE] pb-24">
+    <div className="app-shell flex flex-col bg-[#F7F5EE]">
       {/* Header */}
-      <header className="bg-[#1D4ED8] text-white sticky top-0 z-40 shadow-md">
+      <header className="bg-[#1D4ED8] text-white shrink-0 relative z-40 shadow-md">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <LogoHandCherry size={42} className="flex-shrink-0" />
@@ -68,12 +70,14 @@ export default function AppLayout() {
       </header>
 
       {/* Content */}
-      <main className="max-w-5xl mx-auto px-4 py-5 sm:py-7">
-        <Outlet />
-      </main>
+      <div className={`flex-1 min-h-0 ${fullBleed ? "flex flex-col" : "overflow-y-auto"}`}>
+        <main className={fullBleed ? "flex-1 min-h-0 w-full max-w-5xl mx-auto flex flex-col" : "max-w-5xl mx-auto px-4 py-5 sm:py-7"}>
+          <Outlet />
+        </main>
+      </div>
 
       {/* Bottom nav (mobile + desktop) */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-[#E2DDD0] shadow-[0_-6px_24px_rgba(30,70,32,0.08)] z-40">
+      <nav className="shrink-0 relative pb-[env(safe-area-inset-bottom)] bg-white border-t-2 border-[#E2DDD0] shadow-[0_-6px_24px_rgba(30,70,32,0.08)] z-40">
         <div className="max-w-5xl mx-auto grid grid-cols-6">
           {navItems.map(({ to, label, icon: Icon, testid }) => (
             <NavLink
