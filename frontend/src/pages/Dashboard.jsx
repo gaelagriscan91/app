@@ -66,35 +66,9 @@ export default function Dashboard() {
         </p>
       </div>
 
-      {/* Quick CTAs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <button
-          onClick={() => navigate("/registrar?mode=qr")}
-          className="field-btn-primary"
-          data-testid="dashboard-cta-scan-harvest"
-        >
-          <ScanLine className="w-6 h-6" /> Cosechar por QR
-        </button>
-        <button
-          onClick={() => navigate("/asistencia")}
-          className="field-btn-secondary h-14 text-lg"
-          data-testid="dashboard-cta-asistencia"
-        >
-          <UserCheck className="w-5 h-5" /> Asistencia
-        </button>
-      </div>
+      {/* Quick CTAs removed per user request */}
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 gap-3 sm:gap-4">
-        <StatCard
-          label="Pago hoy"
-          value={formatCurrency(data?.today_payment)}
-          sub="A pagar"
-          Icon={DollarSign}
-          variant="accent"
-          testid="stat-today-payment"
-        />
-      </div>
+      {/* Stats removed per user request */}
 
       {/* Month records list */}
       <div className="field-card p-0 overflow-hidden" data-testid="dashboard-month-records">

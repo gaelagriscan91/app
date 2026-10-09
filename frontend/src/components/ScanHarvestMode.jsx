@@ -571,14 +571,9 @@ export default function ScanHarvestMode() {
       <div className="relative flex-1 overflow-hidden bg-black">
         <div id={containerId} className="absolute inset-0" />
 
-        {/* QR targeting frame */}
+        {/* QR targeting frame — plain outlined square, no corner brackets */}
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="relative w-[72%] max-w-sm aspect-square border-2 border-red-500/80 rounded-xl">
-            <span className="absolute -top-0.5 -left-0.5 w-10 h-10 border-t-4 border-l-4 border-red-500 rounded-tl-xl" />
-            <span className="absolute -top-0.5 -right-0.5 w-10 h-10 border-t-4 border-r-4 border-red-500 rounded-tr-xl" />
-            <span className="absolute -bottom-0.5 -left-0.5 w-10 h-10 border-b-4 border-l-4 border-red-500 rounded-bl-xl" />
-            <span className="absolute -bottom-0.5 -right-0.5 w-10 h-10 border-b-4 border-r-4 border-red-500 rounded-br-xl" />
-          </div>
+          <div className="relative w-[72%] max-w-sm aspect-square border-2 border-red-500/80 rounded-xl" />
         </div>
 
         {/* Floating PRECIO + unit toggle (below top header) */}
