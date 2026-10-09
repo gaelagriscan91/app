@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Download, Filter, Loader2, Wheat, DollarSign, FileText, FileSpreadsheet, Share2, Trash2, AlertTriangle } from "lucide-react";
+import { Download, Filter, Loader2, Wheat, DollarSign, FileText, FileSpreadsheet, Share2, Trash2, AlertTriangle, Save, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import api, { API, formatCurrency, formatNumber } from "@/lib/api";
 import RecibosTab from "@/components/RecibosTab";
@@ -34,6 +34,8 @@ export default function Reportes() {
   const [resetConfirm, setResetConfirm] = useState("");
   const [resetIncludeAttendance, setResetIncludeAttendance] = useState(true);
   const [resetting, setResetting] = useState(false);
+  const [resetCheck, setResetCheck] = useState(null);
+  const [savingBeforeReset, setSavingBeforeReset] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -233,6 +235,10 @@ export default function Reportes() {
       toast.error('Escribe "BORRAR" para confirmar');
       return;
     }
+    if (resetCheck?.unsaved) {
+      toast.error("Primero guarda tu recibo");
+      return;
+    }
     setResetting(true);
     try {
       const { data } = await api.post("/harvests/reset", null, {
@@ -252,9 +258,29 @@ export default function Reportes() {
       setResetConfirm("");
       setRows([]);
     } catch (e) {
+      if (e?.response?.status === 409) loadResetCheck();
       toast.error(e?.response?.data?.detail || "No se pudo borrar el historial");
     } finally {
       setResetting(false);
+    }
+  };
+
+  const loadResetCheck = async () => {
+    setResetCheck(null);
+    try { const { data } = await api.get("/harvests/reset-check"); setResetCheck(data); }
+    catch (_) { setResetCheck({ unsaved: false }); }
+  };
+
+  const saveBeforeReset = async () => {
+    setSavingBeforeReset(true);
+    try {
+      await api.post("/receipts/history", { date_from: resetCheck.date_from, date_to: resetCheck.date_to, note: "Guardado antes de borrar historial" });
+      toast.success("✓ Recibo guardado en Registro. Ya puedes borrar.");
+      await loadResetCheck();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "No se pudo guardar el recibo");
+    } finally {
+      setSavingBeforeReset(false);
     }
   };
 
@@ -318,7 +344,7 @@ export default function Reportes() {
           data-testid="filter-date-to"
         />
         <button
-          onClick={() => setShowReset(true)}
+          onClick={() => { setShowReset(true); loadResetCheck(); }}
           className="h-12 px-4 bg-red-600 hover:bg-red-700 text-white font-extrabold rounded-xl flex items-center justify-center gap-1.5 shadow-sm"
           data-testid="open-reset-modal"
         >
@@ -444,6 +470,23 @@ export default function Reportes() {
               />
               Borrar también asistencias (Check-in/Check-out)
             </label>
+            {resetCheck === null ? (
+              <div className="flex justify-center py-3 mb-3"><Loader2 className="w-5 h-5 animate-spin text-[#1D4ED8]" /></div>
+            ) : resetCheck.unsaved ? (
+              <div className="rounded-xl bg-[#FEF3C7] border-2 border-[#F59E0B] p-3 mb-3" data-testid="reset-save-first">
+                <p className="text-sm font-bold text-[#92400E] mb-2">Antes de borrar, guarda tu recibo para no perder la información.</p>
+                <button
+                  onClick={saveBeforeReset}
+                  disabled={savingBeforeReset}
+                  className="w-full h-11 rounded-xl bg-[#1D4ED8] hover:bg-[#1E3A8A] text-white font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-60"
+                  data-testid="reset-save-receipt-btn"
+                >
+                  {savingBeforeReset ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4" /> Guardar recibo</>}
+                </button>
+              </div>
+            ) : (
+              <p className="text-xs font-bold text-emerald-700 mb-3 flex items-center gap-1" data-testid="reset-saved-ok"><CheckCircle2 className="w-4 h-4" /> Tu información ya está guardada en Registro.</p>
+            )}
             <label className="block text-xs font-bold text-[#1A2210] uppercase tracking-wider mb-1">
               Escribe <span className="text-red-600 font-mono">BORRAR</span> para confirmar
             </label>
@@ -467,7 +510,7 @@ export default function Reportes() {
               </button>
               <button
                 onClick={resetAll}
-                disabled={resetting || resetConfirm.trim().toUpperCase() !== "BORRAR"}
+                disabled={resetting || resetCheck?.unsaved !== false || resetConfirm.trim().toUpperCase() !== "BORRAR"}
                 className="flex-1 h-12 rounded-xl bg-red-600 hover:bg-red-700 text-white font-extrabold disabled:opacity-50 flex items-center justify-center gap-1.5"
                 data-testid="reset-confirm-btn"
               >

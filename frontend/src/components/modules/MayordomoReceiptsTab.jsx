@@ -37,12 +37,11 @@ export default function MayordomoReceiptsTab() {
     })();
   }, []);
 
-  // Group receipts by mayordomo (saved_by). Exclude admin receipts.
+  // Group own receipts by who saved them
   const grouped = useMemo(() => {
     const map = {};
     for (const r of rows) {
       const role = r.saved_by_role || "admin";
-      if (role === "admin") continue; // exclude admin receipts — only mayordomos / users
       const name = r.saved_by_name || "Sin usuario";
       const key = `${role}::${name}`;
       if (!map[key]) map[key] = { key, name, role, receipts: [], total: 0, totalHours: 0, totalWorkers: 0 };

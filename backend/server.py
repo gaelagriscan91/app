@@ -404,9 +404,7 @@ def is_admin(user: dict) -> bool:
 
 
 def scope_filter(user: dict, field: str = "owner_id") -> dict:
-    """Admin sees everything; regular users only their own data."""
-    if is_admin(user):
-        return {}
+    """Every account (admin included) only sees its own data."""
     return {field: user["_id"]}
 
 
@@ -1009,11 +1007,42 @@ async def put_checkin_session(data: dict, user: CurrentUser):
     return {"ok": True}
 
 
+async def _unsaved_activity(user: dict) -> Optional[dict]:
+    """Return the date range of activity not yet covered by a saved receipt, or None."""
+    scope = scope_filter(user)
+    h_last = await db.harvests.find_one(scope, sort=[("created_at", -1)])
+    a_last = await db.attendance.find_one(scope, sort=[("_id", -1)])
+    if not h_last and not a_last:
+        return None
+    stamps = []
+    if h_last:
+        stamps.append(h_last.get("created_at") or "")
+    if a_last:
+        stamps.append(a_last.get("check_out") or a_last.get("check_in") or "")
+    last_activity = max(stamps)
+    saved = await db.receipts_history.find_one({**scope, "saved_at": {"$gte": last_activity}})
+    if saved:
+        return None
+    dates = []
+    for coll in (db.harvests, db.attendance):
+        lo = await coll.find_one(scope, sort=[("date", 1)])
+        hi = await coll.find_one(scope, sort=[("date", -1)])
+        dates += [d.get("date") for d in (lo, hi) if d and d.get("date")]
+    return {"date_from": min(dates), "date_to": max(dates)} if dates else None
+
+
+@api_router.get("/harvests/reset-check")
+async def reset_check(user: CurrentUser):
+    pending = await _unsaved_activity(user)
+    return {"unsaved": bool(pending), **(pending or {})}
+
+
 @api_router.post("/harvests/reset")
 async def reset_all_harvests(user: CurrentUser, include_attendance: bool = True):
-    """Deletes ALL harvests (and optionally attendance) for the current tenant.
-    `scope_filter(user)` ensures mayordomos only delete their own data; admins delete their tenant's data.
-    Used to start the season fresh."""
+    """Deletes ALL harvests (and optionally attendance) of the current account.
+    Requires the activity to be saved as a receipt first."""
+    if await _unsaved_activity(user):
+        raise HTTPException(status_code=409, detail="Primero guarda tu recibo para no perder la información.")
     scope = scope_filter(user)
     h_del = await db.harvests.delete_many(scope)
     await db.checkin_sessions.delete_many(scope_filter(user, "user_id"))
@@ -1978,9 +2007,6 @@ async def admin_list_mayordomos(user: CurrentUser):
     for r in rows:
         r.pop("password_hash", None)
         d = doc_out(r)
-        d["workers_count"] = await db.workers.count_documents({"owner_id": d["id"]})
-        d["parcels_count"] = await db.parcels.count_documents({"owner_id": d["id"]})
-        d["harvests_count"] = await db.harvests.count_documents({"owner_id": d["id"]})
         out.append(d)
     return out
 
@@ -2055,10 +2081,10 @@ async def admin_delete_mayordomo(uid: str, user: CurrentUser):
     existing = await db.users.find_one({"_id": ObjectId(uid)})
     if not existing:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    # Transfer orphan data to admin so nothing gets lost
-    aid = str(user["_id"])
-    for coll in ["workers", "parcels", "products", "harvests", "attendance", "crews"]:
-        await db[coll].update_many({"owner_id": uid}, {"$set": {"owner_id": aid}})
+    # Remove the account and all of its data (admin never takes over other users' data)
+    for coll in ["workers", "parcels", "products", "harvests", "attendance", "crews", "receipts_history"]:
+        await db[coll].delete_many({"owner_id": uid})
+    await db.checkin_sessions.delete_many({"user_id": uid})
     await db.users.delete_one({"_id": ObjectId(uid)})
     return {"ok": True}
 

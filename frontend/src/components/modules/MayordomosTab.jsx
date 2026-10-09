@@ -1,23 +1,24 @@
 import { useEffect, useState } from "react";
-import {
-  UserPlus, Loader2, Mail, Lock, User as UserIcon, Shield,
-  Edit3, Trash2, X, KeyRound, Eye, EyeOff, Users, MapPin, Package,
-  Ban, CheckCircle2,
-} from "lucide-react";
+import { Loader2, Mail, Shield, Trash2, Ban, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatApiErrorDetail } from "@/lib/api";
+
+function statusOf(u) {
+  if (u.active === false) return { label: "Bloqueado", cls: "bg-[#889078] text-white" };
+  if (u.unlocked_by === "trial") return { label: "Prueba gratis", cls: "bg-emerald-600 text-white" };
+  if (u.unlocked_by === "paypal") return { label: "Pagado", cls: "bg-[#FFC439] text-[#003087]" };
+  return { label: "Activo", cls: "bg-[#2563EB] text-white" };
+}
 
 export default function MayordomosTab() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState(null);
 
   const load = async () => {
     setLoading(true);
     try {
       const { data } = await api.get("/admin/mayordomos");
-      setRows(data);
+      setRows((data || []).filter((u) => u.role !== "admin"));
     } catch (e) {
       toast.error(formatApiErrorDetail(e.response?.data?.detail) || "No se pudo cargar");
     } finally {
@@ -26,8 +27,20 @@ export default function MayordomosTab() {
   };
   useEffect(() => { load(); }, []);
 
+  const onToggleBlock = async (u) => {
+    const willBlock = u.active !== false;
+    if (!window.confirm(`¿${willBlock ? "Bloquear" : "Desbloquear"} a ${u.name}?`)) return;
+    try {
+      await api.patch(`/admin/mayordomos/${u.id}`, { active: !willBlock, name: u.name });
+      toast.success(willBlock ? `${u.name} bloqueado` : `${u.name} desbloqueado`);
+      load();
+    } catch (e) {
+      toast.error(formatApiErrorDetail(e.response?.data?.detail) || "No se pudo actualizar");
+    }
+  };
+
   const onDelete = async (u) => {
-    if (!window.confirm(`¿Eliminar cuenta de ${u.name}? Sus datos se transferirán a tu cuenta admin.`)) return;
+    if (!window.confirm(`¿Eliminar la cuenta de ${u.name}? Se borrará la cuenta y toda su información. No se puede deshacer.`)) return;
     try {
       await api.delete(`/admin/mayordomos/${u.id}`);
       toast.success("Cuenta eliminada");
@@ -37,340 +50,52 @@ export default function MayordomosTab() {
     }
   };
 
-  const onToggleBlock = async (u) => {
-    const willBlock = u.active !== false;
-    const verb = willBlock ? "bloquear" : "desbloquear";
-    if (!window.confirm(`¿${verb[0].toUpperCase() + verb.slice(1)} a ${u.name}?`)) return;
-    try {
-      await api.patch(`/admin/mayordomos/${u.id}`, { active: !willBlock, name: u.name });
-      toast.success(willBlock ? `${u.name} bloqueado` : `${u.name} desbloqueado`);
-      load();
-    } catch (e) {
-      toast.error(formatApiErrorDetail(e.response?.data?.detail) || `No se pudo ${verb}`);
-    }
-  };
+  if (loading) return <div className="flex justify-center py-8 text-[#1D4ED8]"><Loader2 className="w-6 h-6 animate-spin" /></div>;
 
   return (
     <div className="space-y-4" data-testid="mayordomos-tab">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>
-          Mayordomos ({rows.length})
-        </h2>
-        <button
-          onClick={() => { setEditing(null); setShowForm(true); }}
-          className="h-11 px-4 bg-[#1D4ED8] hover:bg-[#1E3A8A] text-white font-bold rounded-xl flex items-center gap-1.5"
-          data-testid="mayordomo-add-button"
-        >
-          <UserPlus className="w-4 h-4" /> Nuevo mayordomo
-        </button>
-      </div>
-
-      {loading ? (
-        <div className="flex justify-center py-8 text-[#1D4ED8]"><Loader2 className="w-6 h-6 animate-spin" /></div>
-      ) : rows.length === 0 ? (
+      <h2 className="text-lg font-bold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>Usuarios ({rows.length})</h2>
+      {rows.length === 0 ? (
         <div className="field-card p-8 text-center">
           <Shield className="w-10 h-10 mx-auto text-[#889078] mb-2" />
-          <p className="text-[#556047] font-semibold">Aún no has creado mayordomos</p>
-          <p className="text-xs text-[#889078] mt-1">Toca <b>Nuevo mayordomo</b> para dar acceso a tu primer capataz</p>
+          <p className="text-[#556047] font-semibold">Aún no hay usuarios registrados</p>
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {rows.map((u) => {
-            const isAdmin = u.role === "admin";
-            const isInactive = u.active === false;
+            const st = statusOf(u);
+            const isBlocked = u.active === false;
             return (
-              <div
-                key={u.id}
-                className={`field-card p-4 border-l-4 ${isAdmin ? "border-l-[#2563EB]" : isInactive ? "border-l-[#889078]" : "border-l-[#2563EB]"}`}
-                data-testid={`mayordomo-row-${u.id}`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-bold text-[#1A2210] truncate text-base" style={{ fontFamily: "Outfit, sans-serif" }}>
-                        {u.name}
-                      </h3>
-                      {isAdmin ? (
-                        <span className="bg-[#2563EB] text-white px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
-                          <Shield className="w-3 h-3" /> Admin
-                        </span>
-                      ) : (
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${isInactive ? "bg-[#889078] text-white" : "bg-[#2563EB] text-white"}`}>
-                          {isInactive ? "Inactivo" : "Activo"}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-[#556047] font-semibold truncate flex items-center gap-1 mt-0.5">
-                      <Mail className="w-3 h-3" /> {u.email}
-                    </p>
-                    {u.access_expires_at && !isAdmin && (() => {
-                      const exp = new Date(u.access_expires_at);
-                      const expired = exp.getTime() <= Date.now();
-                      const daysLeft = Math.max(0, Math.ceil((exp.getTime() - Date.now()) / 86400000));
-                      return (
-                        <p className={`text-[11px] font-extrabold mt-0.5 ${expired ? "text-red-600" : "text-amber-700"}`} data-testid={`mayordomo-expiry-${u.id}`}>
-                          {expired ? `Expiró el ${exp.toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}` : `Faltan ${daysLeft} día${daysLeft !== 1 ? "s" : ""}`}
-                        </p>
-                      );
-                    })()}
-                  </div>
+              <div key={u.id} className="field-card p-4" data-testid={`mayordomo-row-${u.id}`}>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-bold text-[#1A2210] truncate text-base" style={{ fontFamily: "Outfit, sans-serif" }}>{u.name}</h3>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${st.cls}`} data-testid={`mayordomo-status-${u.id}`}>{st.label}</span>
                 </div>
-
-                {!isAdmin && (
-                  <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-[#E2DDD0]">
-                    <div className="text-center">
-                      <div className="flex items-center justify-center gap-1 text-[#889078]"><Users className="w-3 h-3" /><span className="text-[10px] font-bold uppercase">Trab.</span></div>
-                      <div className="font-mono-stat text-base text-[#1A2210]">{u.workers_count || 0}</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="flex items-center justify-center gap-1 text-[#889078]"><MapPin className="w-3 h-3" /><span className="text-[10px] font-bold uppercase">Ranc.</span></div>
-                      <div className="font-mono-stat text-base text-[#1A2210]">{u.parcels_count || 0}</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="flex items-center justify-center gap-1 text-[#889078]"><Package className="w-3 h-3" /><span className="text-[10px] font-bold uppercase">Cos.</span></div>
-                      <div className="font-mono-stat text-base text-[#1A2210]">{u.harvests_count || 0}</div>
-                    </div>
-                  </div>
-                )}
-
-                {!isAdmin && (
-                  <div className="flex gap-2 mt-3">
-                    <button
-                      onClick={() => onToggleBlock(u)}
-                      className={`flex-1 h-9 border-2 font-bold rounded-lg text-xs flex items-center justify-center gap-1 ${
-                        isInactive
-                          ? "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
-                          : "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
-                      }`}
-                      data-testid={`mayordomo-toggle-block-${u.id}`}
-                    >
-                      {isInactive ? <><CheckCircle2 className="w-3.5 h-3.5" /> Desbloquear</> : <><Ban className="w-3.5 h-3.5" /> Bloquear</>}
-                    </button>
-                    <button
-                      onClick={() => { setEditing(u); setShowForm(true); }}
-                      className="h-9 px-3 bg-white border-2 border-[#E2DDD0] hover:bg-[#F7F5EE] text-[#556047] font-bold rounded-lg text-xs flex items-center justify-center"
-                      data-testid={`mayordomo-edit-${u.id}`}
-                      title="Editar"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => onDelete(u)}
-                      className="h-9 px-3 bg-white border-2 border-red-100 hover:bg-red-50 text-red-600 font-bold rounded-lg text-xs flex items-center justify-center"
-                      data-testid={`mayordomo-delete-${u.id}`}
-                      title="Eliminar"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
+                <p className="text-xs text-[#556047] font-semibold truncate flex items-center gap-1 mt-0.5"><Mail className="w-3 h-3" /> {u.email}</p>
+                <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={() => onToggleBlock(u)}
+                    className={`flex-1 h-10 border-2 font-bold rounded-lg text-sm flex items-center justify-center gap-1.5 transition-colors ${
+                      isBlocked ? "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100" : "bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
+                    }`}
+                    data-testid={`mayordomo-toggle-block-${u.id}`}
+                  >
+                    {isBlocked ? <><CheckCircle2 className="w-4 h-4" /> Desbloquear</> : <><Ban className="w-4 h-4" /> Bloquear</>}
+                  </button>
+                  <button
+                    onClick={() => onDelete(u)}
+                    className="h-10 px-3 bg-white border-2 border-red-100 hover:bg-red-50 text-red-600 font-bold rounded-lg flex items-center justify-center transition-colors"
+                    data-testid={`mayordomo-delete-${u.id}`}
+                    aria-label="Eliminar cuenta"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             );
           })}
         </div>
       )}
-
-      {showForm && (
-        <MayordomoForm
-          editing={editing}
-          onClose={() => { setShowForm(false); setEditing(null); }}
-          onSaved={() => { load(); setShowForm(false); setEditing(null); }}
-        />
-      )}
-    </div>
-  );
-}
-
-function MayordomoForm({ editing, onClose, onSaved }) {
-  const [name, setName] = useState(editing?.name || "");
-  const [email, setEmail] = useState(editing?.email || "");
-  const [password, setPassword] = useState("");
-  const [active, setActive] = useState(editing?.active !== false);
-  const [accessDays, setAccessDays] = useState(editing?.access_days != null ? String(editing.access_days) : "");
-  const [showPass, setShowPass] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  const isEdit = !!editing;
-
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!name.trim()) return toast.error("Nombre requerido");
-    if (!isEdit && (!email.trim() || !password.trim())) return toast.error("Correo y contraseña requeridos");
-    setSaving(true);
-    try {
-      const daysNum = accessDays.trim() === "" ? null : parseInt(accessDays, 10);
-      if (isEdit) {
-        const payload = { name: name.trim(), active };
-        if (password.trim()) payload.password = password.trim();
-        if (accessDays.trim() !== "") payload.access_days = daysNum;
-        await api.patch(`/admin/mayordomos/${editing.id}`, payload);
-        toast.success(`${name} actualizado`);
-      } else {
-        const payload = {
-          email: email.trim().toLowerCase(),
-          password: password.trim(),
-          name: name.trim(),
-          active,
-        };
-        if (accessDays.trim() !== "" && daysNum > 0) payload.access_days = daysNum;
-        await api.post("/admin/mayordomos", payload);
-        toast.success(`${name} creado. Comparte el acceso.`);
-      }
-      onSaved();
-    } catch (err) {
-      toast.error(formatApiErrorDetail(err.response?.data?.detail) || "No se pudo guardar");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose} data-testid="mayordomo-form-modal">
-      <div className="bg-white rounded-t-3xl sm:rounded-3xl p-6 w-full sm:max-w-md shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-extrabold text-xl" style={{ fontFamily: "Outfit, sans-serif" }}>
-            {isEdit ? "Editar mayordomo" : "Nuevo mayordomo"}
-          </h3>
-          <button onClick={onClose}><X className="w-5 h-5" /></button>
-        </div>
-
-        <form onSubmit={submit} className="space-y-3">
-          <div>
-            <label className="block text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">Nombre completo *</label>
-            <div className="relative">
-              <UserIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#889078]" />
-              <input
-                autoFocus
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Ej. Pedro Hernández"
-                className="field-input w-full !pl-9"
-                data-testid="mayordomo-name-input"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">Correo (Gmail) *</label>
-            <div className="relative">
-              <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#889078]" />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={isEdit}
-                placeholder="mayordomo@gmail.com"
-                className="field-input w-full !pl-9 disabled:bg-[#F7F5EE] disabled:text-[#889078]"
-                data-testid="mayordomo-email-input"
-              />
-            </div>
-            {isEdit && <p className="text-[11px] text-[#889078] mt-1 font-semibold">El correo no se puede cambiar.</p>}
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">
-              {isEdit ? "Nueva contraseña (opcional)" : "Contraseña *"}
-            </label>
-            <div className="relative">
-              <KeyRound className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#889078]" />
-              <input
-                type={showPass ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={isEdit ? "Dejar vacío para no cambiar" : "mínimo 6 caracteres"}
-                className="field-input w-full !pl-9 !pr-10"
-                data-testid="mayordomo-password-input"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPass((v) => !v)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[#889078] hover:text-[#1A2210]"
-              >
-                {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
-          </div>
-
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={active}
-              onChange={(e) => setActive(e.target.checked)}
-              className="w-5 h-5 accent-[#1D4ED8]"
-              data-testid="mayordomo-active-toggle"
-            />
-            <span className="font-bold text-sm text-[#1A2210]">Cuenta activa</span>
-          </label>
-
-          <div>
-            <label className="block text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">
-              Días de acceso (bloquea automático después)
-            </label>
-            <div className="grid grid-cols-5 gap-1.5 mb-2">
-              {[7, 14, 30, 60, 90].map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setAccessDays(String(d))}
-                  className={`h-10 rounded-lg font-extrabold text-xs transition ${
-                    accessDays === String(d)
-                      ? "bg-[#1D4ED8] text-white"
-                      : "bg-white border-2 border-[#E2DDD0] text-[#556047] hover:bg-[#F7F5EE]"
-                  }`}
-                  data-testid={`mayordomo-days-${d}`}
-                >
-                  {d}d
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="number"
-                min="0"
-                value={accessDays}
-                onChange={(e) => setAccessDays(e.target.value)}
-                placeholder="Personalizado (vacío = sin límite)"
-                className="field-input flex-1"
-                data-testid="mayordomo-days-input"
-              />
-              {accessDays && (
-                <button
-                  type="button"
-                  onClick={() => setAccessDays("")}
-                  className="h-12 px-3 rounded-xl bg-white border-2 border-[#E2DDD0] text-[#556047] font-bold text-xs"
-                  data-testid="mayordomo-days-clear"
-                >
-                  Sin límite
-                </button>
-              )}
-            </div>
-            {isEdit && editing?.access_expires_at && (
-              <p className="text-[11px] text-[#889078] mt-1 font-semibold">
-                Expira: {new Date(editing.access_expires_at).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })}
-              </p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={saving}
-              className="h-12 rounded-xl bg-white border-2 border-[#E2DDD0] text-[#556047] font-bold"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="h-12 rounded-xl bg-[#1D4ED8] hover:bg-[#1E3A8A] text-white font-bold flex items-center justify-center gap-2 disabled:opacity-60"
-              data-testid="mayordomo-save-button"
-            >
-              {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <><UserPlus className="w-4 h-4" /> {isEdit ? "Guardar" : "Crear acceso"}</>}
-            </button>
-          </div>
-        </form>
-      </div>
     </div>
   );
 }
