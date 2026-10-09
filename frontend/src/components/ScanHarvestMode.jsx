@@ -330,9 +330,24 @@ export default function ScanHarvestMode() {
       return { ...prev, [w.id]: { name: w.name, count: cur.count + 1 } };
     });
     logScan(w, "qr");
-    // Auto-return to Dashboard and prompt the user to save
-    toast.success(`${w.name} escaneado`, { duration: 1500 });
-    setTimeout(() => navigate(`${returnPath}?prompt=save`), 350);
+    // AUTOSAVE each scan immediately so it shows in Cosecha, keep camera open
+    toast.success(`${w.name} escaneado`, { duration: 1200 });
+    const price = parseFloat(pricePerUnit) || 0;
+    if (parcelId && productId) {
+      api.post("/harvests", {
+        worker_id: w.id,
+        parcel_id: parcelId,
+        product_id: productId,
+        kilos: 0,
+        units: 1,
+        price_per_kg: 0,
+        price_per_unit: price,
+        price_mode: "piece",
+        date: todayKey,
+        photo_path: "",
+        notes: "Cosecha escaneada",
+      }).catch(() => { /* silent — logScan still tracks locally */ });
+    }
   };
 
   const addManual = (workerId) => {
