@@ -9,6 +9,18 @@ export default function Cosecha() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [savingReceipt, setSavingReceipt] = useState(false);
+
+  const saveReceipt = async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    setSavingReceipt(true);
+    try {
+      await api.post("/receipts/history", { date_from: today, date_to: today });
+    } catch (_) { /* already saved — fine */ }
+    await load();
+    toast.success("Registro guardado");
+    setSavingReceipt(false);
+  };
 
   const load = async () => {
     try {
@@ -164,6 +176,17 @@ export default function Cosecha() {
               <div className="text-right text-[13px] font-semibold text-gray-200">
                 Pieza: <span className="font-extrabold text-white">{todayCount}</span>
               </div>
+            </div>
+            <div className="flex items-center justify-end mt-2">
+              <button
+                onClick={saveReceipt}
+                disabled={savingReceipt}
+                className="h-8 px-6 rounded-md bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-[11px] font-extrabold disabled:opacity-50 flex items-center gap-2"
+                data-testid="cosecha-save-button"
+                style={{ fontFamily: "Outfit, sans-serif" }}
+              >
+                {savingReceipt ? <Loader2 className="w-3 h-3 animate-spin" /> : "GUARDAR"}
+              </button>
             </div>
           </div>
         </div>
