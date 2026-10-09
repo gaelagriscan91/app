@@ -21,7 +21,6 @@ export default function Cosecha() {
     (async () => { await load(); setLoading(false); })();
   }, []);
 
-  // When returning from scanner with ?prompt=save, refresh and toast
   useEffect(() => {
     if (searchParams.get("prompt") === "save") {
       load().then(() => {
@@ -59,11 +58,14 @@ export default function Cosecha() {
   }
 
   return (
-    <div className="pb-40" data-testid="cosecha-page">
-      {/* Light card */}
-      <div className="bg-white rounded-2xl border border-[#E6E0D1] shadow-[0_8px_20px_rgba(30,70,32,0.06)] overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[#EFEADA]">
+    <div
+      className="fixed inset-x-0 top-[64px] bottom-0 flex flex-col px-3 pt-3 pb-[180px] bg-[#F7F5EE]"
+      data-testid="cosecha-page"
+    >
+      {/* Registry card fills the available area and scrolls internally */}
+      <div className="flex-1 min-h-0 bg-white rounded-2xl border border-[#E6E0D1] shadow-[0_8px_20px_rgba(30,70,32,0.06)] overflow-hidden flex flex-col">
+        {/* Sticky card header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[#EFEADA] bg-white shrink-0">
           <div className="flex items-center gap-2">
             <ScanLine className="w-5 h-5 text-[#1D4ED8]" strokeWidth={2.4} />
             <h2
@@ -78,76 +80,78 @@ export default function Cosecha() {
           </div>
         </div>
 
-        {/* List */}
-        {sorted.length === 0 ? (
-          <div className="py-10 text-center text-sm text-[#889078] font-semibold">
-            Sin escaneos registrados aún
-          </div>
-        ) : (
-          <ul className="divide-y divide-[#EFEADA]">
-            {sorted.map((r) => {
-              let timeLabel = "";
-              if (r.created_at) {
-                try {
-                  const d = new Date(r.created_at);
-                  timeLabel = d
-                    .toLocaleTimeString("es-MX", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      second: "2-digit",
-                      hour12: true,
-                    })
-                    .toLowerCase();
-                } catch (_) {}
-              }
-              const notes = (r.notes || "").toLowerCase();
-              const sourceLabel = notes.includes("manual") || notes.includes("ajuste")
-                ? "MANUAL"
-                : notes.includes("comparti") || notes.includes("shared")
-                ? "GRUPO"
-                : "QR";
-              const unitWord = (r.unit_label || "pieza").toLowerCase();
-              const unitShort = unitWord.startsWith("libra") ? "LB" : unitWord.startsWith("hora") ? "HR" : "PZA";
-              return (
-                <li
-                  key={r.id}
-                  className="px-4 py-3 flex items-center justify-between gap-3"
-                  data-testid={`cosecha-row-${r.id}`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-extrabold text-[#0F1115] truncate text-xl leading-tight">
-                        {r.worker_name}
-                      </span>
-                      <span className="px-2 py-[2px] rounded-md bg-[#DBE4FF] text-[#1D4ED8] text-[10px] font-extrabold tracking-wider">
-                        {sourceLabel}
-                      </span>
-                    </div>
-                    {timeLabel && (
-                      <div className="mt-1 font-mono-stat text-[12px] font-semibold text-[#889078]">
-                        {timeLabel}
+        {/* Scrollable list */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          {sorted.length === 0 ? (
+            <div className="py-10 text-center text-sm text-[#889078] font-semibold">
+              Sin escaneos registrados aún
+            </div>
+          ) : (
+            <ul className="divide-y divide-[#EFEADA]">
+              {sorted.map((r) => {
+                let timeLabel = "";
+                if (r.created_at) {
+                  try {
+                    const d = new Date(r.created_at);
+                    timeLabel = d
+                      .toLocaleTimeString("es-MX", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                        hour12: true,
+                      })
+                      .toLowerCase();
+                  } catch (_) {}
+                }
+                const notes = (r.notes || "").toLowerCase();
+                const sourceLabel = notes.includes("manual") || notes.includes("ajuste")
+                  ? "MANUAL"
+                  : notes.includes("comparti") || notes.includes("shared")
+                  ? "GRUPO"
+                  : "QR";
+                const unitWord = (r.unit_label || "pieza").toLowerCase();
+                const unitShort = unitWord.startsWith("libra") ? "LB" : unitWord.startsWith("hora") ? "HR" : "PZA";
+                return (
+                  <li
+                    key={r.id}
+                    className="px-4 py-3 flex items-center justify-between gap-3"
+                    data-testid={`cosecha-row-${r.id}`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-[#0F1115] truncate text-xl leading-tight">
+                          {r.worker_name}
+                        </span>
+                        <span className="px-2 py-[2px] rounded-md bg-[#DBE4FF] text-[#1D4ED8] text-[10px] font-extrabold tracking-wider">
+                          {sourceLabel}
+                        </span>
                       </div>
-                    )}
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="font-mono-stat text-xl font-extrabold text-[#1D4ED8] leading-tight">
-                      {formatCurrency(r.payment)}
+                      {timeLabel && (
+                        <div className="mt-1 font-mono-stat text-[12px] font-semibold text-[#889078]">
+                          {timeLabel}
+                        </div>
+                      )}
                     </div>
-                    <div className="text-[11px] font-semibold text-[#889078] mt-0.5">
-                      <span className="font-mono-stat text-[#0F1115] font-extrabold mr-1">
-                        {formatNumber(r.units, r.units % 1 === 0 ? 0 : 2)}
-                      </span>
-                      /{unitShort}
+                    <div className="text-right shrink-0">
+                      <div className="font-mono-stat text-xl font-extrabold text-[#1D4ED8] leading-tight">
+                        {formatCurrency(r.payment)}
+                      </div>
+                      <div className="text-[11px] font-semibold text-[#889078] mt-0.5">
+                        <span className="font-mono-stat text-[#0F1115] font-extrabold mr-1">
+                          {formatNumber(r.units, r.units % 1 === 0 ? 0 : 2)}
+                        </span>
+                        /{unitShort}
+                      </div>
                     </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       </div>
 
-      {/* Bottom action bar: Empleado activo | SCAN | Pieza */}
+      {/* Bottom action bar — fixed above the tab nav */}
       <div className="fixed left-0 right-0 bottom-[70px] z-30 pointer-events-none">
         <div className="max-w-5xl mx-auto px-3 pointer-events-auto">
           <div className="bg-[#111] border-t border-[#2A2A2A] rounded-t-2xl px-3 pt-2 pb-3 shadow-2xl">
