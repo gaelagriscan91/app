@@ -4,15 +4,10 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import api, { formatCurrency, formatNumber } from "@/lib/api";
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
-const scanLogKey = (d) => `agriscan.scanlog.${d}`;
-const sessionKey = (d) => `agriscan.session.${d}`;
-
 export default function Cosecha() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [rows, setRows] = useState([]);
-  const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [savingReceipt, setSavingReceipt] = useState(false);
 
@@ -21,97 +16,52 @@ export default function Cosecha() {
       const { data } = await api.get("/harvests");
       setRows(Array.isArray(data) ? data : []);
     } catch (_) { /* ignore */ }
+  };
+
+  const saveReceipt = async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    setSavingReceipt(true);
     try {
-      const log = JSON.parse(localStorage.getItem(scanLogKey(todayStr())) || "[]");
-      setPendingCount(Array.isArray(log) ? log.length : 0);
-    } catch (_) { setPendingCount(0); }
+      await api.post("/receipts/history", { date_from: today, date_to: today });
+    } catch (_) { /* already saved — fine */ }
+    await load();
+    toast.success("Registro guardado");
+    setSavingReceipt(false);
   };
 
   useEffect(() => {
     (async () => { await load(); setLoading(false); })();
   }, []);
 
-  // Refresh pending/list every time the Cosecha route is visited
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [searchParams]);
+  useEffect(() => {
+    if (searchParams.get("prompt") === "save") {
+      load().then(() => {
+        toast.success("Registro guardado");
+        const next = new URLSearchParams(searchParams);
+        next.delete("prompt");
+        setSearchParams(next, { replace: true });
+      });
+    } else {
+      load();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const sorted = useMemo(() => {
     return [...rows].sort((a, b) => (b.created_at || b.date || "").localeCompare(a.created_at || a.date || ""));
   }, [rows]);
 
   const todayCount = useMemo(() => {
-    const t = todayStr();
-    return sorted.filter((r) => r.date === t).length;
+    const today = new Date().toISOString().slice(0, 10);
+    return sorted.filter((r) => r.date === today).length;
   }, [sorted]);
 
   const activeWorkers = useMemo(() => {
-    const t = todayStr();
+    const today = new Date().toISOString().slice(0, 10);
     const set = new Set();
-    sorted.forEach((r) => { if (r.date === t && r.worker_id) set.add(r.worker_id); });
+    sorted.forEach((r) => { if (r.date === today && r.worker_id) set.add(r.worker_id); });
     return set.size;
   }, [sorted]);
-
-  const saveReceipt = async () => {
-    const today = todayStr();
-    setSavingReceipt(true);
-    try {
-      // 1. Load session (parcel/product/price) + pending scanlog
-      let session = {};
-      try { session = JSON.parse(localStorage.getItem(sessionKey(today)) || "{}"); } catch (_) {}
-      let log = [];
-      try { log = JSON.parse(localStorage.getItem(scanLogKey(today)) || "[]"); } catch (_) {}
-
-      if (!Array.isArray(log) || log.length === 0) {
-        toast.error("No hay escaneos pendientes");
-        setSavingReceipt(false);
-        return;
-      }
-
-      // 2. Resolve parcel + product (session or auto-pick first)
-      let parcelId = session.parcelId;
-      let productId = session.productId;
-      if (!parcelId || !productId) {
-        const [pRes, prRes] = await Promise.all([api.get("/parcels"), api.get("/products")]);
-        const parcels = (pRes.data || []).filter((x) => x.active !== false);
-        const products = (prRes.data || []).filter((x) => x.active !== false);
-        if (!parcelId) parcelId = parcels[0]?.id;
-        if (!productId) productId = products[0]?.id;
-      }
-      if (!parcelId || !productId) {
-        toast.error("Falta parcela o producto");
-        setSavingReceipt(false);
-        return;
-      }
-
-      // 3. POST each scan as its own harvest
-      const price = Number(session.pricePerUnit) || Number(log[0]?.priceAt) || 0;
-      const posts = log.map((e) => api.post("/harvests", {
-        worker_id: e.workerId,
-        parcel_id: parcelId,
-        product_id: productId,
-        kilos: 0,
-        units: typeof e.fraction === "number" ? e.fraction : 1,
-        price_per_kg: 0,
-        price_per_unit: Number(e.priceAt) || price,
-        price_mode: "piece",
-        date: today,
-        photo_path: "",
-        notes: "Cosecha escaneada",
-      }).catch(() => null));
-      const results = await Promise.all(posts);
-      const okCount = results.filter(Boolean).length;
-
-      // 4. Clear local pending log + snapshot receipt
-      try { localStorage.removeItem(scanLogKey(today)); } catch (_) {}
-      try { await api.post("/receipts/history", { date_from: today, date_to: today }); } catch (_) {}
-
-      await load();
-      toast.success(`${okCount} escaneo${okCount === 1 ? "" : "s"} guardado${okCount === 1 ? "" : "s"}`);
-    } catch (_) {
-      toast.error("No se pudo guardar");
-    } finally {
-      setSavingReceipt(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -137,25 +87,15 @@ export default function Cosecha() {
               Registro de escáneo
             </h2>
           </div>
-          <div className="flex items-center gap-2">
-            {pendingCount > 0 && (
-              <span
-                className="px-2 py-[2px] rounded-md bg-amber-100 text-amber-700 text-[10px] font-extrabold tracking-wider"
-                data-testid="cosecha-pending-badge"
-              >
-                {pendingCount} PENDIENTE{pendingCount === 1 ? "" : "S"}
-              </span>
-            )}
-            <div className="font-mono-stat text-base font-bold text-[#889078]">
-              {sorted.length}
-            </div>
+          <div className="font-mono-stat text-base font-bold text-[#889078]">
+            {sorted.length}
           </div>
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto">
           {sorted.length === 0 ? (
             <div className="py-10 text-center text-sm text-[#889078] font-semibold">
-              {pendingCount > 0 ? "Pulsa GUARDAR para registrar los escaneos" : "Sin escaneos registrados aún"}
+              Sin escaneos registrados aún
             </div>
           ) : (
             <ul className="divide-y divide-[#EFEADA]">
@@ -247,7 +187,7 @@ export default function Cosecha() {
                 data-testid="cosecha-save-button"
                 style={{ fontFamily: "Outfit, sans-serif" }}
               >
-                {savingReceipt ? <Loader2 className="w-3 h-3 animate-spin" /> : (pendingCount > 0 ? `GUARDAR (${pendingCount})` : "GUARDAR")}
+                {savingReceipt ? <Loader2 className="w-3 h-3 animate-spin" /> : "GUARDAR"}
               </button>
             </div>
           </div>
