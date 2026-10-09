@@ -140,7 +140,8 @@ export default function ScanHarvestMode() {
         setParcelId(parcel.id);
         setParcelName(parcel.name || "");
         setProductId(product.id);
-        setUnitLabel(product.unit_label || "pieza");
+        // Session unitMode wins over product default — once user picks LB/HR/PZA it sticks
+        setUnitLabel(session.unitMode || product.unit_label || "pieza");
         const pu = Number(product.price_per_unit) || 0;
         if (pu > 0) setPricePerUnit(String(pu));
         setReady(true);
