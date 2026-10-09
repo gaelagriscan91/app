@@ -680,9 +680,33 @@ function CheckInView(props) {
     saveSession?.({ productId: product.id, trabajoName: product.name });
   };
 
+  // Required fields before allowing any check-in
+  const [showErrors, setShowErrors] = useState(false);
+  const priceDraft = unitMode === "horas" ? draftPricePerHour : draftPricePerUnit;
+  const missing = {
+    rancho: !draftRancho.trim(),
+    block: !draftBlock.trim(),
+    trabajo: !draftTrabajo.trim(),
+    variedad: !draftVariedad.trim(),
+    precio: !(Number(priceDraft) > 0),
+  };
+  const missingLabels = { rancho: "Rancho", block: "Block", trabajo: "Trabajo", variedad: "Variedad", precio: unitMode === "horas" ? "Precio / hora" : "Precio" };
+  const requireFields = (fn) => (...args) => {
+    const list = Object.keys(missing).filter((k) => missing[k]);
+    if (list.length) {
+      setShowErrors(true);
+      if (scannerOn) setScannerOn(false);
+      toast.error(`Completa primero: ${list.map((k) => missingLabels[k]).join(", ")}`);
+      return;
+    }
+    return fn(...args);
+  };
+
   // Shared classes for the inline field cards
   const cardCls = "bg-white rounded-2xl p-2 grid grid-cols-2 gap-1.5";
-  const cellCls = "bg-[#F3F4F6] rounded-lg px-2.5 py-1.5 min-w-0";
+  const baseCellCls = "bg-[#F3F4F6] rounded-lg px-2.5 py-1.5 min-w-0";
+  const cellFor = (k) => `${baseCellCls} ${showErrors && missing[k] ? "ring-2 ring-red-500 bg-red-50" : ""}`;
+  const cellCls = baseCellCls;
   const labelCls = "text-[9px] text-[#889078] font-bold uppercase tracking-wider";
   const inputCls = "w-full bg-transparent border-0 outline-none font-bold text-[#1A2210] text-xs truncate p-0 focus:ring-0";
 
@@ -722,7 +746,7 @@ function CheckInView(props) {
               autoComplete="off"
             />
             <button
-              onClick={() => setManualOpen(true)}
+              onClick={requireFields(() => setManualOpen(true))}
               className="w-11 h-11 bg-white rounded-full flex items-center justify-center shadow-sm text-[#1A2210] shrink-0"
               title="Teclado"
               data-testid="manual-open-button"
@@ -730,7 +754,7 @@ function CheckInView(props) {
               <Keyboard className="w-5 h-5" />
             </button>
             <button
-              onClick={() => setScannerOn((v) => !v)}
+              onClick={scannerOn ? () => setScannerOn(false) : requireFields(() => setScannerOn(true))}
               className={`w-11 h-11 rounded-full flex items-center justify-center shadow-sm shrink-0 ${scannerOn ? "bg-red-100 text-red-700" : "bg-white text-[#1A2210]"}`}
               title={scannerOn ? "Detener" : "Escanear"}
               data-testid="toggle-scanner-button"
@@ -763,7 +787,7 @@ function CheckInView(props) {
         {/* Checkout menu + Move crew */}
         <div className="flex items-center gap-2 mb-4">
           <button
-            onClick={() => crews.length > 0 ? setShowCrewPicker(true) : toast.info("Primero crea una cuadrilla en Módulos")}
+            onClick={requireFields(() => crews.length > 0 ? setShowCrewPicker(true) : toast.info("Primero crea una cuadrilla en Módulos"))}
             className="h-10 bg-white text-[#1A2210] px-4 rounded-full text-sm font-bold flex items-center gap-1.5 shadow-sm"
             data-testid="move-crew-button"
           >
@@ -817,8 +841,8 @@ function CheckInView(props) {
         <div className="grid grid-cols-2 gap-2 items-start">
           {/* Left column: Rancho + Block */}
           <div className={cardCls} data-testid="checkin-rancho-row">
-            <div className={cellCls}>
-              <div className={labelCls}>Rancho</div>
+            <div className={cellFor("rancho")}>
+              <div className={labelCls}>Rancho *</div>
               <input
                 type="text"
                 value={draftRancho}
@@ -834,8 +858,8 @@ function CheckInView(props) {
                 {(parcels || []).map((p) => <option key={p.id} value={p.name} />)}
               </datalist>
             </div>
-            <div className={cellCls}>
-              <div className={labelCls}>Block</div>
+            <div className={cellFor("block")}>
+              <div className={labelCls}>Block *</div>
               <input
                 type="text"
                 value={draftBlock}
@@ -852,8 +876,8 @@ function CheckInView(props) {
           {/* Right column: Trabajo/Variedad + Precio stacked */}
           <div className="flex flex-col gap-2">
             <div className={cardCls} data-testid="checkin-trabajo-row">
-              <div className={cellCls}>
-                <div className={labelCls}>Trabajo</div>
+              <div className={cellFor("trabajo")}>
+                <div className={labelCls}>Trabajo *</div>
                 <input
                   type="text"
                   value={draftTrabajo}
@@ -869,8 +893,8 @@ function CheckInView(props) {
                   {(products || []).map((p) => <option key={p.id} value={p.name} />)}
                 </datalist>
               </div>
-              <div className={cellCls}>
-                <div className={labelCls}>Variedad</div>
+              <div className={cellFor("variedad")}>
+                <div className={labelCls}>Variedad *</div>
                 <input
                   type="text"
                   value={draftVariedad}
@@ -885,8 +909,8 @@ function CheckInView(props) {
             </div>
 
             <div className={cardCls} data-testid="checkin-precio-row">
-              <div className={cellCls}>
-                <div className={labelCls}>Precio</div>
+              <div className={unitMode === "horas" ? cellCls : cellFor("precio")}>
+                <div className={labelCls}>Precio{unitMode !== "horas" ? " *" : ""}</div>
                 <div className="flex items-center">
                   <span className="text-[#889078] font-bold text-xs mr-0.5">$</span>
                   <input
@@ -903,8 +927,8 @@ function CheckInView(props) {
                   />
                 </div>
               </div>
-              <div className={cellCls}>
-                <div className={labelCls}>Precio / hora</div>
+              <div className={unitMode === "horas" ? cellFor("precio") : cellCls}>
+                <div className={labelCls}>Precio / hora{unitMode === "horas" ? " *" : ""}</div>
                 <div className="flex items-center">
                   <span className="text-[#889078] font-bold text-xs mr-0.5">$</span>
                   <input
@@ -929,7 +953,7 @@ function CheckInView(props) {
       {/* Scanner area */}
       {scannerOn && (
         <div className="px-4 mt-4">
-          <QrScanner active={scannerOn} onScan={handleScan} />
+          <QrScanner active={scannerOn} onScan={requireFields(handleScan)} />
         </div>
       )}
 
