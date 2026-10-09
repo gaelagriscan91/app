@@ -5,6 +5,7 @@ import api, { formatApiErrorDetail } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
 import { SUPPORT_EMAIL, WHATSAPP_URL } from "@/lib/support";
+import ChangePasswordCard from "@/components/modules/ChangePasswordCard";
 
 function ContactCard() {
   return (
@@ -74,6 +75,7 @@ export default function SubscriptionTab() {
       ) : null}
     </div>
     <ContactCard />
+    <ChangePasswordCard />
     </div>
   );
 }

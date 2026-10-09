@@ -524,6 +524,11 @@ class ResetPasswordIn(BaseModel):
     password: str
 
 
+class ChangePasswordIn(BaseModel):
+    current_password: str
+    new_password: str
+
+
 GENERIC_RESET_MSG = {"message": "Si el correo está registrado, te enviaremos un enlace para restablecer tu contraseña."}
 
 
@@ -585,6 +590,25 @@ async def reset_password(data: ResetPasswordIn):
     await db.password_reset_tokens.delete_many({"user_id": user_id, "used": False})
     # Clear brute-force lockout for this email
     await db.login_attempts.delete_many({"email": email})
+    return {"ok": True}
+
+
+@api_router.post("/auth/change-password")
+async def change_password(data: ChangePasswordIn, request: Request, response: Response, user: CurrentUserAny):
+    """Logged-in user changes own password. Kills other sessions, keeps this one."""
+    doc = await db.users.find_one({"_id": ObjectId(user["_id"])})
+    ip = _client_ip(request)
+    await check_login_lockout(ip, doc["email"])
+    if not verify_password(data.current_password, doc["password_hash"]):
+        await record_failed_login(ip, doc["email"])
+        raise HTTPException(status_code=400, detail="La contraseña actual no es correcta")
+    if len(data.new_password) < 6:
+        raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 6 caracteres")
+    ver = (doc.get("token_version", 0) or 0) + 1
+    await db.users.update_one({"_id": doc["_id"]}, {"$set": {"password_hash": hash_password(data.new_password), "token_version": ver}})
+    await clear_login_attempts(ip, doc["email"])
+    uid = str(doc["_id"])
+    set_auth_cookies(response, create_access_token(uid, doc["email"], ver), create_refresh_token(uid, ver))
     return {"ok": True}
 
 
