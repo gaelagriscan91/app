@@ -9,10 +9,7 @@ import { SUPPORT_EMAIL, WHATSAPP_URL } from "@/lib/support";
 function ContactCard() {
   return (
     <div className="field-card p-5 space-y-3" data-testid="support-contact-card">
-      <div>
-        <div className="font-extrabold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>Contactar AgriScan</div>
-        <div className="text-sm text-[#556047] font-semibold">¿Cómo te puedo ayudar?</div>
-      </div>
+      <div className="font-extrabold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>Contactar AgriScan</div>
       <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 rounded-xl bg-[#25D366] hover:bg-[#1EBE5A] text-white px-4 py-3 font-bold transition-colors" data-testid="support-whatsapp-link">
         <MessageCircle className="w-5 h-5 shrink-0" />
         <span className="flex-1">WhatsApp</span>
