@@ -473,6 +473,8 @@ export default function ScanHarvestMode() {
       return;
     }
     setSaving(true);
+    let sess = {};
+    try { sess = JSON.parse(localStorage.getItem(`agriscan.session.${todayKey}`) || "{}"); } catch { sess = {}; }
     try {
       await Promise.all(
         entries.map(([workerId, v]) =>
@@ -488,6 +490,8 @@ export default function ScanHarvestMode() {
             date: todayKey,
             photo_path: "",
             notes: v.count % 1 !== 0 ? "Canasta compartida" : "Cosecha escaneada",
+            block: sess.block || "",
+            variety: sess.variedad || "",
           })
         )
       );

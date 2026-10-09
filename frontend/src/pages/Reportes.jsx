@@ -368,7 +368,7 @@ export default function Reportes() {
                                   <div className="min-w-0 flex-1">
                                     <div className="text-xs font-extrabold text-[#1A2210]">{h.date}</div>
                                     <div className="text-[11px] text-[#556047] font-semibold truncate">
-                                      {h.parcel_name} · {h.product_name}
+                                      {h.parcel_name}{h.block ? ` · Block ${h.block}` : ""} · {h.product_name}{h.variety ? ` · ${h.variety}` : ""}
                                     </div>
                                     <div className="text-[11px] text-[#556047] font-semibold">
                                       {formatNumber(h.units, h.units % 1 === 0 ? 0 : 2)} {h.unit_label || "u"} · <span className="font-mono-stat">${formatNumber(price, 2)}</span> c/u

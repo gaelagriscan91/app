@@ -334,6 +334,8 @@ class HarvestIn(BaseModel):
     date: str  # YYYY-MM-DD
     photo_path: Optional[str] = ""
     notes: Optional[str] = ""
+    block: Optional[str] = ""
+    variety: Optional[str] = ""
 
 
 # ---------------------------------------------------------------------------
@@ -876,6 +878,8 @@ async def create_harvest(data: HarvestIn, user: CurrentUser):
         "date": data.date,
         "photo_path": data.photo_path or "",
         "notes": data.notes or "",
+        "block": (data.block or "").strip(),
+        "variety": (data.variety or "").strip(),
         "created_by": user["_id"],
         "owner_id": owner_of(user),
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -902,6 +906,8 @@ async def update_harvest(hid: str, data: HarvestIn, user: CurrentUser):
         "price_per_kg": price_per_kg, "price_per_unit": price_per_unit,
         "payment": payment, "date": data.date,
         "photo_path": data.photo_path or "", "notes": data.notes or "",
+        "block": (data.block or existing.get("block") or "").strip(),
+        "variety": (data.variety or existing.get("variety") or "").strip(),
     }
     await db.harvests.update_one({"_id": ObjectId(hid)}, {"$set": upd})
     row = await db.harvests.find_one({"_id": ObjectId(hid)})
@@ -1091,7 +1097,7 @@ async def export_excel(
     ws = wb.active
     ws.title = "Cosechas"
     ws.append([
-        "Fecha", "Trabajador", "Parcela", "Producto",
+        "Fecha", "Trabajador", "Parcela", "Block", "Producto", "Variedad",
         "Kilos", "Precio/Kg", "Unidades", "Precio/Unidad",
         "Pago Total ($)", "Notas"
     ])
@@ -1100,7 +1106,9 @@ async def export_excel(
             r.get("date", ""),
             r.get("worker_name", ""),
             r.get("parcel_name", ""),
+            r.get("block", ""),
             r.get("product_name", ""),
+            r.get("variety", ""),
             float(r.get("kilos", 0)),
             float(r.get("price_per_kg", 0)),
             float(r.get("units", 0)),
@@ -1113,7 +1121,7 @@ async def export_excel(
     total_units = sum(float(r.get("units", 0)) for r in enriched)
     total_payment = sum(float(r.get("payment", 0)) for r in enriched)
     ws.append([])
-    ws.append(["TOTALES", "", "", "", total_kilos, "", total_units, "", total_payment, ""])
+    ws.append(["TOTALES", "", "", "", "", "", total_kilos, "", total_units, "", total_payment, ""])
 
     for col in ws.columns:
         length = max((len(str(c.value)) for c in col if c.value is not None), default=10)
@@ -1198,6 +1206,8 @@ async def receipts(
                 "date": h.get("date"),
                 "product_name": prod["name"] if prod else "—",
                 "parcel_name": parc["name"] if parc else "—",
+                "block": h.get("block", ""),
+                "variety": h.get("variety", ""),
                 "kilos": float(h.get("kilos", 0)),
                 "units": float(h.get("units", 0)),
                 "unit_label": prod.get("unit_label", "u") if prod else "u",

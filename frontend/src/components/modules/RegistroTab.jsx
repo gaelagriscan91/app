@@ -204,6 +204,8 @@ export default function RegistroTab() {
                     const harvests = r.harvests || [];
                     const parcels = [...new Set(harvests.map((h) => h.parcel_name).filter((x) => x && x !== "—"))];
                     const products = [...new Set(harvests.map((h) => h.product_name).filter((x) => x && x !== "—"))];
+                    const blocks = [...new Set(harvests.map((h) => h.block).filter(Boolean))];
+                    const varieties = [...new Set(harvests.map((h) => h.variety).filter(Boolean))];
                     const prices = [...new Set(harvests.map((h) => h.price_per_unit).filter((x) => x > 0))];
                     const priceLabel = prices.length === 0 ? "—" : prices.length === 1 ? formatCurrency(prices[0]) : "Varios";
                     const dates = harvests.map((h) => h.date).filter(Boolean).sort();
@@ -223,6 +225,8 @@ export default function RegistroTab() {
                         <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
                           <div><span className="text-[#889078] font-bold uppercase tracking-wider">Rancho:</span> <span className="text-[#1A2210] font-bold">{parcels.join(", ") || "—"}</span></div>
                           <div><span className="text-[#889078] font-bold uppercase tracking-wider">Trabajo:</span> <span className="text-[#1A2210] font-bold">{products.join(", ") || "—"}</span></div>
+                          <div data-testid={`registro-block-${r.worker_id}`}><span className="text-[#889078] font-bold uppercase tracking-wider">Block:</span> <span className="text-[#1A2210] font-bold">{blocks.join(", ") || "—"}</span></div>
+                          <div data-testid={`registro-variedad-${r.worker_id}`}><span className="text-[#889078] font-bold uppercase tracking-wider">Variedad:</span> <span className="text-[#1A2210] font-bold">{varieties.join(", ") || "—"}</span></div>
                           <div><span className="text-[#889078] font-bold uppercase tracking-wider">Precio/pieza:</span> <span className="text-[#1A2210] font-bold font-mono-stat">{priceLabel}</span></div>
                           <div><span className="text-[#889078] font-bold uppercase tracking-wider">Piezas:</span> <span className="text-[#1A2210] font-bold font-mono-stat">{Math.round(r.total_units || 0)}</span></div>
                           <div><span className="text-[#889078] font-bold uppercase tracking-wider">Horas:</span> <span className="text-[#1A2210] font-bold font-mono-stat">{formatNumber(r.total_hours || 0, 2)}h</span></div>
