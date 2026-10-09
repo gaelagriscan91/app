@@ -16,6 +16,7 @@ App de registro de cosecha estilo PickTrace para equipos agrícolas:
 - Android: Capacitor (`/app/frontend/android`) con CI por GitHub Actions
 
 ## Implementado (estado actual tras reseteo 10/2026)
+- **Pestaña "Usuarios"** (2026-10-09): la pestaña admin "Mayordomos" ahora se llama "Usuarios"; el aviso del Inicio dice "usuarios nuevos esperan desbloqueo".
 - **Desbloqueo por días** (2026-10-09): en Módulos → Mayordomos, "Desbloquear" pide 3, 7, 15 o 30 días (PATCH `access_days`). Al vencer se bloquea solo; la fila muestra "Se bloquea en X días" y los vencidos salen como Bloqueado.
 - **Pestaña Soporte** (2026-10-09): "Mi plan" se renombró a "Soporte" y se quitó la tarjeta de plan/estado. Contiene: Contactar AgriScan (WhatsApp + correo), Restablecer contraseña y, solo si hay suscripción PayPal activa, "Cancelar suscripción".
 - **Restablecer contraseña en Mi plan** (2026-10-09): botón que abre formulario (actual, nueva, repetir). POST `/api/auth/change-password` verifica la actual (con bloqueo por intentos), sube `token_version` (cierra otras sesiones) y renueva las cookies de esta sesión.

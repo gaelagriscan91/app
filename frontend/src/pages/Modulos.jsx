@@ -17,7 +17,7 @@ export default function Modulos() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const tabs = isAdmin
-    ? [...baseTabs, { id: "mayordomos", label: "Mayordomos", Icon: Shield, testid: "tab-mayordomos" }]
+    ? [...baseTabs, { id: "mayordomos", label: "Usuarios", Icon: Shield, testid: "tab-mayordomos" }]
     : [...baseTabs, { id: "plan", label: "Soporte", Icon: LifeBuoy, testid: "tab-plan" }];
   const [tab, setTab] = useState(() => new URLSearchParams(window.location.search).get("tab") || "workers");
   return (

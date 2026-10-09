@@ -29,7 +29,7 @@ export default function PendingMayordomosNotice() {
       </div>
       <div className="flex-1 min-w-0">
         <div className="font-extrabold text-[#92400E] text-sm">
-          {pending.length === 1 ? "1 mayordomo nuevo espera desbloqueo" : `${pending.length} mayordomos nuevos esperan desbloqueo`}
+          {pending.length === 1 ? "1 usuario nuevo espera desbloqueo" : `${pending.length} usuarios nuevos esperan desbloqueo`}
         </div>
         <div className="text-xs text-[#92400E]/80 font-semibold truncate">
           {pending.slice(0, 3).map((u) => u.name || u.email).join(", ")}{pending.length > 3 ? "…" : ""}
