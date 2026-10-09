@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Html5Qrcode } from "html5-qrcode";
 import {
   Camera, CameraOff, Minus, Plus, Save, Loader2, RotateCcw,
@@ -38,6 +38,8 @@ function playBeep() {
  */
 export default function ScanHarvestMode() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnPath = searchParams.get("from") === "cosecha" ? "/cosecha" : "/";
   const todayKey = todayISO();
 
   const [workers, setWorkers] = useState([]);
@@ -330,7 +332,7 @@ export default function ScanHarvestMode() {
     logScan(w, "qr");
     // Auto-return to Dashboard and prompt the user to save
     toast.success(`${w.name} escaneado`, { duration: 1500 });
-    setTimeout(() => navigate("/?prompt=save"), 350);
+    setTimeout(() => navigate(`${returnPath}?prompt=save`), 350);
   };
 
   const addManual = (workerId) => {
@@ -689,7 +691,7 @@ export default function ScanHarvestMode() {
 
         {/* Floating X close button (top-right) */}
         <button
-          onClick={() => navigate("/")}
+          onClick={() => navigate(returnPath)}
           className="absolute top-[max(env(safe-area-inset-top),16px)] right-4 w-11 h-11 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center backdrop-blur-sm z-10"
           data-testid="scan-close-fullscreen"
           aria-label="Cerrar"

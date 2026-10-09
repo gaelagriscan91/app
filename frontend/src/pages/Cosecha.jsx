@@ -1,21 +1,38 @@
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, ScanLine } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 import api, { formatCurrency, formatNumber } from "@/lib/api";
 
 export default function Cosecha() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const load = async () => {
+    try {
+      const { data } = await api.get("/harvests");
+      setRows(Array.isArray(data) ? data : []);
+    } catch (_) { /* ignore */ }
+  };
+
   useEffect(() => {
-    (async () => {
-      try {
-        const { data } = await api.get("/harvests");
-        setRows(Array.isArray(data) ? data : []);
-      } catch (_) { /* ignore */ } finally { setLoading(false); }
-    })();
+    (async () => { await load(); setLoading(false); })();
   }, []);
+
+  // When returning from scanner with ?prompt=save, refresh and toast
+  useEffect(() => {
+    if (searchParams.get("prompt") === "save") {
+      load().then(() => {
+        toast.success("Registro guardado");
+        const next = new URLSearchParams(searchParams);
+        next.delete("prompt");
+        setSearchParams(next, { replace: true });
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const sorted = useMemo(() => {
     return [...rows].sort((a, b) => (b.created_at || b.date || "").localeCompare(a.created_at || a.date || ""));
@@ -140,7 +157,7 @@ export default function Cosecha() {
               </div>
               <div className="flex items-center justify-center">
                 <button
-                  onClick={() => navigate("/registrar?mode=qr")}
+                  onClick={() => navigate("/registrar?mode=qr&from=cosecha")}
                   className="w-20 h-20 rounded-full bg-[#DC2626] hover:bg-[#B91C1C] active:scale-95 text-white font-extrabold text-base shadow-[0_6px_20px_rgba(220,38,38,0.5)] flex items-center justify-center transition"
                   data-testid="cosecha-scan-button"
                   aria-label="Escanear"
