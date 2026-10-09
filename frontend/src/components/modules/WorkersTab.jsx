@@ -4,7 +4,11 @@ import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 
-const EMPTY = { name: "", document_id: "", phone: "", role: "Cosechador", active: true };
+const EMPTY = { first_name: "", last_name: "", document_id: "", phone: "", role: "Cosechador", active: true };
+const splitName = (n = "") => {
+  const parts = n.trim().split(/\s+/);
+  return { first_name: parts[0] || "", last_name: parts.slice(1).join(" ") };
+};
 
 export default function WorkersTab() {
   const [rows, setRows] = useState([]);
@@ -29,20 +33,23 @@ export default function WorkersTab() {
 
   const startNew = () => { setForm(EMPTY); setEditing("new"); };
   const startEdit = (r) => {
-    setForm({ name: r.name, document_id: r.document_id || "", phone: r.phone || "", role: r.role || "Cosechador", active: r.active !== false });
+    setForm({ ...splitName(r.name), document_id: r.document_id || "", phone: r.phone || "", role: r.role || "Cosechador", active: r.active !== false });
     setEditing(r.id);
   };
   const cancel = () => { setEditing(null); setForm(EMPTY); };
 
   const save = async () => {
-    if (!form.name.trim()) { toast.error("El nombre es obligatorio"); return; }
+    if (!form.first_name.trim()) { toast.error("El nombre es obligatorio"); return; }
+    if (!form.last_name.trim()) { toast.error("El apellido es obligatorio"); return; }
+    const { first_name, last_name, ...rest } = form;
+    const payload = { ...rest, name: `${first_name.trim()} ${last_name.trim()}`, document_id: form.document_id.trim() };
     setSaving(true);
     try {
       if (editing === "new") {
-        await api.post("/workers", form);
+        await api.post("/workers", payload);
         toast.success("Trabajador agregado — QR generado");
       } else {
-        await api.put(`/workers/${editing}`, form);
+        await api.put(`/workers/${editing}`, payload);
         toast.success("Trabajador actualizado");
       }
       await load();
@@ -158,7 +165,7 @@ export default function WorkersTab() {
       </div>
 
       <div className="flex flex-col sm:flex-row gap-2">
-        <button onClick={startNew} className="field-btn-primary flex-1" data-testid="add-worker-button">
+        <button onClick={startNew} className="field-btn-primary sm:flex-1" data-testid="add-worker-button">
           <UserPlus className="w-5 h-5" /> Agregar trabajador
         </button>
         <button
@@ -177,10 +184,10 @@ export default function WorkersTab() {
             <h3 className="font-bold text-[#1A2210]">{editing === "new" ? "Nuevo trabajador" : "Editar trabajador"}</h3>
             <button onClick={cancel} className="w-9 h-9 rounded-lg hover:bg-[#F0EDE1]"><X className="w-4 h-4 mx-auto" /></button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <input className="field-input !h-12 !text-base" placeholder="Nombre completo" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} data-testid="worker-name-input" />
-            <input className="field-input !h-12 !text-base" placeholder="Documento / ID" value={form.document_id} onChange={(e) => setForm({ ...form, document_id: e.target.value })} data-testid="worker-document-input" />
-            <input className="field-input !h-12 !text-base" placeholder="Teléfono" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} data-testid="worker-phone-input" />
+          <div className="grid grid-cols-1 gap-3">
+            <input className="field-input !h-12 !text-base" placeholder="Nombre (obligatorio)" value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} data-testid="worker-first-name-input" />
+            <input className="field-input !h-12 !text-base" placeholder="Apellido (obligatorio)" value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} data-testid="worker-last-name-input" />
+            <input className="field-input !h-12 !text-base" placeholder="SS# (opcional)" inputMode="numeric" value={form.document_id} onChange={(e) => setForm({ ...form, document_id: e.target.value })} data-testid="worker-ss-input" />
             <select className="field-input !h-12 !text-base" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} data-testid="worker-role-input">
               <option>Cosechador</option>
               <option>Supervisor</option>
@@ -190,7 +197,7 @@ export default function WorkersTab() {
             </select>
           </div>
           <label className="flex items-center gap-2 font-semibold text-[#1A2210]">
-            <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} className="w-5 h-5 accent-[#1D4ED8]" />
+            <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} className="w-5 h-5 accent-[#1D4ED8]" data-testid="worker-active-checkbox" />
             Activo
           </label>
           <button onClick={save} disabled={saving} className="field-btn-primary disabled:opacity-60" data-testid="worker-save-button">
@@ -210,7 +217,7 @@ export default function WorkersTab() {
               <div className="min-w-0 flex-1">
                 <div className="font-bold text-[#1A2210] truncate">{r.name}</div>
                 <div className="text-xs text-[#556047] font-semibold truncate">
-                  {r.role || "—"} • {r.document_id || "sin ID"} • {r.phone || "sin tel."}
+                  {r.role || "—"} • {r.document_id ? `SS# ${r.document_id}` : "sin SS#"}
                 </div>
                 {r.qr_code && (
                   <div className="text-[10px] font-mono text-[#889078] truncate">{r.qr_code}</div>

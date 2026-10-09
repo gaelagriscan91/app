@@ -12,29 +12,26 @@ import api from "@/lib/api";
  */
 export default function QuickAddWorker({ open, onClose, onCreated }) {
   const [name, setName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [documentId, setDocumentId] = useState("");
-  const [phone, setPhone] = useState("");
   const [role, setRole] = useState("Cosechador");
   const [saving, setSaving] = useState(false);
 
   if (!open) return null;
 
   const reset = () => {
-    setName(""); setDocumentId(""); setPhone(""); setRole("Cosechador");
+    setName(""); setLastName(""); setDocumentId(""); setRole("Cosechador");
   };
 
   const submit = async (e) => {
     e?.preventDefault();
-    if (!name.trim()) {
-      toast.error("Escribe el nombre del trabajador");
-      return;
-    }
+    if (!name.trim()) { toast.error("El nombre es obligatorio"); return; }
+    if (!lastName.trim()) { toast.error("El apellido es obligatorio"); return; }
     setSaving(true);
     try {
       const { data } = await api.post("/workers", {
-        name: name.trim(),
+        name: `${name.trim()} ${lastName.trim()}`,
         document_id: documentId.trim(),
-        phone: phone.trim(),
         role,
         active: true,
       });
@@ -73,26 +70,10 @@ export default function QuickAddWorker({ open, onClose, onCreated }) {
 
         <form onSubmit={submit} className="space-y-3">
           <div>
-            <label className="block text-xs font-bold text-[#1A2210] mb-1 uppercase tracking-wider">Nombre completo *</label>
-            <input
-              autoFocus
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ej. Pedro Hernández"
-              className="field-input !h-12 !text-base"
-              data-testid="qa-worker-name"
-            />
+            <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre (obligatorio)" className="field-input !h-12 !text-base" data-testid="qa-worker-name" />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-[#1A2210] mb-1 uppercase tracking-wider">Documento / ID</label>
-              <input value={documentId} onChange={(e) => setDocumentId(e.target.value)} className="field-input !h-12 !text-base" placeholder="Opcional" data-testid="qa-worker-doc" />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-[#1A2210] mb-1 uppercase tracking-wider">Teléfono</label>
-              <input value={phone} onChange={(e) => setPhone(e.target.value)} className="field-input !h-12 !text-base" placeholder="Opcional" data-testid="qa-worker-phone" />
-            </div>
-          </div>
+          <input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Apellido (obligatorio)" className="field-input !h-12 !text-base" data-testid="qa-worker-last-name" />
+          <input value={documentId} onChange={(e) => setDocumentId(e.target.value)} inputMode="numeric" placeholder="SS# (opcional)" className="field-input !h-12 !text-base" data-testid="qa-worker-doc" />
           <div>
             <label className="block text-xs font-bold text-[#1A2210] mb-1 uppercase tracking-wider">Rol</label>
             <select value={role} onChange={(e) => setRole(e.target.value)} className="field-input !h-12 !text-base" data-testid="qa-worker-role">

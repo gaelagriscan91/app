@@ -16,6 +16,7 @@ App de registro de cosecha estilo PickTrace para equipos agrícolas:
 - Android: Capacitor (`/app/frontend/android`) con CI por GitHub Actions
 
 ## Implementado (estado actual tras reseteo 10/2026)
+- **Alta de trabajador** (2026-10-09): formulario con Nombre (obligatorio), Apellido (obligatorio), SS# (opcional, se guarda en `document_id`), Rol y Activo; se quitó Teléfono. Se guarda como `name` = "Nombre Apellido". Aplicado en Módulos → Trabajadores y en el alta rápida de Check in.
 - **Excel de recibos estilo planilla** (2026-10-09): `/api/receipts/export` genera encabezado RANCH / BLOCK# / Trabajo / Variedad / Mayordomo y tabla con encabezado gris y bordes: SS#, EMPLOYEE NAME, Hora entrada (h:mm:ss a.m.), Fecha (M/D/AAAA), Hora Salida, Total Horas, Total piezas, Precio ($), $. Una fila por trabajador (periodo sumado), sin fila de totales. `harvests` ahora también guarda `mayordomo`; si faltan Block/Variedad/Mayordomo se usan los de la sesión del teléfono (Mayordomo solo para el mismo día).
 - **Block y Variedad guardados** (2026-10-09): `harvests` ahora guarda `block` y `variety` (tomados de la sesión de Check in al guardar el escaneo). Se muestran en Reportes (detalle por trabajador), en el detalle de Recibos guardados (Registro) y como columnas en el Excel. Las cosechas anteriores a este cambio quedan sin Block/Variedad.
 - **Check in (Asistencia)**: Rancho, Block, Trabajo, Variedad y Precio (o Precio/hora en modo Horas) son obligatorios; sin ellos no se puede dar entrada (cámara, teclado, Move Crew); campos vacíos se marcan en rojo. (2026-10-09)
