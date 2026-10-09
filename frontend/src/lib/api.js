@@ -8,6 +8,34 @@ const api = axios.create({
   withCredentials: true,
 });
 
+// Blocked/expired accounts: tell the app to show the blocked screen
+const isBlockedError = (e) =>
+  e?.response?.status === 403 && /bloquead|vencido/i.test(String(e?.response?.data?.detail || ""));
+export { isBlockedError };
+
+// Sliding session: on 401 try one refresh (rotates the 30-day cookie) and retry
+let refreshing = null;
+api.interceptors.response.use(
+  (r) => r,
+  async (error) => {
+    const cfg = error.config || {};
+    const url = cfg.url || "";
+    if (isBlockedError(error)) {
+      window.dispatchEvent(new Event("agriscan:blocked"));
+      return Promise.reject(error);
+    }
+    if (error.response?.status === 401 && !cfg._retried && !/\/auth\/(login|refresh|register|logout)/.test(url)) {
+      cfg._retried = true;
+      try {
+        refreshing = refreshing || api.post("/auth/refresh").finally(() => { refreshing = null; });
+        await refreshing;
+        return api(cfg);
+      } catch (_) {}
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default api;
 
 // Check-in session values (Block/Variedad/Mayordomo) for a date, used as receipt-export fallbacks

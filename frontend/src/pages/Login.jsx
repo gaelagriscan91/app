@@ -26,6 +26,8 @@ export default function Login() {
       try { localStorage.setItem(LAST_EMAIL_KEY, email.trim()); } catch (_) {}
       toast.success("Bienvenido de vuelta");
       navigate("/");
+    } else if (res.blocked) {
+      try { localStorage.setItem(LAST_EMAIL_KEY, email.trim()); } catch (_) {}
     } else {
       setError(res.error);
       toast.error(res.error);
@@ -110,7 +112,7 @@ export default function Login() {
 
           <div className="text-center pt-2">
             <p className="text-white text-lg">¿No tienes cuenta?</p>
-            <p className="text-[#8DC63F] text-base font-bold mt-1" data-testid="login-no-account-hint">Pide a tu administrador</p>
+            <button type="button" onClick={() => navigate("/register")} className="text-[#8DC63F] text-lg font-bold mt-1 hover:text-[#A6D95C] transition-colors" data-testid="login-signup-link">Crear cuenta</button>
           </div>
         </form>
       </div>

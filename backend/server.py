@@ -24,7 +24,7 @@ from fastapi import (
     FastAPI, APIRouter, HTTPException, Depends, Request, Response,
     UploadFile, File, Form, Query, Header, BackgroundTasks
 )
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
@@ -141,17 +141,39 @@ def create_access_token(user_id: str, email: str, token_version: int = 0) -> str
 def create_refresh_token(user_id: str, token_version: int = 0) -> str:
     payload = {
         "sub": user_id, "ver": token_version,
-        "exp": datetime.now(timezone.utc) + timedelta(days=7),
+        "exp": datetime.now(timezone.utc) + timedelta(days=REFRESH_DAYS),
         "type": "refresh",
     }
     return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
+
+
+REFRESH_DAYS = 30
+BLOCKED_DETAIL = "Cuenta bloqueada. Contacta al administrador."
 
 
 def set_auth_cookies(response: Response, access: str, refresh: str):
     response.set_cookie("access_token", access, httponly=True, secure=True, samesite="none",
                         max_age=86400, path="/")
     response.set_cookie("refresh_token", refresh, httponly=True, secure=True, samesite="none",
-                        max_age=604800, path="/")
+                        max_age=REFRESH_DAYS * 86400, path="/")
+
+
+async def ensure_not_blocked(user: dict):
+    """Raise 403 for blocked or expired non-admin accounts."""
+    if user.get("role") == "admin":
+        return
+    exp_iso = user.get("access_expires_at")
+    if exp_iso:
+        try:
+            expired = datetime.now(timezone.utc) > datetime.fromisoformat(exp_iso)
+        except Exception:
+            expired = False
+        if expired:
+            if user.get("active") is not False:
+                await db.users.update_one({"_id": ObjectId(str(user["_id"]))}, {"$set": {"active": False}})
+            raise HTTPException(status_code=403, detail="Acceso vencido. Cuenta bloqueada, contacta al administrador.")
+    if user.get("active") is False:
+        raise HTTPException(status_code=403, detail=BLOCKED_DETAIL)
 
 
 async def get_current_user(request: Request) -> dict:
@@ -171,6 +193,7 @@ async def get_current_user(request: Request) -> dict:
             raise HTTPException(status_code=401, detail="Usuario no encontrado")
         if payload.get("ver", 0) != user.get("token_version", 0):
             raise HTTPException(status_code=401, detail="Sesión expirada")
+        await ensure_not_blocked(user)
         user["_id"] = str(user["_id"])
         user.pop("password_hash", None)
         return user
@@ -398,13 +421,30 @@ class MayordomoUpdate(BaseModel):
 # Auth endpoints
 # ---------------------------------------------------------------------------
 @api_router.post("/auth/register")
-async def register(data: RegisterIn, response: Response):
-    # Public registration is DISABLED. Only admins can create mayordomo accounts
-    # via POST /api/admin/mayordomos.
-    raise HTTPException(
-        status_code=403,
-        detail="El registro público está deshabilitado. Pide a tu administrador que te cree una cuenta.",
-    )
+async def register(data: RegisterIn, request: Request, response: Response):
+    """Self sign-up for mayordomos. Accounts start BLOCKED until an admin unblocks them."""
+    email = data.email.lower().strip()
+    name = data.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Escribe tu nombre")
+    if len(data.password) < 6:
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 6 caracteres")
+    ip = _client_ip(request)
+    since = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    if await db.register_attempts.count_documents({"ip": ip, "created_at": {"$gt": since}}) >= 5:
+        raise HTTPException(status_code=429, detail="Demasiados registros. Intenta más tarde.")
+    await db.register_attempts.insert_one({"ip": ip, "created_at": datetime.now(timezone.utc).isoformat()})
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(status_code=400, detail="Ese correo ya tiene una cuenta. Inicia sesión.")
+    doc = {
+        "email": email, "name": name, "password_hash": hash_password(data.password),
+        "role": "user", "active": False, "self_registered": True, "token_version": 0,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    res = await db.users.insert_one(doc)
+    uid = str(res.inserted_id)
+    set_auth_cookies(response, create_access_token(uid, email, 0), create_refresh_token(uid, 0))
+    return {"id": uid, "email": email, "name": name, "role": "user", "blocked": True}
 
 
 @api_router.post("/auth/login")
@@ -416,27 +456,18 @@ async def login(data: LoginIn, request: Request, response: Response):
     if not user or not verify_password(data.password, user["password_hash"]):
         await record_failed_login(ip, email)
         raise HTTPException(status_code=401, detail="Correo o contraseña incorrectos")
-    # Auto-block when the access window has expired
-    exp_iso = user.get("access_expires_at")
-    if exp_iso and user.get("role") != "admin":
-        try:
-            exp_dt = datetime.fromisoformat(exp_iso)
-            if datetime.now(timezone.utc) > exp_dt:
-                if user.get("active") is not False:
-                    await db.users.update_one({"_id": user["_id"]}, {"$set": {"active": False}})
-                raise HTTPException(status_code=403, detail="Acceso vencido. Pide al administrador que renueve tu acceso.")
-        except HTTPException:
-            raise
-        except Exception:
-            pass
-    # Block manually-deactivated accounts (non-admin)
-    if user.get("active") is False and user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Cuenta bloqueada. Contacta al administrador.")
     await clear_login_attempts(ip, email)
     uid = str(user["_id"])
     ver = user.get("token_version", 0)
-    access = create_access_token(uid, email, ver)
-    refresh = create_refresh_token(uid, ver)
+    access, refresh = create_access_token(uid, email, ver), create_refresh_token(uid, ver)
+    # Blocked/expired accounts keep their cookies so the app shows the blocked screen
+    # and lets them in automatically once an admin unblocks them.
+    try:
+        await ensure_not_blocked(user)
+    except HTTPException as e:
+        blocked = JSONResponse({"detail": e.detail}, status_code=e.status_code)
+        set_auth_cookies(blocked, access, refresh)
+        return blocked
     set_auth_cookies(response, access, refresh)
     return {"id": uid, "email": email, "name": user.get("name", ""), "role": user.get("role", "user")}
 
@@ -458,9 +489,8 @@ async def refresh_token(request: Request, response: Response):
             raise HTTPException(status_code=401, detail="Sesión expirada")
         uid = str(user["_id"])
         ver = user.get("token_version", 0)
-        access = create_access_token(uid, user["email"], ver)
-        response.set_cookie("access_token", access, httponly=True, secure=True,
-                            samesite="none", max_age=86400, path="/")
+        # Sliding 30-day session: rotate both tokens on every refresh
+        set_auth_cookies(response, create_access_token(uid, user["email"], ver), create_refresh_token(uid, ver))
         return {"ok": True}
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expirado")
