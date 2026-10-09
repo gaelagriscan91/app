@@ -531,8 +531,11 @@ export default function ScanHarvestMode() {
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col select-none" data-testid="scan-harvest-mode">
-      {/* Blue top bar */}
-      <div className="bg-[#2B55D1] text-white pt-[env(safe-area-inset-top)]">
+      {/* Transparent top bar (overlay) */}
+      <div
+        className="absolute top-0 left-0 right-0 z-20 text-white pt-[env(safe-area-inset-top)]"
+        style={{ textShadow: "0 1px 3px rgba(0,0,0,0.7)" }}
+      >
         <div className="flex items-center justify-between px-3 h-14">
           <div className="min-w-0 flex-1">
             <div className="text-[10px] font-bold uppercase tracking-wider opacity-80 flex items-center gap-1.5">
@@ -578,23 +581,24 @@ export default function ScanHarvestMode() {
           </div>
         </div>
 
-        {/* Floating PRECIO + unit toggle (top-left) */}
-        <div className="absolute top-4 left-3 flex items-stretch gap-1.5">
+        {/* Floating PRECIO + unit toggle (below top header) */}
+        <div className="absolute top-[112px] left-3 flex items-stretch gap-1.5 z-10">
           <button
             onClick={() => setEditPrice(true)}
-            className="bg-white rounded-xl shadow-xl px-3 py-2 text-left border border-black/5 active:scale-[0.98]"
+            className="rounded-xl px-3 py-2 text-left active:scale-[0.98]"
             data-testid="scan-price-chip"
+            style={{ textShadow: "0 1px 2px rgba(0,0,0,0.6)" }}
           >
-            <div className="text-[10px] font-bold uppercase tracking-wider text-[#556047] leading-none">Precio</div>
-            <div className="font-mono-stat text-2xl text-[#1A2210] leading-tight mt-0.5">
-              {pricePerUnit ? `$${pricePerUnit}` : <span className="text-red-500">—</span>}
+            <div className="text-[10px] font-bold uppercase tracking-wider text-white/90 leading-none">Precio</div>
+            <div className="font-mono-stat text-2xl text-white leading-tight mt-0.5">
+              {pricePerUnit ? `$${pricePerUnit}` : <span className="text-red-300">—</span>}
             </div>
-            <div className="text-[10px] font-bold text-[#889078] leading-none">
+            <div className="text-[10px] font-bold text-white/90 leading-none">
               / {unitLabel}
             </div>
           </button>
           <div
-            className="flex flex-col justify-stretch bg-white rounded-xl shadow-xl p-1 border border-black/5"
+            className="flex flex-col justify-stretch gap-1"
             data-testid="scan-unit-toggle"
           >
             {[
@@ -613,7 +617,8 @@ export default function ScanHarvestMode() {
                     localStorage.setItem(k, JSON.stringify(s));
                   } catch (_) {}
                 }}
-                className={`flex-1 px-2 rounded-md text-[11px] font-extrabold transition ${unitLabel === v ? "bg-[#1D4ED8] text-white" : "text-[#1A2210] hover:bg-black/5"}`}
+                className={`flex-1 px-2 rounded-md text-[11px] font-extrabold transition ${unitLabel === v ? "bg-[#1D4ED8] text-white" : "text-white hover:bg-white/15"}`}
+                style={{ textShadow: unitLabel === v ? "none" : "0 1px 2px rgba(0,0,0,0.6)" }}
                 data-testid={`scan-unit-${v}`}
               >
                 {l}
@@ -648,7 +653,12 @@ export default function ScanHarvestMode() {
       </div>
 
       {/* Blue bottom bar — last worker + totals (or shared-basket panel when active) */}
-      <div className="bg-[#2B55D1] text-white pb-[env(safe-area-inset-bottom)]" data-testid="scan-bottom-bar">
+      {/* Transparent bottom bar (overlay) */}
+      <div
+        className="absolute bottom-0 left-0 right-0 z-20 text-white pb-[env(safe-area-inset-bottom)]"
+        data-testid="scan-bottom-bar"
+        style={{ textShadow: "0 1px 3px rgba(0,0,0,0.7)" }}
+      >
         {shareMode && shareBuffer.length > 0 ? (
           <div className="px-4 pt-3 pb-2" data-testid="scan-share-panel">
             <div className="text-sm font-bold opacity-95 truncate" data-testid="scan-share-names">
