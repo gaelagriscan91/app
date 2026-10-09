@@ -560,57 +560,7 @@ export default function ScanHarvestMode() {
         </div>
 
         {/* Price auto-loaded from Check In session — chip removed from camera UI */}
-
-        {/* Pause/Resume floating button (top-right) */}
-        <button
-          onClick={() => setScannerOn((v) => !v)}
-          className={`absolute top-4 right-3 w-11 h-11 rounded-full flex items-center justify-center shadow-xl ${
-            scannerOn ? "bg-white text-[#1A2210]" : "bg-red-500 text-white"
-          }`}
-          data-testid="scan-toggle-camera"
-          aria-label={scannerOn ? "Pausar" : "Reanudar"}
-        >
-          {scannerOn ? <CameraOff className="w-5 h-5" /> : <Camera className="w-5 h-5" />}
-        </button>
-
-        {/* Shared-basket toggle (below pause) */}
-        <button
-          onClick={() => {
-            if (shareMode) {
-              // Turning OFF
-              if (shareBuffer.length > 0) {
-                if (!window.confirm("Hay una canasta compartida sin guardar. ¿Descartar?")) return;
-                setShareBuffer([]);
-                setShareBaskets(0);
-                shareSessionIdRef.current = null;
-              }
-              setShareMode(false);
-            } else {
-              // Turning ON: offer to pull existing tally workers into the shared group
-              const tallyEntries = Object.entries(tally);
-              if (tallyEntries.length > 0) {
-                const ok = window.confirm(
-                  `¿Agrupar los ${tallyEntries.length} trabajador(es) actuales como canasta compartida?`
-                );
-                if (ok) {
-                  shareSessionIdRef.current = `share-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-                  setShareBuffer(tallyEntries.map(([id, v]) => ({ id, name: v.name })));
-                  setShareBaskets(1);
-                  setTally({});
-                }
-              }
-              setShareMode(true);
-            }
-          }}
-          className={`absolute top-[72px] right-3 h-11 px-3 rounded-full flex items-center gap-1.5 font-extrabold text-xs shadow-xl ${
-            shareMode ? "bg-[#DC2626] text-white" : "bg-white text-[#1A2210]"
-          }`}
-          data-testid="scan-share-toggle"
-          aria-label="Canasta compartida"
-        >
-          <Users className="w-4 h-4" />
-          {shareMode ? "Compartir ON" : "Compartir"}
-        </button>
+        {/* Pause/Resume & Compartir buttons removed per user request */}
 
         {/* Side action: Manual add */}
         <button
