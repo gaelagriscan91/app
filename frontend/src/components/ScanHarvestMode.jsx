@@ -522,7 +522,7 @@ export default function ScanHarvestMode() {
             </div>
           </div>
           <button
-            onClick={() => navigate("/registrar")}
+            onClick={() => navigate("/")}
             className="w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center"
             data-testid="scan-close-fullscreen"
             aria-label="Cerrar"
