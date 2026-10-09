@@ -30,6 +30,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from bson import ObjectId
 from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 
 # ---------------------------------------------------------------------------
 # MongoDB
@@ -336,6 +337,7 @@ class HarvestIn(BaseModel):
     notes: Optional[str] = ""
     block: Optional[str] = ""
     variety: Optional[str] = ""
+    mayordomo: Optional[str] = ""
 
 
 # ---------------------------------------------------------------------------
@@ -880,6 +882,7 @@ async def create_harvest(data: HarvestIn, user: CurrentUser):
         "notes": data.notes or "",
         "block": (data.block or "").strip(),
         "variety": (data.variety or "").strip(),
+        "mayordomo": (data.mayordomo or "").strip(),
         "created_by": user["_id"],
         "owner_id": owner_of(user),
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -908,6 +911,7 @@ async def update_harvest(hid: str, data: HarvestIn, user: CurrentUser):
         "photo_path": data.photo_path or "", "notes": data.notes or "",
         "block": (data.block or existing.get("block") or "").strip(),
         "variety": (data.variety or existing.get("variety") or "").strip(),
+        "mayordomo": (data.mayordomo or existing.get("mayordomo") or "").strip(),
     }
     await db.harvests.update_one({"_id": ObjectId(hid)}, {"$set": upd})
     row = await db.harvests.find_one({"_id": ObjectId(hid)})
@@ -1208,6 +1212,7 @@ async def receipts(
                 "parcel_name": parc["name"] if parc else "—",
                 "block": h.get("block", ""),
                 "variety": h.get("variety", ""),
+                "mayordomo": h.get("mayordomo", ""),
                 "kilos": float(h.get("kilos", 0)),
                 "units": float(h.get("units", 0)),
                 "unit_label": prod.get("unit_label", "u") if prod else "u",
@@ -1289,75 +1294,143 @@ async def receipts_export(
     worker_id: Optional[str] = None,
     crew_id: Optional[str] = None,
     tz_offset: int = 0,
+    block: Optional[str] = "",
+    variety: Optional[str] = "",
+    mayordomo: Optional[str] = "",
 ):
-    """Returns an Excel with one aggregated row per worker.
-    `tz_offset` is minutes east of UTC (JS: -new Date().getTimezoneOffset())."""
+    """Excel receipt: header (Ranch/Block/Trabajo/Variedad/Mayordomo) + one row per worker.
+    `tz_offset` is minutes east of UTC. block/variety/mayordomo are fallbacks from the device session."""
     rows = await receipts(user=user, date_from=date_from, date_to=date_to, worker_id=worker_id, crew_id=crew_id)
     now_iso = datetime.now(timezone.utc).isoformat()
 
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Recibos"
-    ws.append([
-        "Trabajador", "ID", "Rol",
-        "Periodo desde", "Periodo hasta",
-        "Horas", "Días",
-        "Total kilos", "Total piezas",
-        "Precio/pieza", "Total a pagar ($)",
-    ])
+    def _uniq(key: str) -> str:
+        vals = []
+        for r in rows:
+            for h in r.get("harvests", []):
+                v = (h.get(key) or "").strip()
+                if v and v != "—" and v not in vals:
+                    vals.append(v)
+        return ", ".join(vals)
+
+    def _time_local(iso_ts: Optional[str]) -> str:
+        if not iso_ts:
+            return ""
+        try:
+            dt = datetime.fromisoformat(iso_ts)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            local = dt.astimezone(timezone.utc) + timedelta(minutes=tz_offset)
+            h12 = local.hour % 12 or 12
+            return f"{h12}:{local.minute:02d}:{local.second:02d} {'a.m.' if local.hour < 12 else 'p.m.'}"
+        except Exception:
+            return ""
+
+    def _fmt_date(d: str) -> str:
+        try:
+            y, m, dd = d.split("-")
+            return f"{int(m)}/{int(dd)}/{y}"
+        except Exception:
+            return d or ""
+
     def _fmt_hours(h: float) -> str:
-        """Match the app display: '0min', '45min', '1h 23min'."""
         total_min = int(round(float(h or 0) * 60))
         hh, mm = divmod(total_min, 60)
         return f"{hh}h {mm}min" if hh > 0 else f"{mm}min"
 
-    grand_hours = 0.0
-    grand_kilos = 0.0
-    grand_units = 0.0
-    grand_payment = 0.0
+    same_day = date_from == date_to
+    header_vals = {
+        "ranch": _uniq("parcel_name"),
+        "block": _uniq("block") or (block or "").strip(),
+        "trabajo": _uniq("product_name"),
+        "variety": _uniq("variety") or (variety or "").strip(),
+        "mayordomo": _uniq("mayordomo") or ((mayordomo or "").strip() if same_day else ""),
+    }
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Recibos"
+    bold = Font(bold=True, size=12)
+    thin = Side(style="thin", color="999999")
+    box = Border(left=thin, right=thin, top=thin, bottom=thin)
+    underline = Border(bottom=Side(style="thin", color="000000"))
+
+    def _label(cell: str, text: str, value: str, merge_to: Optional[str] = None):
+        ws[cell] = text
+        ws[cell].font = bold
+        ws[cell].alignment = Alignment(horizontal="right", vertical="bottom")
+        col = ws[cell].column
+        vcell = ws.cell(row=ws[cell].row, column=col + 1, value=value)
+        vcell.alignment = Alignment(horizontal="center", vertical="bottom")
+        last = ws[merge_to].column if merge_to else col + 1
+        for c in range(col + 1, last + 1):
+            ws.cell(row=ws[cell].row, column=c).border = underline
+        if merge_to:
+            ws.merge_cells(start_row=ws[cell].row, start_column=col + 1, end_row=ws[cell].row, end_column=last)
+
+    _label("A2", "RANCH", header_vals["ranch"], "C2")
+    _label("D2", "BLOCK#", header_vals["block"], "F2")
+    _label("G2", "Trabajo", header_vals["trabajo"], "I2")
+    _label("A3", "Variedad", header_vals["variety"], "B3")
+    _label("C3", "Mayordomo", header_vals["mayordomo"], "F3")
+    ws.row_dimensions[2].height = 24
+    ws.row_dimensions[3].height = 24
+
+    headers = ["SS#", "EMPLOYEE  NAME", "Hora entrada", "Fecha", "Hora Salida",
+               "Total Horas", "Total piezas", "Precio", "$"]
+    hdr_row = 5
+    grey = PatternFill("solid", fgColor="BFC1C2")
+    for i, t in enumerate(headers, start=1):
+        c = ws.cell(row=hdr_row, column=i, value=t)
+        c.font = Font(bold=True, size=11)
+        c.fill = grey
+        c.border = box
+        c.alignment = Alignment(horizontal="right" if i == 2 else "left", vertical="top", wrap_text=True)
+    ws.row_dimensions[hdr_row].height = 42
+
+    money = '"$"#,##0.00'
+    r_idx = hdr_row
     for r in rows:
+        r_idx += 1
         total_units = float(r.get("total_units", 0))
         total_payment = float(r.get("total_payment", 0))
-        price_per_unit = round(total_payment / total_units, 2) if total_units > 0 else 0.0
-        desde = _hhmm_local(r.get("min_check_in_iso"), tz_offset)
+        prices = {float(h.get("price_per_unit", 0)) for h in r.get("harvests", []) if float(h.get("price_per_unit", 0)) > 0}
+        price = prices.pop() if len(prices) == 1 else (round(total_payment / total_units, 2) if total_units > 0 else 0.0)
+        entrada = _time_local(r.get("min_check_in_iso"))
         if r.get("max_check_out_iso") and not r.get("still_working"):
-            hasta = _hhmm_local(r.get("max_check_out_iso"), tz_offset)
+            salida = _time_local(r.get("max_check_out_iso"))
         elif r.get("min_check_in_iso"):
-            hasta = _hhmm_local(now_iso, tz_offset)
+            salida = _time_local(now_iso)
         else:
-            hasta = ""
-        ws.append([
-            r.get("worker_name", ""),
-            r.get("document_id", ""),
-            r.get("role", ""),
-            desde,
-            hasta,
+            salida = ""
+        dates = sorted({a.get("date") for a in r.get("attendance", []) if a.get("date")} |
+                       {h.get("date") for h in r.get("harvests", []) if h.get("date")})
+        if not dates:
+            fecha = _fmt_date(date_from) if same_day else f"{_fmt_date(date_from)} - {_fmt_date(date_to)}"
+        elif dates[0] == dates[-1]:
+            fecha = _fmt_date(dates[0])
+        else:
+            fecha = f"{_fmt_date(dates[0])} - {_fmt_date(dates[-1])}"
+        ss = (r.get("document_id") or "").strip()
+        values = [
+            int(ss) if ss.isdigit() else ss,
+            (r.get("worker_name") or "").strip(),
+            entrada, fecha, salida,
             _fmt_hours(r.get("total_hours", 0)),
-            int(r.get("days_worked", 0)),
-            float(r.get("total_kilos", 0)),
-            total_units,
-            price_per_unit,
+            int(total_units) if total_units == int(total_units) else round(total_units, 2),
+            price,
             total_payment,
-        ])
-        grand_hours += float(r.get("total_hours", 0))
-        grand_kilos += float(r.get("total_kilos", 0))
-        grand_units += total_units
-        grand_payment += total_payment
+        ]
+        for i, v in enumerate(values, start=1):
+            c = ws.cell(row=r_idx, column=i, value=v)
+            c.border = box
+            c.font = Font(size=11)
+            c.alignment = Alignment(horizontal="right" if i in (1, 6, 7, 8, 9) else "left", vertical="center")
+            if i in (8, 9):
+                c.number_format = money
+        ws.row_dimensions[r_idx].height = 30
 
-    ws.append([])
-    ws.append([
-        "TOTALES", "", "", "", "",
-        _fmt_hours(grand_hours),
-        "",
-        round(grand_kilos, 2),
-        round(grand_units, 2),
-        "",
-        round(grand_payment, 2),
-    ])
-
-    for col in ws.columns:
-        length = max((len(str(c.value)) for c in col if c.value is not None), default=10)
-        ws.column_dimensions[col[0].column_letter].width = min(length + 2, 30)
+    for letter, w in zip("ABCDEFGHI", [12, 26, 14, 12, 14, 12, 10, 10, 11]):
+        ws.column_dimensions[letter].width = w
 
     buf = io.BytesIO()
     wb.save(buf)

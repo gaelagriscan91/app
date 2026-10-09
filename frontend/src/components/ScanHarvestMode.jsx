@@ -492,6 +492,7 @@ export default function ScanHarvestMode() {
             notes: v.count % 1 !== 0 ? "Canasta compartida" : "Cosecha escaneada",
             block: sess.block || "",
             variety: sess.variedad || "",
+            mayordomo: sess.mayordomo || "",
           })
         )
       );

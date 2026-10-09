@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Printer, Loader2, Calendar, Users, Clock, DollarSign, FileText, PrinterIcon, Bluetooth, BluetoothSearching, Receipt, FileCheck, Share2, Save } from "lucide-react";
 import { toast } from "sonner";
-import api, { formatCurrency, formatNumber } from "@/lib/api";
+import api, { formatCurrency, formatNumber, sessionExportParams } from "@/lib/api";
 import { thermalPrinter, buildReceiptLines, receiptTicketHtml } from "@/lib/thermalPrinter";
 
 function startOfMonthISO() {
@@ -253,6 +253,7 @@ export default function RecibosTab() {
           date_to: r.date_to || dateTo,
           worker_id: r.worker_id,
           tz_offset: -new Date().getTimezoneOffset(),
+          ...sessionExportParams(r.date_to || dateTo),
         },
         responseType: "blob",
       })).data;
@@ -282,6 +283,7 @@ export default function RecibosTab() {
           worker_id: workerId || undefined,
           crew_id: crewId || undefined,
           tz_offset: -new Date().getTimezoneOffset(),
+          ...sessionExportParams(dateTo),
         },
         responseType: "blob",
       })).data;

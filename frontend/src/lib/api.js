@@ -10,6 +10,16 @@ const api = axios.create({
 
 export default api;
 
+// Check-in session values (Block/Variedad/Mayordomo) for a date, used as receipt-export fallbacks
+export function sessionExportParams(date) {
+  try {
+    const s = JSON.parse(localStorage.getItem(`agriscan.session.${date}`) || "{}");
+    return { block: s.block || undefined, variety: s.variedad || undefined, mayordomo: s.mayordomo || undefined };
+  } catch {
+    return {};
+  }
+}
+
 export function formatApiErrorDetail(detail) {
   if (detail == null) return "Ocurrió un error. Intenta de nuevo.";
   if (typeof detail === "string") return detail;

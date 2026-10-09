@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import api, { formatApiErrorDetail, formatCurrency, formatNumber, todayISO, formatHHMM } from "@/lib/api";
+import api, { formatApiErrorDetail, formatCurrency, formatNumber, todayISO, formatHHMM, sessionExportParams } from "@/lib/api";
 import QrScanner from "@/components/QrScanner";
 import QuickAddWorker from "@/components/QuickAddWorker";
 
@@ -1200,7 +1200,7 @@ function SummaryView({ data, selectedParcel, harvestsToday = [], date, onClose }
       let blob = null;
       try {
         const resp = await api.get("/receipts/export", {
-          params: { date_from: date, date_to: date, tz_offset: -new Date().getTimezoneOffset() },
+          params: { date_from: date, date_to: date, tz_offset: -new Date().getTimezoneOffset(), ...sessionExportParams(date) },
           responseType: "blob",
         });
         blob = resp.data;
