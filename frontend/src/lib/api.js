@@ -14,7 +14,14 @@ export default api;
 export function sessionExportParams(date) {
   try {
     const s = JSON.parse(localStorage.getItem(`agriscan.session.${date}`) || "{}");
-    return { block: s.block || undefined, variety: s.variedad || undefined, mayordomo: s.mayordomo || undefined };
+    return {
+      rancho: s.ranchoName || undefined,
+      trabajo: s.trabajoName || undefined,
+      block: s.block || undefined,
+      variety: s.variedad || undefined,
+      mayordomo: s.mayordomo || undefined,
+      price: (s.unitMode === "horas" ? s.pricePerHour : s.pricePerUnit) || undefined,
+    };
   } catch {
     return {};
   }

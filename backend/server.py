@@ -1314,6 +1314,9 @@ async def receipts_export(
     block: Optional[str] = "",
     variety: Optional[str] = "",
     mayordomo: Optional[str] = "",
+    rancho: Optional[str] = "",
+    trabajo: Optional[str] = "",
+    price: Optional[float] = None,
 ):
     """Excel receipt: header (Ranch/Block/Trabajo/Variedad/Mayordomo) + one row per worker.
     `tz_offset` is minutes east of UTC. block/variety/mayordomo are fallbacks from the device session."""
@@ -1355,12 +1358,18 @@ async def receipts_export(
         return f"{hh}h {mm}min" if hh > 0 else f"{mm}min"
 
     same_day = date_from == date_to
+    session_price = float(price or 0)
+
+    def _pick(sess_val: Optional[str], key: str) -> str:
+        s = (sess_val or "").strip()
+        return s if (same_day and s) else (_uniq(key) or s)
+
     header_vals = {
-        "ranch": _uniq("parcel_name"),
-        "block": _uniq("block") or (block or "").strip(),
-        "trabajo": _uniq("product_name"),
-        "variety": _uniq("variety") or (variety or "").strip(),
-        "mayordomo": _uniq("mayordomo") or ((mayordomo or "").strip() if same_day else ""),
+        "ranch": _pick(rancho, "parcel_name"),
+        "block": _pick(block, "block"),
+        "trabajo": _pick(trabajo, "product_name"),
+        "variety": _pick(variety, "variety"),
+        "mayordomo": _uniq("mayordomo") if not same_day else ((mayordomo or "").strip() or _uniq("mayordomo")),
     }
 
     wb = Workbook()
@@ -1411,7 +1420,7 @@ async def receipts_export(
         total_units = float(r.get("total_units", 0))
         total_payment = float(r.get("total_payment", 0))
         prices = {float(h.get("price_per_unit", 0)) for h in r.get("harvests", []) if float(h.get("price_per_unit", 0)) > 0}
-        price = prices.pop() if len(prices) == 1 else (round(total_payment / total_units, 2) if total_units > 0 else 0.0)
+        price = prices.pop() if len(prices) == 1 else (round(total_payment / total_units, 2) if total_units > 0 else float(session_price))
         entrada = _time_local(r.get("min_check_in_iso"))
         if r.get("max_check_out_iso") and not r.get("still_working"):
             salida = _time_local(r.get("max_check_out_iso"))
