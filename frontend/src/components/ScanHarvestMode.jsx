@@ -366,6 +366,21 @@ export default function ScanHarvestMode() {
     });
   };
 
+  // Set the exact count for a worker — used for libras/horas direct entry
+  const setCount = (workerId, value) => {
+    const v = Math.max(0, Number(value) || 0);
+    setTally((prev) => {
+      const existing = prev[workerId];
+      const name = existing?.name || workers.find((x) => x.id === workerId)?.name || "—";
+      if (v === 0) {
+        const copy = { ...prev };
+        delete copy[workerId];
+        return copy;
+      }
+      return { ...prev, [workerId]: { name, count: v } };
+    });
+  };
+
   // Mark the LAST scanned piece as a fraction. Default scan adds +1 (completo).
   // Tapping these buttons adjusts the last +1 to the chosen fraction.
   // Example: 1/2 -> delta = 0.5 - 1 = -0.5 so last entry becomes 0.5 instead of 1.
@@ -693,6 +708,20 @@ export default function ScanHarvestMode() {
                 >
                   <Minus className="w-5 h-5" />
                 </button>
+                {(unitLabel === "libra" || unitLabel === "hora") && (
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    min="0"
+                    value={lastWorkerStats.count || ""}
+                    placeholder="0"
+                    onChange={(e) => setCount(lastWorker.id, e.target.value)}
+                    className="w-20 h-10 rounded-lg bg-white/15 text-white text-center font-mono-stat font-extrabold text-base placeholder:text-white/40 focus:outline-none focus:bg-white/25 border border-white/15"
+                    data-testid="scan-last-weight-input"
+                    aria-label={unitLabel === "libra" ? "Libras" : "Horas"}
+                  />
+                )}
                 <button
                   onClick={() => bump(lastWorker.id, 1)}
                   className="w-10 h-10 rounded-full bg-white text-[#2B55D1] hover:bg-white/90 flex items-center justify-center"
