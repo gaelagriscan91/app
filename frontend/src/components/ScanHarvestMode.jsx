@@ -327,10 +327,25 @@ export default function ScanHarvestMode() {
       return { ...prev, [w.id]: { name: w.name, count: cur.count + 1 } };
     });
     logScan(w, "qr");
-    // Keep the camera open — the user can scan the next worker right away.
-    // The pending scans are tracked locally and shown as "sin guardar" rows
-    // in the Cosecha list. GUARDAR button persists them to the backend.
+    // Autosave each scan to backend so it appears instantly in Cosecha.
+    // Camera stays open — user keeps scanning. Exit via the X button.
     toast.success(`${w.name} escaneado`, { duration: 1000 });
+    const price = parseFloat(pricePerUnit) || 0;
+    if (parcelId && productId) {
+      api.post("/harvests", {
+        worker_id: w.id,
+        parcel_id: parcelId,
+        product_id: productId,
+        kilos: 0,
+        units: 1,
+        price_per_kg: 0,
+        price_per_unit: price,
+        price_mode: "piece",
+        date: todayKey,
+        photo_path: "",
+        notes: "Cosecha escaneada",
+      }).catch(() => { /* silent — logScan still tracks locally */ });
+    }
   };
 
   const addManual = (workerId) => {

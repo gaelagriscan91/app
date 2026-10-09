@@ -1,149 +1,51 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, ScanLine } from "lucide-react";
+import { Loader2, ScanLine, Camera } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import api, { formatCurrency, formatNumber, todayISO } from "@/lib/api";
 
-const todayStr = () => todayISO();
-const scanLogKey = (d) => `agriscan.scanlog.${d}`;
-const sessionKey = (d) => `agriscan.session.${d}`;
-
 export default function Cosecha() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [rows, setRows] = useState([]);
-  const [pending, setPending] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [savingReceipt, setSavingReceipt] = useState(false);
-
-  const readPending = () => {
-    try {
-      const log = JSON.parse(localStorage.getItem(scanLogKey(todayStr())) || "[]");
-      setPending(Array.isArray(log) ? log : []);
-    } catch (_) { setPending([]); }
-  };
+  const [session, setSession] = useState({});
 
   const load = async () => {
     try {
       const { data } = await api.get("/harvests");
       setRows(Array.isArray(data) ? data : []);
     } catch (_) { /* ignore */ }
-    readPending();
+    try {
+      const s = JSON.parse(localStorage.getItem(`agriscan.session.${todayISO()}`) || "{}");
+      setSession(s || {});
+    } catch (_) { setSession({}); }
   };
 
   useEffect(() => {
     (async () => { await load(); setLoading(false); })();
   }, []);
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [searchParams]);
-
-  const saveReceipt = async () => {
-    const today = todayStr();
-    setSavingReceipt(true);
-    try {
-      let session = {};
-      try { session = JSON.parse(localStorage.getItem(sessionKey(today)) || "{}"); } catch (_) {}
-
-      if (pending.length === 0) {
-        try { await api.post("/receipts/history", { date_from: today, date_to: today }); } catch (_) {}
-        await load();
-        toast.success("Registro guardado");
-        setSavingReceipt(false);
-        return;
-      }
-
-      let parcelId = session.parcelId;
-      let productId = session.productId;
-      if (!parcelId || !productId) {
-        const [pRes, prRes] = await Promise.all([api.get("/parcels"), api.get("/products")]);
-        const parcels = (pRes.data || []).filter((x) => x.active !== false);
-        const products = (prRes.data || []).filter((x) => x.active !== false);
-        if (!parcelId) parcelId = parcels[0]?.id;
-        if (!productId) productId = products[0]?.id;
-      }
-      if (!parcelId || !productId) {
-        toast.error("Falta parcela o producto");
-        setSavingReceipt(false);
-        return;
-      }
-
-      const price = Number(session.pricePerUnit) || Number(pending[0]?.priceAt) || 0;
-      const posts = pending.map((e) => api.post("/harvests", {
-        worker_id: e.workerId,
-        parcel_id: parcelId,
-        product_id: productId,
-        kilos: 0,
-        units: typeof e.fraction === "number" ? e.fraction : 1,
-        price_per_kg: 0,
-        price_per_unit: Number(e.priceAt) || price,
-        price_mode: "piece",
-        date: today,
-        photo_path: "",
-        notes: "Cosecha escaneada",
-      }).catch(() => null));
-      const results = await Promise.all(posts);
-      const okCount = results.filter(Boolean).length;
-
-      try { localStorage.removeItem(scanLogKey(today)); } catch (_) {}
-      try { await api.post("/receipts/history", { date_from: today, date_to: today }); } catch (_) {}
-
-      await load();
-      toast.success(`${okCount} escaneo${okCount === 1 ? "" : "s"} guardado${okCount === 1 ? "" : "s"}`);
-    } catch (_) {
-      toast.error("No se pudo guardar");
-    } finally {
-      setSavingReceipt(false);
+  useEffect(() => {
+    if (searchParams.get("prompt") === "save") {
+      load().then(() => {
+        const next = new URLSearchParams(searchParams);
+        next.delete("prompt");
+        setSearchParams(next, { replace: true });
+      });
+    } else {
+      load();
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const sorted = useMemo(() => {
-    return [...rows].sort((a, b) => (b.created_at || b.date || "").localeCompare(a.created_at || a.date || ""));
+    return [...rows].sort((a, b) =>
+      (b.created_at || b.date || "").localeCompare(a.created_at || a.date || "")
+    );
   }, [rows]);
 
-  // Merge saved rows + pending scans into a single list sorted by most recent.
-  // Pending entries carry source="pending" so the row can show a "SIN GUARDAR" badge.
-  const combined = useMemo(() => {
-    const today = todayStr();
-    const session = (() => {
-      try { return JSON.parse(localStorage.getItem(sessionKey(today)) || "{}"); } catch (_) { return {}; }
-    })();
-    const unitMode = (session.unitMode || "pieza").toLowerCase();
-    const unitShort = unitMode.startsWith("libra") ? "LB" : unitMode.startsWith("hora") ? "HR" : "PZA";
-    const unitLabel = unitShort === "LB" ? "libra" : unitShort === "HR" ? "hora" : "pieza";
-
-    const pendingRows = (pending || []).map((e) => {
-      const units = typeof e.fraction === "number" ? e.fraction : 1;
-      const price = Number(e.priceAt) || Number(session.pricePerUnit) || 0;
-      return {
-        id: `pending-${e.id}`,
-        worker_name: e.name,
-        worker_id: e.workerId,
-        date: today,
-        created_at: e.at,
-        units,
-        payment: units * price,
-        unit_label: unitLabel,
-        notes: "pending",
-        _pending: true,
-      };
-    });
-    const list = [...pendingRows, ...sorted];
-    return list.sort((a, b) => (b.created_at || b.date || "").localeCompare(a.created_at || a.date || ""));
-  }, [sorted, pending]);
-
-  const todayCount = useMemo(() => {
-    const t = todayStr();
-    const saved = sorted.filter((r) => r.date === t).length;
-    return saved + pending.length;
-  }, [sorted, pending]);
-
-  const activeWorkers = useMemo(() => {
-    const t = todayStr();
-    const set = new Set();
-    sorted.forEach((r) => { if (r.date === t && r.worker_id) set.add(r.worker_id); });
-    pending.forEach((e) => { if (e.workerId) set.add(e.workerId); });
-    return set.size;
-  }, [sorted, pending]);
+  const sessionReady = !!session.parcelId && !!session.productId;
 
   if (loading) {
     return (
@@ -155,9 +57,15 @@ export default function Cosecha() {
 
   return (
     <div
-      className="fixed inset-x-0 top-[64px] bottom-0 flex flex-col px-3 pt-3 pb-[180px] bg-[#F7F5EE]"
+      className="fixed inset-x-0 top-[64px] bottom-[70px] flex flex-col px-3 pt-3 pb-3 bg-[#F7F5EE]"
       data-testid="cosecha-page"
     >
+      {!sessionReady && (
+        <div className="bg-white rounded-2xl border border-[#E6E0D1] shadow-[0_8px_20px_rgba(30,70,32,0.06)] px-4 py-3 mb-3 flex items-center justify-center gap-2 text-[#1D4ED8] text-sm font-semibold">
+          <Loader2 className="w-4 h-4 animate-spin" /> Preparando jornada…
+        </div>
+      )}
+
       <div className="flex-1 min-h-0 bg-white rounded-2xl border border-[#E6E0D1] shadow-[0_8px_20px_rgba(30,70,32,0.06)] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between px-4 py-3 border-b border-[#EFEADA] bg-white shrink-0">
           <div className="flex items-center gap-2">
@@ -169,43 +77,46 @@ export default function Cosecha() {
               Registro de escáneo
             </h2>
           </div>
-          <div className="flex items-center gap-2">
-            {pending.length > 0 && (
-              <span
-                className="px-2 py-[2px] rounded-md bg-amber-100 text-amber-700 text-[10px] font-extrabold tracking-wider"
-                data-testid="cosecha-pending-badge"
-              >
-                {pending.length} PENDIENTE{pending.length === 1 ? "" : "S"}
-              </span>
-            )}
+          <div className="flex items-center gap-3">
             <div className="font-mono-stat text-base font-bold text-[#889078]">
-              {combined.length}
+              {sorted.length}
             </div>
+            <button
+              onClick={() => navigate("/registrar?mode=qr&from=cosecha")}
+              className="w-10 h-10 rounded-full bg-[#1D4ED8] hover:bg-[#1E40AF] active:scale-95 text-white flex items-center justify-center shadow-md transition"
+              data-testid="cosecha-camera-button"
+              aria-label="Abrir cámara"
+              title="Escanear"
+            >
+              <Camera className="w-5 h-5" />
+            </button>
           </div>
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto">
-          {combined.length === 0 ? (
+          {sorted.length === 0 ? (
             <div className="py-10 text-center text-sm text-[#889078] font-semibold">
               Sin escaneos registrados aún
             </div>
           ) : (
             <ul className="divide-y divide-[#EFEADA]">
-              {combined.map((r) => {
+              {sorted.map((r) => {
                 let timeLabel = "";
                 if (r.created_at) {
                   try {
                     const d = new Date(r.created_at);
                     timeLabel = d
-                      .toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true })
+                      .toLocaleTimeString("es-MX", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                        hour12: true,
+                      })
                       .toLowerCase();
                   } catch (_) {}
                 }
                 const notes = (r.notes || "").toLowerCase();
-                const isPending = !!r._pending;
-                const sourceLabel = isPending
-                  ? "SIN GUARDAR"
-                  : notes.includes("manual") || notes.includes("ajuste")
+                const sourceLabel = notes.includes("manual") || notes.includes("ajuste")
                   ? "MANUAL"
                   : notes.includes("comparti") || notes.includes("shared")
                   ? "GRUPO"
@@ -215,17 +126,15 @@ export default function Cosecha() {
                 return (
                   <li
                     key={r.id}
-                    className={`px-4 py-3 flex items-center justify-between gap-3 ${isPending ? "bg-amber-50/60" : ""}`}
-                    data-testid={isPending ? `cosecha-pending-${r.id}` : `cosecha-row-${r.id}`}
+                    className="px-4 py-3 flex items-center justify-between gap-3"
+                    data-testid={`cosecha-row-${r.id}`}
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="font-extrabold text-[#0F1115] truncate text-xl leading-tight">
                           {r.worker_name}
                         </span>
-                        <span
-                          className={`px-2 py-[2px] rounded-md text-[10px] font-extrabold tracking-wider ${isPending ? "bg-amber-100 text-amber-700" : "bg-[#DBE4FF] text-[#1D4ED8]"}`}
-                        >
+                        <span className="px-2 py-[2px] rounded-md bg-[#DBE4FF] text-[#1D4ED8] text-[10px] font-extrabold tracking-wider">
                           {sourceLabel}
                         </span>
                       </div>
@@ -236,7 +145,7 @@ export default function Cosecha() {
                       )}
                     </div>
                     <div className="text-right shrink-0">
-                      <div className={`font-mono-stat text-xl font-extrabold leading-tight ${isPending ? "text-amber-700" : "text-[#1D4ED8]"}`}>
+                      <div className="font-mono-stat text-xl font-extrabold text-[#1D4ED8] leading-tight">
                         {formatCurrency(r.payment)}
                       </div>
                       <div className="text-[11px] font-semibold text-[#889078] mt-0.5">
@@ -251,43 +160,6 @@ export default function Cosecha() {
               })}
             </ul>
           )}
-        </div>
-      </div>
-
-      <div className="fixed left-0 right-0 bottom-[70px] z-30 pointer-events-none">
-        <div className="max-w-5xl mx-auto px-3 pointer-events-auto">
-          <div className="bg-[#111] border-t border-[#2A2A2A] rounded-t-2xl px-3 pt-2 pb-3 shadow-2xl">
-            <div className="grid grid-cols-3 items-center gap-2">
-              <div className="text-[13px] font-semibold text-gray-200">
-                Empleado activo: <span className="font-extrabold text-white">{activeWorkers}</span>
-              </div>
-              <div className="flex items-center justify-center">
-                <button
-                  onClick={() => navigate("/registrar?mode=qr&from=cosecha")}
-                  className="w-20 h-20 rounded-full bg-[#DC2626] hover:bg-[#B91C1C] active:scale-95 text-white font-extrabold text-base shadow-[0_6px_20px_rgba(220,38,38,0.5)] flex items-center justify-center transition"
-                  data-testid="cosecha-scan-button"
-                  aria-label="Escanear"
-                  style={{ fontFamily: "Outfit, sans-serif" }}
-                >
-                  SCAN
-                </button>
-              </div>
-              <div className="text-right text-[13px] font-semibold text-gray-200">
-                Pieza: <span className="font-extrabold text-white">{todayCount}</span>
-              </div>
-            </div>
-            <div className="flex items-center justify-end mt-2">
-              <button
-                onClick={saveReceipt}
-                disabled={savingReceipt}
-                className="h-8 px-6 rounded-md bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-[11px] font-extrabold disabled:opacity-50 flex items-center gap-2"
-                data-testid="cosecha-save-button"
-                style={{ fontFamily: "Outfit, sans-serif" }}
-              >
-                {savingReceipt ? <Loader2 className="w-3 h-3 animate-spin" /> : (pending.length > 0 ? `GUARDAR (${pending.length})` : "GUARDAR")}
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>
