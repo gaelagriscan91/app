@@ -428,6 +428,7 @@ class MayordomoCreate(BaseModel):
 
 class MayordomoUpdate(BaseModel):
     name: Optional[str] = None
+    email: Optional[EmailStr] = None
     password: Optional[str] = None
     role: Optional[str] = None
     active: Optional[bool] = None
@@ -2081,8 +2082,17 @@ async def admin_update_mayordomo(uid: str, data: MayordomoUpdate, user: CurrentU
             upd["access_expires_at"] = None
             upd["unlocked_by"] = "admin"
     if data.password:
+        if len(data.password) < 6:
+            raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 6 caracteres")
         upd["password_hash"] = hash_password(data.password)
         upd["token_version"] = (existing.get("token_version", 0) or 0) + 1
+    if data.email is not None:
+        new_email = str(data.email).lower().strip()
+        if new_email != existing.get("email"):
+            if await db.users.find_one({"email": new_email, "_id": {"$ne": existing["_id"]}}):
+                raise HTTPException(status_code=400, detail="Ese correo ya lo usa otra cuenta")
+            upd["email"] = new_email
+            upd["token_version"] = (existing.get("token_version", 0) or 0) + 1
     if data.access_days is not None:
         now = datetime.now(timezone.utc)
         if data.access_days <= 0:

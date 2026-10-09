@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Mail, Shield, Trash2, Ban, CheckCircle2 } from "lucide-react";
+import { Loader2, Mail, Shield, Trash2, Ban, CheckCircle2, Pencil, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatApiErrorDetail } from "@/lib/api";
 
@@ -37,6 +37,38 @@ export default function MayordomosTab() {
   useEffect(() => { load(); }, []);
 
   const [unlocking, setUnlocking] = useState(null);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [showPw, setShowPw] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const startEdit = (u) => {
+    setUnlocking(null);
+    setForm({ email: u.email, password: "" });
+    setShowPw(false);
+    setEditing(editing === u.id ? null : u.id);
+  };
+
+  const saveEdit = async (u) => {
+    const email = form.email.trim();
+    if (!email) return toast.error("Escribe el correo");
+    if (form.password && form.password.length < 6) return toast.error("La contraseña debe tener al menos 6 caracteres");
+    const payload = { name: u.name };
+    if (email.toLowerCase() !== u.email) payload.email = email;
+    if (form.password) payload.password = form.password;
+    if (!payload.email && !payload.password) { setEditing(null); return; }
+    setSaving(true);
+    try {
+      await api.patch(`/admin/mayordomos/${u.id}`, payload);
+      toast.success("Usuario actualizado");
+      setEditing(null);
+      load();
+    } catch (e) {
+      toast.error(formatApiErrorDetail(e.response?.data?.detail) || "No se pudo actualizar");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const unlockFor = async (u, days) => {
     try {
@@ -51,7 +83,7 @@ export default function MayordomosTab() {
 
   const onToggleBlock = async (u) => {
     const willBlock = u.active !== false && !isExpired(u);
-    if (!willBlock) { setUnlocking(unlocking === u.id ? null : u.id); return; }
+    if (!willBlock) { setEditing(null); setUnlocking(unlocking === u.id ? null : u.id); return; }
     if (!window.confirm(`¿Bloquear a ${u.name}?`)) return;
     try {
       await api.patch(`/admin/mayordomos/${u.id}`, { active: false, name: u.name });
@@ -112,6 +144,14 @@ export default function MayordomosTab() {
                     {isBlocked ? <><CheckCircle2 className="w-4 h-4" /> Desbloquear</> : <><Ban className="w-4 h-4" /> Bloquear</>}
                   </button>
                   <button
+                    onClick={() => startEdit(u)}
+                    className="h-10 px-3 bg-white border-2 border-blue-100 hover:bg-blue-50 text-[#1D4ED8] font-bold rounded-lg flex items-center justify-center transition-colors"
+                    data-testid={`mayordomo-edit-${u.id}`}
+                    aria-label="Editar usuario"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button
                     onClick={() => onDelete(u)}
                     className="h-10 px-3 bg-white border-2 border-red-100 hover:bg-red-50 text-red-600 font-bold rounded-lg flex items-center justify-center transition-colors"
                     data-testid={`mayordomo-delete-${u.id}`}
@@ -120,6 +160,24 @@ export default function MayordomosTab() {
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
+                {editing === u.id && (
+                  <div className="mt-3 rounded-xl bg-[#EEF2FF] border-2 border-blue-200 p-3 space-y-2 animate-in fade-in slide-in-from-top-1 duration-200" data-testid={`mayordomo-edit-form-${u.id}`}>
+                    <p className="text-xs font-bold text-[#1E3A8A]">Editar correo y contraseña</p>
+                    <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="Correo" className="field-input !h-11 w-full" data-testid={`mayordomo-edit-email-${u.id}`} />
+                    <div className="relative">
+                      <input type={showPw ? "text" : "password"} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Nueva contraseña (dejar vacío para no cambiar)" autoComplete="new-password" className="field-input !h-11 w-full pr-10" data-testid={`mayordomo-edit-password-${u.id}`} />
+                      <button type="button" onClick={() => setShowPw((v) => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-[#556047]" aria-label="Mostrar contraseña" data-testid={`mayordomo-edit-toggle-${u.id}`}>
+                        {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button onClick={() => setEditing(null)} disabled={saving} className="h-10 rounded-lg bg-white border-2 border-[#E2DDD0] text-[#556047] font-bold" data-testid={`mayordomo-edit-cancel-${u.id}`}>Cancelar</button>
+                      <button onClick={() => saveEdit(u)} disabled={saving} className="h-10 rounded-lg bg-[#1D4ED8] hover:bg-[#1E3A8A] text-white font-bold flex items-center justify-center transition-colors disabled:opacity-60" data-testid={`mayordomo-edit-save-${u.id}`}>
+                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Guardar"}
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {unlocking === u.id && (
                   <div className="mt-3 rounded-xl bg-emerald-50 border-2 border-emerald-200 p-3 animate-in fade-in slide-in-from-top-1 duration-200" data-testid={`mayordomo-unlock-days-${u.id}`}>
                     <p className="text-xs font-bold text-emerald-800 mb-2">¿Cuántos días desbloqueado?</p>
