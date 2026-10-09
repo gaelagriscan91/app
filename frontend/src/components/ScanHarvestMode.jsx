@@ -732,25 +732,26 @@ export default function ScanHarvestMode() {
                 </button>
               </div>
             </div>
-            {/* Unit toggle and price field moved to top-left chip; keep only fraction row here */}
-            {/* Quick fraction selector — adjusts the last added piece */}
-            <div className="grid grid-cols-4 gap-1.5 mt-2">
-              {[
-                { frac: 1, label: "Completo", testid: "frac-full" },
-                { frac: 0.75, label: "3/4", testid: "frac-three-quarter" },
-                { frac: 0.5, label: "1/2", testid: "frac-half" },
-                { frac: 0.25, label: "1/4", testid: "frac-quarter" },
-              ].map(({ frac, label, testid }) => (
-                <button
-                  key={testid}
-                  onClick={() => markLastAs(frac)}
-                  className="h-9 rounded-lg bg-white/15 hover:bg-white/25 active:scale-[0.97] text-white font-extrabold text-xs flex items-center justify-center transition"
-                  data-testid={testid}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            {/* Quick fraction selector — only for piezas */}
+            {unitLabel === "pieza" && (
+              <div className="grid grid-cols-4 gap-1.5 mt-2">
+                {[
+                  { frac: 1, label: "Completo", testid: "frac-full" },
+                  { frac: 0.75, label: "3/4", testid: "frac-three-quarter" },
+                  { frac: 0.5, label: "1/2", testid: "frac-half" },
+                  { frac: 0.25, label: "1/4", testid: "frac-quarter" },
+                ].map(({ frac, label, testid }) => (
+                  <button
+                    key={testid}
+                    onClick={() => markLastAs(frac)}
+                    className="h-9 rounded-lg bg-white/15 hover:bg-white/25 active:scale-[0.97] text-white font-extrabold text-xs flex items-center justify-center transition"
+                    data-testid={testid}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           <div className="px-4 py-5 text-center text-sm font-bold opacity-85" data-testid="scan-bottom-empty">

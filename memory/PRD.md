@@ -16,14 +16,19 @@ App de registro de cosecha estilo PickTrace para equipos agrícolas:
 - Android: Capacitor (`/app/frontend/android`) con CI por GitHub Actions
 
 ## Implementado (estado actual tras reseteo 10/2026)
-- **Inicio (Panel principal)** restaurado al diseño original: título + fecha, botones Cosechar por QR / Asistencia, tarjeta Pago hoy, lista Registros del mes con Ver reportes
+- **Inicio (Panel principal)** diseño original: título + fecha, botones Cosechar por QR / Asistencia, tarjeta Pago hoy, lista Registros del mes
 - **Nav inferior con 6 pestañas**: Inicio · Cosechar · Asistencia · Día · Reportes · Módulos
-- Scanner `ScanHarvestMode.jsx` restaurado al comportamiento original (sin autosave inmediato, cooldown de 2 min, navegación a Jornada tras scan)
 - `/health` y `/api/health` endpoints para liveness/readiness probes de Kubernetes
-- Autenticación JWT con cookies; roles admin/user (mayordomo)
-- Mayordomos con fecha de expiración y bloqueo manual
-- Reportes y Lista del Día simplificados
-- Módulos: Trabajadores, Cuadrilla, Registro, Mayordomos
+- Autenticación JWT con cookies; roles admin/user (mayordomo); expiración y bloqueo manual
+- Reportes y Lista del Día simplificados; Módulos: Trabajadores, Cuadrilla, Registro, Mayordomos
+
+### Scanner (ScanHarvestMode.jsx) — mejoras recientes
+- Botones de pausa cámara y "Compartir" eliminados del scanner
+- Chip **PRECIO** arriba-izquierda muestra el precio actual y `/ {unidad}`
+- Toggle **PZA / LB / HR** vertical junto al chip PRECIO (seleccionado en azul)
+- Toggle y precio sincronizan con `agriscan.session.{fecha}` → Check In se mantiene al día
+- Modo **PZA**: fracciones visibles (Completo · 3/4 · 1/2 · 1/4), controles +/-
+- Modo **LB/HR**: fracciones ocultas; campo numérico editable entre +/- para teclear decimales exactos
 
 ## Backlog priorizado
 ### P1
