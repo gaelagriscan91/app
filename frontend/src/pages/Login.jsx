@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Lock, Mail, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import LogoHandCherry from "@/components/LogoHandCherry";
@@ -28,114 +28,85 @@ export default function Login() {
     }
   };
 
+  const lineInput = "w-full bg-transparent border-0 border-b border-white/80 text-white text-lg placeholder:text-white/85 py-2.5 focus:outline-none focus:border-[#8DC63F] transition-colors";
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F7F5EE] p-4 relative overflow-hidden">
-      {/* Decorative background */}
+    <div className="min-h-screen relative overflow-hidden bg-[#1F2E52] flex flex-col" data-testid="login-page">
+      {/* White diagonal bottom */}
       <div
-        className="absolute inset-0 opacity-[0.06] pointer-events-none"
-        style={{
-          backgroundImage: "radial-gradient(#1D4ED8 1px, transparent 1px)",
-          backgroundSize: "22px 22px",
-        }}
+        className="absolute inset-x-0 bottom-0 h-[30%] bg-white pointer-events-none"
+        style={{ clipPath: "polygon(0 0, 100% 75%, 100% 100%, 0 100%)" }}
       />
 
-      <div className="relative w-full max-w-md">
-        <div className="flex flex-col items-center mb-6">
-          <LogoHandCherry size={110} className="mb-2 drop-shadow-md" />
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-[#1A2210] tracking-tight" style={{ fontFamily: "Outfit, sans-serif" }}>
-            AgriScan
-          </h1>
-          <p className="text-sm text-[#556047] mt-1 font-medium text-center">
-            Control de cosechas en el campo
-          </p>
-        </div>
+      <div className="relative flex-1 flex flex-col items-center px-10 pt-16 sm:pt-20 w-full max-w-md mx-auto">
+        <LogoHandCherry size={130} className="mb-2" />
+        <h1 className="text-2xl font-bold text-white tracking-tight mb-8" style={{ fontFamily: "Outfit, sans-serif" }} data-testid="login-brand-name">
+          AgriScan
+        </h1>
 
-        <div className="field-card p-6 sm:p-7">
-          <h2 className="text-xl font-bold text-[#1A2210] mb-1" style={{ fontFamily: "Outfit, sans-serif" }}>
-            Iniciar sesión
-          </h2>
-          <p className="text-sm text-[#556047] mb-5 font-medium">
-            Ingresa tus credenciales para continuar
-          </p>
+        <form onSubmit={onSubmit} className="w-full space-y-6">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="email"
+            className={lineInput}
+            placeholder="Correo electrónico"
+            data-testid="login-email-input"
+          />
 
-          <form onSubmit={onSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-bold text-[#1A2210] mb-1.5">
-                Correo electrónico
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-[#889078]" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                  className="field-input pl-11"
-                  placeholder="tu@correo.com"
-                  data-testid="login-email-input"
-                />
-              </div>
+          <div className="relative">
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+              className={`${lineInput} pr-24`}
+              placeholder="Contraseña"
+              data-testid="login-password-input"
+            />
+            <button
+              type="button"
+              onClick={() => navigate("/forgot-password")}
+              className="absolute right-0 top-1/2 -translate-y-1/2 text-sm font-bold text-[#8DC63F] hover:text-[#A6D95C] transition-colors"
+              data-testid="login-forgot-link"
+            >
+              ¿Olvidaste?
+            </button>
+          </div>
+
+          {error ? (
+            <div className="bg-red-500/15 border border-red-400/50 rounded-xl p-3 text-sm text-red-100 font-semibold" data-testid="login-error">
+              {error}
             </div>
+          ) : null}
 
-            <div>
-              <label className="block text-sm font-bold text-[#1A2210] mb-1.5">
-                Contraseña
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-[#889078]" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="current-password"
-                  className="field-input pl-11"
-                  placeholder="••••••••"
-                  data-testid="login-password-input"
-                />
-              </div>
-            </div>
-
-            {error ? (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700 font-semibold" data-testid="login-error">
-                {error}
-              </div>
-            ) : null}
-
+          <div className="flex justify-center pt-4">
             <button
               type="submit"
               disabled={loading}
-              className="field-btn-primary disabled:opacity-60"
+              className="w-[70%] h-14 rounded-xl bg-[#8DC63F] hover:bg-[#7DB52F] active:scale-[0.98] text-white text-xl font-bold flex items-center justify-center transition-[background-color,transform] disabled:opacity-60"
               data-testid="login-submit-button"
             >
-              {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                "Entrar al campo"
-              )}
+              {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : "Entrar"}
             </button>
+          </div>
 
-            <div className="text-center pt-1">
-              <button
-                type="button"
-                onClick={() => navigate("/forgot-password")}
-                className="text-sm text-[#1D4ED8] font-bold hover:underline"
-                data-testid="login-forgot-link"
-              >
-                ¿Olvidaste tu contraseña?
-              </button>
-            </div>
+          <div className="text-center pt-2">
+            <p className="text-white text-lg">¿No tienes cuenta?</p>
+            <p className="text-[#8DC63F] text-base font-bold mt-1" data-testid="login-no-account-hint">Pide a tu administrador</p>
+          </div>
+        </form>
+      </div>
 
-            <p className="text-center text-[11px] text-[#889078] pt-1 font-semibold">
-              ¿No tienes cuenta? Pide a tu administrador que te cree una.
-            </p>
-          </form>
+      <div className="relative px-8 pb-8 pt-4 flex items-end justify-between max-w-md w-full mx-auto">
+        <div className="flex flex-col items-center" data-testid="login-footer-logo">
+          <LogoHandCherry size={70} />
+          <span className="text-lg font-bold text-[#1F2E52] -mt-1" style={{ fontFamily: "Outfit, sans-serif" }}>AgriScan</span>
         </div>
-
-        <p className="text-center text-[11px] text-[#889078] mt-5 font-medium">
-          © {new Date().getFullYear()} AgriScan — Hecho para el campo
-        </p>
+        <p className="text-[11px] text-[#889078] font-medium">© {new Date().getFullYear()} AgriScan</p>
       </div>
     </div>
   );
