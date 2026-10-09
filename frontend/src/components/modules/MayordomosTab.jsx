@@ -3,8 +3,17 @@ import { Loader2, Mail, Shield, Trash2, Ban, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatApiErrorDetail } from "@/lib/api";
 
+const UNLOCK_DAYS = [3, 7, 15, 30];
+
+const isExpired = (u) => u.access_expires_at && new Date(u.access_expires_at).getTime() <= Date.now();
+
+function daysLeft(u) {
+  if (!u.access_expires_at || isExpired(u)) return null;
+  return Math.max(1, Math.ceil((new Date(u.access_expires_at).getTime() - Date.now()) / 86400000));
+}
+
 function statusOf(u) {
-  if (u.active === false) return { label: "Bloqueado", cls: "bg-[#889078] text-white" };
+  if (u.active === false || isExpired(u)) return { label: "Bloqueado", cls: "bg-[#889078] text-white" };
   if (u.unlocked_by === "trial") return { label: "Prueba gratis", cls: "bg-emerald-600 text-white" };
   if (u.unlocked_by === "paypal") return { label: "Pagado", cls: "bg-[#FFC439] text-[#003087]" };
   return { label: "Activo", cls: "bg-[#2563EB] text-white" };
@@ -27,12 +36,26 @@ export default function MayordomosTab() {
   };
   useEffect(() => { load(); }, []);
 
-  const onToggleBlock = async (u) => {
-    const willBlock = u.active !== false;
-    if (!window.confirm(`¿${willBlock ? "Bloquear" : "Desbloquear"} a ${u.name}?`)) return;
+  const [unlocking, setUnlocking] = useState(null);
+
+  const unlockFor = async (u, days) => {
     try {
-      await api.patch(`/admin/mayordomos/${u.id}`, { active: !willBlock, name: u.name });
-      toast.success(willBlock ? `${u.name} bloqueado` : `${u.name} desbloqueado`);
+      await api.patch(`/admin/mayordomos/${u.id}`, { active: true, name: u.name, access_days: days });
+      toast.success(`${u.name} desbloqueado por ${days} días`);
+      setUnlocking(null);
+      load();
+    } catch (e) {
+      toast.error(formatApiErrorDetail(e.response?.data?.detail) || "No se pudo desbloquear");
+    }
+  };
+
+  const onToggleBlock = async (u) => {
+    const willBlock = u.active !== false && !isExpired(u);
+    if (!willBlock) { setUnlocking(unlocking === u.id ? null : u.id); return; }
+    if (!window.confirm(`¿Bloquear a ${u.name}?`)) return;
+    try {
+      await api.patch(`/admin/mayordomos/${u.id}`, { active: false, name: u.name });
+      toast.success(`${u.name} bloqueado`);
       load();
     } catch (e) {
       toast.error(formatApiErrorDetail(e.response?.data?.detail) || "No se pudo actualizar");
@@ -64,7 +87,8 @@ export default function MayordomosTab() {
         <div className="grid gap-3 sm:grid-cols-2">
           {rows.map((u) => {
             const st = statusOf(u);
-            const isBlocked = u.active === false;
+            const isBlocked = u.active === false || isExpired(u);
+            const left = daysLeft(u);
             return (
               <div key={u.id} className="field-card p-4" data-testid={`mayordomo-row-${u.id}`}>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -72,6 +96,11 @@ export default function MayordomosTab() {
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${st.cls}`} data-testid={`mayordomo-status-${u.id}`}>{st.label}</span>
                 </div>
                 <p className="text-xs text-[#556047] font-semibold truncate flex items-center gap-1 mt-0.5"><Mail className="w-3 h-3" /> {u.email}</p>
+                {left && !isBlocked && (
+                  <p className="text-[11px] font-extrabold mt-0.5 text-amber-700" data-testid={`mayordomo-days-left-${u.id}`}>
+                    Se bloquea en {left} día{left !== 1 ? "s" : ""}
+                  </p>
+                )}
                 <div className="flex gap-2 mt-3">
                   <button
                     onClick={() => onToggleBlock(u)}
@@ -91,6 +120,23 @@ export default function MayordomosTab() {
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
+                {unlocking === u.id && (
+                  <div className="mt-3 rounded-xl bg-emerald-50 border-2 border-emerald-200 p-3 animate-in fade-in slide-in-from-top-1 duration-200" data-testid={`mayordomo-unlock-days-${u.id}`}>
+                    <p className="text-xs font-bold text-emerald-800 mb-2">¿Cuántos días desbloqueado?</p>
+                    <div className="grid grid-cols-4 gap-2">
+                      {UNLOCK_DAYS.map((d) => (
+                        <button
+                          key={d}
+                          onClick={() => unlockFor(u, d)}
+                          className="h-10 rounded-lg bg-white border-2 border-emerald-300 text-emerald-800 font-extrabold text-sm hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-colors"
+                          data-testid={`mayordomo-unlock-${d}-${u.id}`}
+                        >
+                          {d} días
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}

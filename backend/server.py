@@ -2074,6 +2074,8 @@ async def admin_update_mayordomo(uid: str, data: MayordomoUpdate, user: CurrentU
         upd["role"] = data.role
     if data.active is not None:
         upd["active"] = data.active
+        if data.active:
+            upd["unlocked_by"] = "admin"
         if data.active and data.access_days is None and existing.get("unlocked_by") == "trial":
             # Admin unblock ends the free-trial countdown
             upd["access_expires_at"] = None
