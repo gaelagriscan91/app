@@ -6,7 +6,7 @@ import {
   DollarSign, X, UserPlus, ListChecks, Users, Check,
 } from "lucide-react";
 import { toast } from "sonner";
-import api, { formatCurrency, formatNumber, formatApiErrorDetail, todayISO } from "@/lib/api";
+import api, { formatCurrency, formatNumber, formatApiErrorDetail, todayISO, fetchCheckinSession, saveCheckinSession } from "@/lib/api";
 
 // Short "ding" via Web Audio API
 let _audioCtx = null;
@@ -116,9 +116,7 @@ export default function ScanHarvestMode() {
   useEffect(() => {
     (async () => {
       try {
-        let session = {};
-        try { session = JSON.parse(localStorage.getItem(`agriscan.session.${todayKey}`) || "{}"); }
-        catch { session = {}; }
+        const session = await fetchCheckinSession(todayKey);
         const [wRes, pRes, prRes] = await Promise.all([
           api.get("/workers"),
           api.get("/parcels"),
@@ -615,6 +613,7 @@ export default function ScanHarvestMode() {
                     const s = JSON.parse(localStorage.getItem(k) || "{}");
                     s.unitMode = v;
                     localStorage.setItem(k, JSON.stringify(s));
+                    saveCheckinSession(s);
                   } catch (_) {}
                 }}
                 className={`flex-1 px-2 rounded-md text-[11px] font-extrabold transition ${unitLabel === v ? "bg-[#1D4ED8] text-white" : "text-white hover:bg-white/15"}`}

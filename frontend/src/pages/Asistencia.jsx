@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import api, { formatApiErrorDetail, formatCurrency, formatNumber, todayISO, formatHHMM, sessionExportParams } from "@/lib/api";
+import api, { formatApiErrorDetail, formatCurrency, formatNumber, todayISO, formatHHMM, sessionExportParams, fetchCheckinSession, saveCheckinSession } from "@/lib/api";
 import QrScanner from "@/components/QrScanner";
 import QuickAddWorker from "@/components/QuickAddWorker";
 
@@ -40,6 +40,13 @@ export default function Asistencia() {
 
   // Session (persisted in localStorage per-date)
   const [session, setSession] = useState(() => loadSession(todayISO()));
+  const [sessionVersion, setSessionVersion] = useState(0);
+  useEffect(() => {
+    fetchCheckinSession(date).then((s) => {
+      if (s && Object.keys(s).length) { setSession(s); setSessionVersion((v) => v + 1); }
+    });
+    // eslint-disable-next-line
+  }, []);
 
   // Check-in sub-view state
   const [scannerOn, setScannerOn] = useState(false);
@@ -59,6 +66,7 @@ export default function Asistencia() {
     const next = { ...session, ...patch };
     setSession(next);
     try { localStorage.setItem(SESSION_KEY(date), JSON.stringify(next)); } catch (_) {}
+    saveCheckinSession(next);
   };
 
   const load = async () => {
@@ -238,10 +246,7 @@ export default function Asistencia() {
       for (const r of openRows) {
         try { await api.post("/attendance/scan", { code: r.worker_id, date }); } catch (_) {}
       }
-      // Clear active session so next day starts fresh (session is per-date in localStorage)
-      try { localStorage.removeItem(SESSION_KEY(date)); } catch (_) {}
-      setSession({ parcelId: "", crewId: "", productId: "", mayordomo: "" });
-      toast.success("✅ Día cerrado. Los registros quedaron guardados. Mañana empiezas fresco.");
+      toast.success("✅ Día cerrado. Los registros quedaron guardados.");
       setEndDayOpen(false);
       await load();
     } finally {
@@ -262,6 +267,7 @@ export default function Asistencia() {
 
   if (view === "checkin") return (
     <CheckInView
+      key={sessionVersion}
       navigate={navigate}
       data={data}
       loading={loading}
@@ -482,7 +488,7 @@ export default function Asistencia() {
                 </div>
                 <div className="mt-3 text-xs text-[#556047] font-semibold bg-[#F7F5EE] rounded-xl p-3">
                   ✅ Todos los registros ya están guardados.<br />
-                  Al confirmar, se cerrarán las jornadas abiertas y se limpiará la sesión para que mañana empieces fresco con un nuevo Rancho/Mayordomo.
+                  Al confirmar, se cerrarán las jornadas abiertas. Rancho, Block, Trabajo, Variedad y Precio se quedan guardados hasta que borres el historial.
                 </div>
               </>
             )}

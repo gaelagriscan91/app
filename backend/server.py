@@ -941,6 +941,22 @@ async def delete_harvest(hid: str, user: CurrentUser):
     return {"ok": True}
 
 
+@api_router.get("/checkin-session")
+async def get_checkin_session(user: CurrentUser):
+    doc = await db.checkin_sessions.find_one({"user_id": user["_id"]})
+    return (doc or {}).get("data", {})
+
+
+@api_router.put("/checkin-session")
+async def put_checkin_session(data: dict, user: CurrentUser):
+    await db.checkin_sessions.update_one(
+        {"user_id": user["_id"]},
+        {"$set": {"data": data, "updated_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True,
+    )
+    return {"ok": True}
+
+
 @api_router.post("/harvests/reset")
 async def reset_all_harvests(user: CurrentUser, include_attendance: bool = True):
     """Deletes ALL harvests (and optionally attendance) for the current tenant.
@@ -948,6 +964,7 @@ async def reset_all_harvests(user: CurrentUser, include_attendance: bool = True)
     Used to start the season fresh."""
     scope = scope_filter(user)
     h_del = await db.harvests.delete_many(scope)
+    await db.checkin_sessions.delete_many(scope_filter(user, "user_id"))
     a_del = {"deleted_count": 0}
     if include_attendance:
         a_res = await db.attendance.delete_many(scope)

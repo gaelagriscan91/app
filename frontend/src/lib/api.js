@@ -20,6 +20,26 @@ export function sessionExportParams(date) {
   }
 }
 
+// Check-in session (Rancho/Block/Trabajo/Variedad/Precio) persisted on the server until history reset
+export async function fetchCheckinSession(date) {
+  const key = `agriscan.session.${date}`;
+  let local = {};
+  try { local = JSON.parse(localStorage.getItem(key) || "{}"); } catch { local = {}; }
+  try {
+    const { data } = await api.get("/checkin-session");
+    if (data && Object.keys(data).length) {
+      try { localStorage.setItem(key, JSON.stringify(data)); } catch {}
+      return data;
+    }
+    if (Object.keys(local).length) api.put("/checkin-session", local).catch(() => {});
+  } catch {}
+  return local;
+}
+
+export function saveCheckinSession(data) {
+  return api.put("/checkin-session", data).catch(() => {});
+}
+
 export function formatApiErrorDetail(detail) {
   if (detail == null) return "Ocurrió un error. Intenta de nuevo.";
   if (typeof detail === "string") return detail;
