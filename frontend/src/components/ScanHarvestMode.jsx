@@ -660,6 +660,56 @@ export default function ScanHarvestMode() {
                 </button>
               </div>
             </div>
+            {/* Unit + price controls (persist to session so Check In stays in sync) */}
+            <div className="grid grid-cols-[1fr_1fr] gap-1.5 mt-2">
+              <div className="flex items-center bg-white/15 rounded-lg p-0.5" data-testid="scan-unit-toggle">
+                {[
+                  { v: "pieza", l: "PZA" },
+                  { v: "libra", l: "LB" },
+                  { v: "hora", l: "HR" },
+                ].map(({ v, l }) => (
+                  <button
+                    key={v}
+                    onClick={() => {
+                      setUnitLabel(v);
+                      try {
+                        const k = `agriscan.session.${todayKey}`;
+                        const s = JSON.parse(localStorage.getItem(k) || "{}");
+                        s.unitMode = v;
+                        localStorage.setItem(k, JSON.stringify(s));
+                      } catch (_) {}
+                    }}
+                    className={`flex-1 h-8 rounded-md text-[11px] font-extrabold transition ${unitLabel === v ? "bg-white text-[#2B55D1]" : "text-white/90 hover:bg-white/10"}`}
+                    data-testid={`scan-unit-${v}`}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+              <div className="relative" data-testid="scan-price-field">
+                <DollarSign className="w-4 h-4 text-white/80 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  value={pricePerUnit}
+                  placeholder="0.00"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setPricePerUnit(v);
+                    try {
+                      const k = `agriscan.session.${todayKey}`;
+                      const s = JSON.parse(localStorage.getItem(k) || "{}");
+                      s.pricePerUnit = parseFloat(v) || 0;
+                      localStorage.setItem(k, JSON.stringify(s));
+                    } catch (_) {}
+                  }}
+                  className="w-full h-8 pl-7 pr-2 rounded-lg bg-white/15 text-white font-mono-stat text-sm font-extrabold placeholder:text-white/50 focus:outline-none focus:bg-white/25 border border-white/10"
+                  data-testid="scan-price-input"
+                />
+              </div>
+            </div>
             {/* Quick fraction selector — adjusts the last added piece */}
             <div className="grid grid-cols-4 gap-1.5 mt-2">
               {[
