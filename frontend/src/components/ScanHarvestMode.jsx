@@ -275,7 +275,9 @@ export default function ScanHarvestMode() {
     setLastWorker({ id: w.id, name: w.name });
     setTally((prev) => {
       const cur = prev[w.id] || { name: w.name, count: 0 };
-      return { ...prev, [w.id]: { name: w.name, count: cur.count + 1 } };
+      // Piezas increment by 1 per scan; libra/hora start at 0 so user types the exact amount
+      const delta = unitLabel === "pieza" ? 1 : 0;
+      return { ...prev, [w.id]: { name: w.name, count: cur.count + delta } };
     });
     logScan(w, "qr");
   };
@@ -304,7 +306,8 @@ export default function ScanHarvestMode() {
     }
     setTally((prev) => {
       const cur = prev[w.id] || { name: w.name, count: 0 };
-      return { ...prev, [w.id]: { name: w.name, count: cur.count + 1 } };
+      const delta = unitLabel === "pieza" ? 1 : 0;
+      return { ...prev, [w.id]: { name: w.name, count: cur.count + delta } };
     });
     logScan(w, "manual");
     setShowManual(false);
@@ -700,15 +703,26 @@ export default function ScanHarvestMode() {
                 </div>
               </div>
               <div className="ml-auto flex items-center gap-1">
-                <button
-                  onClick={() => bump(lastWorker.id, -1)}
-                  className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center"
-                  data-testid="scan-last-dec"
-                  aria-label="Restar"
-                >
-                  <Minus className="w-5 h-5" />
-                </button>
-                {(unitLabel === "libra" || unitLabel === "hora") && (
+                {unitLabel === "pieza" ? (
+                  <>
+                    <button
+                      onClick={() => bump(lastWorker.id, -1)}
+                      className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center"
+                      data-testid="scan-last-dec"
+                      aria-label="Restar"
+                    >
+                      <Minus className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => bump(lastWorker.id, 1)}
+                      className="w-10 h-10 rounded-full bg-white text-[#2B55D1] hover:bg-white/90 flex items-center justify-center"
+                      data-testid="scan-last-inc"
+                      aria-label="Sumar"
+                    >
+                      <Plus className="w-5 h-5" />
+                    </button>
+                  </>
+                ) : (
                   <input
                     type="number"
                     inputMode="decimal"
@@ -716,20 +730,14 @@ export default function ScanHarvestMode() {
                     min="0"
                     value={lastWorkerStats.count || ""}
                     placeholder="0"
+                    autoFocus
+                    onFocus={(e) => e.target.select()}
                     onChange={(e) => setCount(lastWorker.id, e.target.value)}
-                    className="w-20 h-10 rounded-lg bg-white/15 text-white text-center font-mono-stat font-extrabold text-base placeholder:text-white/40 focus:outline-none focus:bg-white/25 border border-white/15"
+                    className="w-28 h-12 rounded-xl bg-white text-[#1A2210] text-center font-mono-stat font-extrabold text-2xl placeholder:text-[#889078] focus:outline-none focus:ring-2 focus:ring-white/60 border border-white/20"
                     data-testid="scan-last-weight-input"
                     aria-label={unitLabel === "libra" ? "Libras" : "Horas"}
                   />
                 )}
-                <button
-                  onClick={() => bump(lastWorker.id, 1)}
-                  className="w-10 h-10 rounded-full bg-white text-[#2B55D1] hover:bg-white/90 flex items-center justify-center"
-                  data-testid="scan-last-inc"
-                  aria-label="Sumar"
-                >
-                  <Plus className="w-5 h-5" />
-                </button>
               </div>
             </div>
             {/* Quick fraction selector — only for piezas */}
