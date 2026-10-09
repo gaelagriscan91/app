@@ -16,6 +16,7 @@ App de registro de cosecha estilo PickTrace para equipos agrícolas:
 - Android: Capacitor (`/app/frontend/android`) con CI por GitHub Actions
 
 ## Implementado (estado actual tras reseteo 10/2026)
+- **Login extras** (2026-10-09): ojito para mostrar/ocultar contraseña, recuerda el último correo (localStorage `agriscan.lastEmail`), mano del logo en blanco sobre el azul (`/assets/logo-light.png`, prop `light` en LogoHandCherry).
 - **Portada / Login nuevo** (2026-10-09): fondo azul marino, logo cereza + "AgriScan" sin cambios, campos con línea inferior, "¿Olvidaste?" a la derecha, botón verde "Entrar", diagonal blanca abajo con logo pequeño y ©.
 - **Excel recibo usa datos del Check in** (2026-10-09): el encabezado (Rancho, Block, Trabajo, Variedad, Mayordomo) siempre usa lo escrito ahora en Check in (leído del servidor `checkin_sessions`); si un campo está vacío usa lo de las cosechas. El Precio del Check in se usa para trabajadores sin cosecha.
 - **Datos de Check in persistentes** (2026-10-09): Rancho/Block/Trabajo/Variedad/Precio/Mayordomo se guardan en el servidor (`checkin_sessions`, por usuario; GET/PUT `/api/checkin-session`). Siguen aunque se cierre la app o cambie el día; "Cerrar día" ya no los limpia. Solo se borran con Reportes → Borrar todo (`/api/harvests/reset`).

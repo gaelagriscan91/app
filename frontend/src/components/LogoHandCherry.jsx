@@ -2,10 +2,10 @@
  * AgriScan logo: cherries held in an open hand (user-supplied artwork).
  * Uses /assets/logo.webp from the public folder so it benefits from browser caching.
  */
-export default function LogoHandCherry({ size = 32, className = "" }) {
+export default function LogoHandCherry({ size = 32, className = "", light = false }) {
   return (
     <img
-      src="/assets/logo.png"
+      src={light ? "/assets/logo-light.png" : "/assets/logo.png"}
       alt="AgriScan"
       width={size}
       height={size}

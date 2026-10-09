@@ -1,15 +1,18 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2 } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import LogoHandCherry from "@/components/LogoHandCherry";
 
+const LAST_EMAIL_KEY = "agriscan.lastEmail";
+
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => localStorage.getItem(LAST_EMAIL_KEY) || "");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -20,6 +23,7 @@ export default function Login() {
     const res = await login(email, password);
     setLoading(false);
     if (res.ok) {
+      try { localStorage.setItem(LAST_EMAIL_KEY, email.trim()); } catch (_) {}
       toast.success("Bienvenido de vuelta");
       navigate("/");
     } else {
@@ -39,7 +43,7 @@ export default function Login() {
       />
 
       <div className="relative flex-1 flex flex-col items-center px-10 pt-16 sm:pt-20 w-full max-w-md mx-auto">
-        <LogoHandCherry size={130} className="mb-2" />
+        <LogoHandCherry size={130} light className="mb-2" />
         <h1 className="text-2xl font-bold text-white tracking-tight mb-8" style={{ fontFamily: "Outfit, sans-serif" }} data-testid="login-brand-name">
           AgriScan
         </h1>
@@ -58,15 +62,25 @@ export default function Login() {
 
           <div className="relative">
             <input
-              type="password"
+              type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoFocus={!!email}
               autoComplete="current-password"
-              className={`${lineInput} pr-24`}
+              className={`${lineInput} pr-36`}
               placeholder="Contraseña"
               data-testid="login-password-input"
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute right-24 top-1/2 -translate-y-1/2 p-1.5 text-white/85 hover:text-white transition-colors"
+              aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              data-testid="login-toggle-password"
+            >
+              {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+            </button>
             <button
               type="button"
               onClick={() => navigate("/forgot-password")}
