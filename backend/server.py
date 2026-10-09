@@ -1893,6 +1893,18 @@ async def shutdown_db_client():
 # ---------------------------------------------------------------------------
 app.include_router(api_router)
 
+
+# Kubernetes liveness/readiness probe — must be reachable without /api prefix
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
+
+
+@app.get("/api/health")
+async def api_health_check():
+    return {"status": "ok"}
+
+
 frontend_url = os.environ.get("FRONTEND_URL", "")
 cors_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",")]
 if frontend_url and frontend_url not in cors_origins:
