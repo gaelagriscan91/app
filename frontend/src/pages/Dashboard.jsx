@@ -70,13 +70,13 @@ export default function Dashboard() {
 
       {/* Stats removed per user request */}
 
-      {/* Month records list */}
-      <div className="field-card p-0 overflow-hidden" data-testid="dashboard-month-records">
+      {/* Today records list */}
+      <div className="field-card p-0 overflow-hidden" data-testid="dashboard-today-records">
         <div className="px-5 py-4 border-b border-[#E2DDD0] flex items-center justify-between">
           <div>
-            <div className="text-xs font-bold uppercase tracking-wider text-[#556047]">Registros del mes</div>
+            <div className="text-xs font-bold uppercase tracking-wider text-[#556047]">Registros del día</div>
             <div className="text-sm font-extrabold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>
-              {data?.month_records_count || 0} cosechas
+              {data?.today_records_count || 0} cosechas
             </div>
           </div>
           <button
@@ -87,13 +87,13 @@ export default function Dashboard() {
             Ver reportes <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
-        {(!data?.month_records || data.month_records.length === 0) ? (
+        {(!data?.today_records || data.today_records.length === 0) ? (
           <div className="px-5 py-8 text-center text-sm text-[#556047] font-semibold">
-            Sin registros este mes aún.
+            Sin registros hoy aún.
           </div>
         ) : (
           <ul className="divide-y divide-[#E2DDD0] max-h-[480px] overflow-y-auto">
-            {data.month_records.map((r) => (
+            {data.today_records.map((r) => (
               <li key={r.id} className={`px-5 py-3 flex items-center justify-between gap-3 ${r.pending ? "bg-amber-50/60" : ""}`} data-testid={`dashboard-record-${r.id}`}>
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-[#1A2210] truncate flex items-center gap-1.5 flex-wrap">

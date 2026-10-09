@@ -16,7 +16,7 @@ App de registro de cosecha estilo PickTrace para equipos agrícolas:
 - Android: Capacitor (`/app/frontend/android`) con CI por GitHub Actions
 
 ## Implementado (estado actual tras reseteo 10/2026)
-- **Inicio (Panel principal)** diseño original: título + fecha, botones Cosechar por QR / Asistencia, tarjeta Pago hoy, lista Registros del mes
+- **Inicio (Panel principal)**: título + fecha y lista "Registros del día" (solo cosechas de hoy + trabajadores con entrada sin cosecha). Se quitaron Cosechar por QR / Asistencia / Pago hoy. (2026-10-09: cambiado de "Registros del mes" a "Registros del día"; backend /api/dashboard devuelve today_records y today_records_count)
 - **Nav inferior con 6 pestañas**: Inicio · Cosechar · Asistencia · Día · Reportes · Módulos
 - `/health` y `/api/health` endpoints para liveness/readiness probes de Kubernetes
 - Autenticación JWT con cookies; roles admin/user (mayordomo); expiración y bloqueo manual

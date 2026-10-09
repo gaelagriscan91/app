@@ -1052,6 +1052,8 @@ async def dashboard(user: CurrentUser):
         "weekly": list(weekly.values()),
         "month_records": month_records + pending_records,
         "month_records_count": len(month_rows),
+        "today_records": [await _enrich_harvest(r) for r in sorted(today_rows, key=lambda r: str(r.get("_id", "")), reverse=True)] + pending_records,
+        "today_records_count": len(today_rows),
         "pending_count": len(pending_records),
     }
 
