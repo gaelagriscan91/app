@@ -330,8 +330,24 @@ export default function ScanHarvestMode() {
       return { ...prev, [w.id]: { name: w.name, count: cur.count + 1 } };
     });
     logScan(w, "qr");
-    // Return to Cosecha — the worker name will appear on the GUARDAR button
+    // Autosave the harvest + return to registry so the user can press GUARDAR
     toast.success(`${w.name} escaneado`, { duration: 1200 });
+    const price = parseFloat(pricePerUnit) || 0;
+    if (parcelId && productId) {
+      api.post("/harvests", {
+        worker_id: w.id,
+        parcel_id: parcelId,
+        product_id: productId,
+        kilos: 0,
+        units: 1,
+        price_per_kg: 0,
+        price_per_unit: price,
+        price_mode: "piece",
+        date: todayKey,
+        photo_path: "",
+        notes: "Cosecha escaneada",
+      }).catch(() => { /* silent — logScan still tracks locally */ });
+    }
     setTimeout(() => navigate(returnPath), 400);
   };
 
