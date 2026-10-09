@@ -201,7 +201,9 @@ async def _load_user(request: Request, allow_blocked: bool) -> dict:
             await ensure_not_blocked(user)
             user["blocked"] = False
         except HTTPException:
-            if not allow_blocked:
+            # Blocked accounts may look around (read-only GETs) but cannot save or export
+            read_only = request.method == "GET" and "export" not in request.url.path
+            if not (allow_blocked or read_only):
                 raise
             user["blocked"] = True
         user["_id"] = str(user["_id"])
@@ -1789,6 +1791,179 @@ async def delete_attendance(aid: str, user: CurrentUser):
 # ---------------------------------------------------------------------------
 # Admin: Mayordomos management (admin-only)
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Billing: PayPal monthly subscription ($29.99) — auto unblock / block
+# ---------------------------------------------------------------------------
+PLAN_PRICE = "29.99"
+
+
+def _paypal_base() -> str:
+    return "https://api-m.paypal.com" if os.environ.get("PAYPAL_MODE") == "live" else "https://api-m.sandbox.paypal.com"
+
+
+def paypal_configured() -> bool:
+    return bool(os.environ.get("PAYPAL_CLIENT_ID") and os.environ.get("PAYPAL_SECRET"))
+
+
+async def _paypal_token(client: httpx.AsyncClient) -> str:
+    r = await client.post(
+        f"{_paypal_base()}/v1/oauth2/token",
+        auth=(os.environ["PAYPAL_CLIENT_ID"], os.environ["PAYPAL_SECRET"]),
+        data={"grant_type": "client_credentials"},
+    )
+    r.raise_for_status()
+    return r.json()["access_token"]
+
+
+async def _paypal(method: str, path: str, json_body: Optional[dict] = None) -> dict:
+    async with httpx.AsyncClient(timeout=30) as client:
+        token = await _paypal_token(client)
+        r = await client.request(method, f"{_paypal_base()}{path}", json=json_body,
+                                 headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"})
+        if r.status_code >= 400:
+            logger.error(f"PayPal {method} {path} -> {r.status_code}: {r.text[:400]}")
+            raise HTTPException(status_code=502, detail="PayPal no respondió. Intenta de nuevo.")
+        return r.json() if r.content else {}
+
+
+async def _plan_id() -> str:
+    """Use PAYPAL_PLAN_ID, or create (once) a product + $29.99/month plan and cache it in Mongo."""
+    env_plan = os.environ.get("PAYPAL_PLAN_ID")
+    if env_plan:
+        return env_plan
+    mode = os.environ.get("PAYPAL_MODE") or "sandbox"
+    cached = await db.billing_config.find_one({"key": f"plan_{mode}"})
+    if cached:
+        return cached["plan_id"]
+    product = await _paypal("POST", "/v1/catalogs/products", {"name": "AgriScan", "type": "SERVICE", "category": "SOFTWARE"})
+    plan = await _paypal("POST", "/v1/billing/plans", {
+        "product_id": product["id"], "name": "AgriScan mensual", "status": "ACTIVE",
+        "billing_cycles": [{
+            "frequency": {"interval_unit": "MONTH", "interval_count": 1},
+            "tenure_type": "REGULAR", "sequence": 1, "total_cycles": 0,
+            "pricing_scheme": {"fixed_price": {"value": PLAN_PRICE, "currency_code": "USD"}},
+        }],
+        "payment_preferences": {"auto_bill_outstanding": True, "payment_failure_threshold": 1},
+    })
+    await db.billing_config.insert_one({"key": f"plan_{mode}", "plan_id": plan["id"], "product_id": product["id"]})
+    return plan["id"]
+
+
+async def _apply_subscription(sub: dict):
+    """Sync a PayPal subscription onto its user (custom_id = user id)."""
+    uid = sub.get("custom_id")
+    if not uid or not ObjectId.is_valid(uid):
+        return
+    status = sub.get("status", "")
+    next_bill = (sub.get("billing_info") or {}).get("next_billing_time")
+    upd = {"subscription_id": sub.get("id"), "subscription_status": status,
+           "subscription_checked_at": datetime.now(timezone.utc).isoformat()}
+    if status == "ACTIVE":
+        upd.update({"active": True, "unlocked_by": "paypal", "access_expires_at": None})
+        if next_bill:
+            # 2-day grace so a late renewal webhook doesn't block a paying user
+            upd["paid_until"] = (datetime.fromisoformat(next_bill.replace("Z", "+00:00")) + timedelta(days=2)).isoformat()
+    await db.users.update_one({"_id": ObjectId(uid)}, {"$set": upd})
+    if status in ("CANCELLED", "SUSPENDED", "EXPIRED"):
+        u = await db.users.find_one({"_id": ObjectId(uid)})
+        if u and u.get("unlocked_by") == "paypal" and u.get("role") != "admin":
+            # Keep access until the period already paid ends
+            until = u.get("paid_until")
+            if until and datetime.fromisoformat(until) > datetime.now(timezone.utc):
+                await db.users.update_one({"_id": u["_id"]}, {"$set": {"access_expires_at": until}})
+            else:
+                await db.users.update_one({"_id": u["_id"]}, {"$set": {"active": False}})
+
+
+class BillingConfirmIn(BaseModel):
+    subscription_id: str
+
+
+@api_router.get("/billing/status")
+async def billing_status(user: CurrentUserAny):
+    u = await db.users.find_one({"_id": ObjectId(user["_id"])})
+    sub_id = u.get("subscription_id")
+    # Re-sync from PayPal at most every 6h (backup for missed webhooks)
+    checked = u.get("subscription_checked_at")
+    stale = not checked or datetime.now(timezone.utc) - datetime.fromisoformat(checked) > timedelta(hours=6)
+    if sub_id and paypal_configured() and stale:
+        try:
+            await _apply_subscription(await _paypal("GET", f"/v1/billing/subscriptions/{sub_id}"))
+            u = await db.users.find_one({"_id": u["_id"]})
+        except HTTPException:
+            pass
+    return {
+        "configured": paypal_configured(), "price": PLAN_PRICE, "currency": "USD",
+        "status": u.get("subscription_status") or "", "subscription_id": sub_id or "",
+        "paid_until": u.get("paid_until") or "", "blocked": user.get("blocked", False),
+    }
+
+
+@api_router.post("/billing/subscribe")
+async def billing_subscribe(user: CurrentUserAny):
+    if not paypal_configured():
+        raise HTTPException(status_code=503, detail="Los pagos con PayPal aún no están activados.")
+    base = os.environ["FRONTEND_URL"].rstrip("/")
+    sub = await _paypal("POST", "/v1/billing/subscriptions", {
+        "plan_id": await _plan_id(), "custom_id": user["_id"],
+        "subscriber": {"email_address": user["email"]},
+        "application_context": {
+            "brand_name": "AgriScan", "locale": "es-MX", "user_action": "SUBSCRIBE_NOW",
+            "shipping_preference": "NO_SHIPPING",
+            "return_url": f"{base}/?billing=return", "cancel_url": f"{base}/?billing=cancel",
+        },
+    })
+    approve = next((lk["href"] for lk in sub.get("links", []) if lk.get("rel") == "approve"), "")
+    await db.users.update_one({"_id": ObjectId(user["_id"])}, {"$set": {"subscription_id": sub["id"], "subscription_status": sub.get("status", "")}})
+    return {"approve_url": approve, "subscription_id": sub["id"]}
+
+
+@api_router.post("/billing/confirm")
+async def billing_confirm(data: BillingConfirmIn, user: CurrentUserAny):
+    if not paypal_configured():
+        raise HTTPException(status_code=503, detail="Los pagos con PayPal aún no están activados.")
+    sub = await _paypal("GET", f"/v1/billing/subscriptions/{data.subscription_id}")
+    if sub.get("custom_id") != user["_id"]:
+        raise HTTPException(status_code=403, detail="Esta suscripción no es tuya")
+    await _apply_subscription(sub)
+    return {"status": sub.get("status", ""), "active": sub.get("status") == "ACTIVE"}
+
+
+@api_router.post("/billing/cancel")
+async def billing_cancel(user: CurrentUserAny):
+    u = await db.users.find_one({"_id": ObjectId(user["_id"])})
+    sub_id = u.get("subscription_id")
+    if not sub_id or not paypal_configured():
+        raise HTTPException(status_code=400, detail="No tienes una suscripción activa")
+    await _paypal("POST", f"/v1/billing/subscriptions/{sub_id}/cancel", {"reason": "Cancelado por el usuario en AgriScan"})
+    await _apply_subscription(await _paypal("GET", f"/v1/billing/subscriptions/{sub_id}"))
+    u = await db.users.find_one({"_id": u["_id"]})
+    return {"ok": True, "paid_until": u.get("paid_until") or ""}
+
+
+@api_router.post("/billing/paypal-webhook")
+async def paypal_webhook(request: Request):
+    body = await request.json()
+    webhook_id = os.environ.get("PAYPAL_WEBHOOK_ID")
+    if not (paypal_configured() and webhook_id):
+        raise HTTPException(status_code=503, detail="Webhook no configurado")
+    h = request.headers
+    check = await _paypal("POST", "/v1/notifications/verify-webhook-signature", {
+        "auth_algo": h.get("paypal-auth-algo"), "cert_url": h.get("paypal-cert-url"),
+        "transmission_id": h.get("paypal-transmission-id"), "transmission_sig": h.get("paypal-transmission-sig"),
+        "transmission_time": h.get("paypal-transmission-time"), "webhook_id": webhook_id, "webhook_event": body,
+    })
+    if check.get("verification_status") != "SUCCESS":
+        raise HTTPException(status_code=400, detail="Firma inválida")
+    event = body.get("event_type", "")
+    res = body.get("resource") or {}
+    sub_id = res.get("id") if event.startswith("BILLING.SUBSCRIPTION") else res.get("billing_agreement_id")
+    if sub_id:
+        # Always re-read the subscription from PayPal instead of trusting the payload
+        await _apply_subscription(await _paypal("GET", f"/v1/billing/subscriptions/{sub_id}"))
+    return {"ok": True}
+
+
 @api_router.get("/admin/mayordomos")
 async def admin_list_mayordomos(user: CurrentUser):
     require_admin(user)

@@ -1,8 +1,11 @@
+import { useEffect } from "react";
 import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { ClipboardList, CalendarCheck, FileSpreadsheet, Boxes, LogOut, Home, ScanLine, Lock } from "lucide-react";
+import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+import api from "@/lib/api";
 import LogoHandCherry from "@/components/LogoHandCherry";
-import BlockedAccount from "@/pages/BlockedAccount";
+import PaywallDialog from "@/components/PaywallDialog";
 
 const navItems = [
   { to: "/", label: "Inicio", icon: Home, testid: "nav-dashboard" },
@@ -14,10 +17,34 @@ const navItems = [
 ];
 
 export default function AppLayout() {
-  const { user, logout, blocked } = useAuth();
+  const { user, logout, blocked, setPaywallOpen, refresh } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   // Inicio is a full-bleed column (list scrolls inside, action panel pinned above the nav)
-  const fullBleed = useLocation().pathname === "/" && !blocked;
+  const fullBleed = location.pathname === "/";
+
+  // PayPal return (?billing=return&subscription_id=...) + periodic subscription re-sync
+  useEffect(() => {
+    const q = new URLSearchParams(location.search);
+    const flag = q.get("billing");
+    const subId = q.get("subscription_id");
+    if (flag === "return" && subId) {
+      api.post("/billing/confirm", { subscription_id: subId })
+        .then(async ({ data }) => {
+          const ok = await refresh();
+          if (data.active && ok) toast.success("¡Pago recibido! Tu cuenta está desbloqueada");
+          else toast.info("Pago en proceso. Se desbloqueará en cuanto PayPal lo confirme.");
+        })
+        .catch(() => toast.error("No se pudo confirmar el pago"))
+        .finally(() => navigate("/", { replace: true }));
+    } else if (flag === "cancel") {
+      toast.info("Pago cancelado");
+      navigate("/", { replace: true });
+    } else if (user && user.role !== "admin") {
+      api.get("/billing/status").then(({ data }) => { if (data.blocked !== !!blocked) refresh(); }).catch(() => {});
+    }
+    // eslint-disable-next-line
+  }, []);
 
   const handleLogout = async () => {
     await logout();
@@ -70,10 +97,24 @@ export default function AppLayout() {
         </div>
       </header>
 
+      {blocked && (
+        <button
+          onClick={() => setPaywallOpen(true)}
+          className="shrink-0 w-full bg-[#FEF3C7] border-b-2 border-[#F59E0B] px-4 py-2.5 flex items-center justify-between gap-2 text-left hover:bg-[#FDE68A] transition-colors"
+          data-testid="blocked-banner"
+        >
+          <span className="flex items-center gap-2 text-sm font-bold text-[#92400E]">
+            <Lock className="w-4 h-4 shrink-0" /> Cuenta bloqueada — solo puedes ver
+          </span>
+          <span className="shrink-0 bg-[#FFC439] text-[#003087] text-xs font-extrabold px-3 py-1.5 rounded-full">Pagar $29.99/mes</span>
+        </button>
+      )}
+      <PaywallDialog />
+
       {/* Content */}
       <div className={`flex-1 min-h-0 ${fullBleed ? "flex flex-col" : "overflow-y-auto"}`}>
         <main className={fullBleed ? "flex-1 min-h-0 w-full max-w-5xl mx-auto flex flex-col" : "max-w-5xl mx-auto px-4 py-5 sm:py-7"}>
-          {blocked ? <BlockedAccount /> : <Outlet />}
+          <Outlet />
         </main>
       </div>
 
@@ -96,13 +137,8 @@ export default function AppLayout() {
             >
               {({ isActive }) => (
                 <>
-                  <div className={`relative w-11 h-11 rounded-xl flex items-center justify-center transition-all ${isActive ? "bg-[#1D4ED8] text-white shadow-md scale-105" : "bg-transparent"} ${blocked ? "opacity-50" : ""}`}>
+                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all ${isActive ? "bg-[#1D4ED8] text-white shadow-md scale-105" : "bg-transparent"}`}>
                     <Icon className="w-5 h-5" strokeWidth={2.3} />
-                    {blocked && (
-                      <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[#B45309] text-white flex items-center justify-center shadow" data-testid={`${testid}-lock`}>
-                        <Lock className="w-3 h-3" strokeWidth={2.8} />
-                      </span>
-                    )}
                   </div>
                   <span className="text-[11px] font-semibold leading-tight">{label}</span>
                 </>

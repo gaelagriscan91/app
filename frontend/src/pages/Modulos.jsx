@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Users, UserCog, Shield, FileText } from "lucide-react";
+import { Users, UserCog, Shield, FileText, CreditCard } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import WorkersTab from "@/components/modules/WorkersTab";
 import MayordomoReceiptsTab from "@/components/modules/MayordomoReceiptsTab";
 import MayordomosTab from "@/components/modules/MayordomosTab";
 import RegistroTab from "@/components/modules/RegistroTab";
+import SubscriptionTab from "@/components/modules/SubscriptionTab";
 
 const baseTabs = [
   { id: "workers", label: "Trabajadores", Icon: Users, testid: "tab-workers" },
@@ -17,8 +18,8 @@ export default function Modulos() {
   const isAdmin = user?.role === "admin";
   const tabs = isAdmin
     ? [...baseTabs, { id: "mayordomos", label: "Mayordomos", Icon: Shield, testid: "tab-mayordomos" }]
-    : baseTabs;
-  const [tab, setTab] = useState("workers");
+    : [...baseTabs, { id: "plan", label: "Mi plan", Icon: CreditCard, testid: "tab-plan" }];
+  const [tab, setTab] = useState(() => new URLSearchParams(window.location.search).get("tab") || "workers");
   return (
     <div className="space-y-5" data-testid="modulos-page">
       <div>
@@ -49,6 +50,7 @@ export default function Modulos() {
       {tab === "crews" && <MayordomoReceiptsTab />}
       {tab === "registro" && <RegistroTab />}
       {tab === "mayordomos" && isAdmin && <MayordomosTab />}
+      {tab === "plan" && !isAdmin && <SubscriptionTab />}
     </div>
   );
 }

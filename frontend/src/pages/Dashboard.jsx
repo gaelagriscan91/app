@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Wheat, Users, DollarSign, TrendingUp, Loader2, ArrowRight, ScanLine, UserCheck } from "lucide-react";
 import api, { formatCurrency, formatNumber } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import PendingMayordomosNotice from "@/components/PendingMayordomosNotice";
 
 function StatCard({ label, value, sub, Icon, variant = "light", testid }) {
   const base = "rounded-2xl p-4 sm:p-5 border-2 shadow-sm transition-transform hover:-translate-y-0.5";
@@ -31,6 +33,7 @@ function StatCard({ label, value, sub, Icon, variant = "light", testid }) {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -65,6 +68,8 @@ export default function Dashboard() {
           {new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
         </p>
       </div>
+
+      {user?.role === "admin" && <PendingMayordomosNotice />}
 
       {/* Quick CTAs removed per user request */}
 

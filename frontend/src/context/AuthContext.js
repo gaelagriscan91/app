@@ -7,6 +7,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [blocked, setBlocked] = useState(false);
+  const [paywallOpen, setPaywallOpen] = useState(false);
 
   const fetchMe = useCallback(async () => {
     try {
@@ -25,7 +26,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     fetchMe();
-    const onBlocked = () => { fetchMe(); };
+    const onBlocked = () => { setBlocked(true); setPaywallOpen(true); };
     window.addEventListener("agriscan:blocked", onBlocked);
     return () => window.removeEventListener("agriscan:blocked", onBlocked);
   }, [fetchMe]);
@@ -79,7 +80,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, blocked, login, register, logout, refresh: fetchMe, forgotPassword, resetPassword }}>
+    <AuthContext.Provider value={{ user, loading, blocked, paywallOpen, setPaywallOpen, login, register, logout, refresh: fetchMe, forgotPassword, resetPassword }}>
       {children}
     </AuthContext.Provider>
   );
