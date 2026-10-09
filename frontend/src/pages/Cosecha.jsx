@@ -4,64 +4,123 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import api, { formatCurrency, formatNumber } from "@/lib/api";
 
+const todayStr = () => new Date().toISOString().slice(0, 10);
+const scanLogKey = (d) => `agriscan.scanlog.${d}`;
+const sessionKey = (d) => `agriscan.session.${d}`;
+
 export default function Cosecha() {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const [rows, setRows] = useState([]);
+  const [pending, setPending] = useState([]);
   const [loading, setLoading] = useState(true);
   const [savingReceipt, setSavingReceipt] = useState(false);
+
+  const readPending = () => {
+    try {
+      const log = JSON.parse(localStorage.getItem(scanLogKey(todayStr())) || "[]");
+      setPending(Array.isArray(log) ? log : []);
+    } catch (_) { setPending([]); }
+  };
 
   const load = async () => {
     try {
       const { data } = await api.get("/harvests");
       setRows(Array.isArray(data) ? data : []);
     } catch (_) { /* ignore */ }
-  };
-
-  const saveReceipt = async () => {
-    const today = new Date().toISOString().slice(0, 10);
-    setSavingReceipt(true);
-    try {
-      await api.post("/receipts/history", { date_from: today, date_to: today });
-    } catch (_) { /* already saved — fine */ }
-    await load();
-    toast.success("Registro guardado");
-    setSavingReceipt(false);
+    readPending();
   };
 
   useEffect(() => {
     (async () => { await load(); setLoading(false); })();
   }, []);
 
-  useEffect(() => {
-    if (searchParams.get("prompt") === "save") {
-      load().then(() => {
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [searchParams]);
+
+  const saveReceipt = async () => {
+    const today = todayStr();
+    setSavingReceipt(true);
+    try {
+      let session = {};
+      try { session = JSON.parse(localStorage.getItem(sessionKey(today)) || "{}"); } catch (_) {}
+
+      if (pending.length === 0) {
+        // Nothing pending — just snapshot the receipt for today
+        try { await api.post("/receipts/history", { date_from: today, date_to: today }); } catch (_) {}
+        await load();
         toast.success("Registro guardado");
-        const next = new URLSearchParams(searchParams);
-        next.delete("prompt");
-        setSearchParams(next, { replace: true });
-      });
-    } else {
-      load();
+        setSavingReceipt(false);
+        return;
+      }
+
+      // Resolve parcel + product
+      let parcelId = session.parcelId;
+      let productId = session.productId;
+      if (!parcelId || !productId) {
+        const [pRes, prRes] = await Promise.all([api.get("/parcels"), api.get("/products")]);
+        const parcels = (pRes.data || []).filter((x) => x.active !== false);
+        const products = (prRes.data || []).filter((x) => x.active !== false);
+        if (!parcelId) parcelId = parcels[0]?.id;
+        if (!productId) productId = products[0]?.id;
+      }
+      if (!parcelId || !productId) {
+        toast.error("Falta parcela o producto");
+        setSavingReceipt(false);
+        return;
+      }
+
+      const price = Number(session.pricePerUnit) || Number(pending[0]?.priceAt) || 0;
+      const posts = pending.map((e) => api.post("/harvests", {
+        worker_id: e.workerId,
+        parcel_id: parcelId,
+        product_id: productId,
+        kilos: 0,
+        units: typeof e.fraction === "number" ? e.fraction : 1,
+        price_per_kg: 0,
+        price_per_unit: Number(e.priceAt) || price,
+        price_mode: "piece",
+        date: today,
+        photo_path: "",
+        notes: "Cosecha escaneada",
+      }).catch(() => null));
+      const results = await Promise.all(posts);
+      const okCount = results.filter(Boolean).length;
+
+      try { localStorage.removeItem(scanLogKey(today)); } catch (_) {}
+      try { await api.post("/receipts/history", { date_from: today, date_to: today }); } catch (_) {}
+
+      await load();
+      toast.success(`${okCount} escaneo${okCount === 1 ? "" : "s"} guardado${okCount === 1 ? "" : "s"}`);
+    } catch (_) {
+      toast.error("No se pudo guardar");
+    } finally {
+      setSavingReceipt(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  };
 
   const sorted = useMemo(() => {
     return [...rows].sort((a, b) => (b.created_at || b.date || "").localeCompare(a.created_at || a.date || ""));
   }, [rows]);
 
   const todayCount = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return sorted.filter((r) => r.date === today).length;
+    const t = todayStr();
+    return sorted.filter((r) => r.date === t).length;
   }, [sorted]);
 
   const activeWorkers = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const t = todayStr();
     const set = new Set();
-    sorted.forEach((r) => { if (r.date === today && r.worker_id) set.add(r.worker_id); });
+    sorted.forEach((r) => { if (r.date === t && r.worker_id) set.add(r.worker_id); });
     return set.size;
   }, [sorted]);
+
+  // Latest pending worker name — shown on GUARDAR button
+  const pendingLabel = useMemo(() => {
+    if (!pending.length) return "GUARDAR";
+    const latest = pending[0]?.name || "";
+    if (pending.length === 1) return `GUARDAR · ${latest}`;
+    return `GUARDAR · ${latest} +${pending.length - 1}`;
+  }, [pending]);
 
   if (loading) {
     return (
@@ -95,7 +154,7 @@ export default function Cosecha() {
         <div className="flex-1 min-h-0 overflow-y-auto">
           {sorted.length === 0 ? (
             <div className="py-10 text-center text-sm text-[#889078] font-semibold">
-              Sin escaneos registrados aún
+              {pending.length > 0 ? "Pulsa GUARDAR para registrar los escaneos" : "Sin escaneos registrados aún"}
             </div>
           ) : (
             <ul className="divide-y divide-[#EFEADA]">
@@ -183,11 +242,11 @@ export default function Cosecha() {
               <button
                 onClick={saveReceipt}
                 disabled={savingReceipt}
-                className="h-8 px-6 rounded-md bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-[11px] font-extrabold disabled:opacity-50 flex items-center gap-2"
+                className={`h-9 px-5 rounded-md text-white text-[11px] font-extrabold flex items-center gap-2 active:scale-95 disabled:opacity-50 transition-colors ${pending.length > 0 ? "bg-emerald-500 hover:bg-emerald-600 shadow-[0_0_12px_rgba(16,185,129,0.5)]" : "bg-emerald-600 hover:bg-emerald-700"}`}
                 data-testid="cosecha-save-button"
                 style={{ fontFamily: "Outfit, sans-serif" }}
               >
-                {savingReceipt ? <Loader2 className="w-3 h-3 animate-spin" /> : "GUARDAR"}
+                {savingReceipt ? <Loader2 className="w-3 h-3 animate-spin" /> : pendingLabel}
               </button>
             </div>
           </div>
