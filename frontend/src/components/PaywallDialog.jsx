@@ -10,7 +10,7 @@ export const SUPPORT_EMAIL = "gaelagriscan@gmail.com";
 const PERKS = ["Registrar cosechas y escanear QR", "Check in / Check out de trabajadores", "Exportar recibos y reportes a Excel"];
 
 export default function PaywallDialog() {
-  const { paywallOpen, setPaywallOpen, refresh } = useAuth();
+  const { paywallOpen, setPaywallOpen, refresh, user, blocked } = useAuth();
   const [billing, setBilling] = useState(null);
   const [paying, setPaying] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -49,10 +49,12 @@ export default function PaywallDialog() {
             <Lock className="w-7 h-7 text-[#F59E0B]" />
           </div>
           <DialogTitle className="text-xl font-extrabold" style={{ fontFamily: "Outfit, sans-serif" }} data-testid="blocked-title">
-            Cuenta bloqueada
+            {blocked ? (user?.trial_used ? "Tu prueba gratis terminó" : "Cuenta bloqueada") : "Activa tu plan"}
           </DialogTitle>
           <DialogDescription className="text-white/80 text-sm mt-1">
-            Puedes ver la app, pero para registrar, escanear, guardar y exportar necesitas activar tu plan.
+            {blocked
+              ? "Puedes ver la app, pero para registrar, escanear, guardar y exportar necesitas activar tu plan."
+              : "Sigue usando AgriScan sin interrupciones cuando termine tu prueba gratis."}
           </DialogDescription>
           <div className="mt-4 flex items-end justify-center gap-1" data-testid="paywall-price">
             <span className="text-4xl font-extrabold font-mono-stat">${price}</span>

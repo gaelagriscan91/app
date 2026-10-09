@@ -26,7 +26,7 @@ export default function Register() {
     setLoading(false);
     if (res.ok) {
       try { localStorage.setItem("agriscan.lastEmail", email.trim()); } catch (_) {}
-      toast.success("Cuenta creada. Espera a que te la desbloqueen.");
+      toast.success("¡Cuenta creada! Tienes 3 días gratis para probar AgriScan.");
     } else {
       setError(res.error);
       toast.error(res.error);

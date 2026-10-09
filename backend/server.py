@@ -148,6 +148,7 @@ def create_refresh_token(user_id: str, token_version: int = 0) -> str:
 
 
 REFRESH_DAYS = 30
+TRIAL_DAYS = 3
 BLOCKED_DETAIL = "Cuenta bloqueada. Contacta al administrador."
 
 
@@ -454,15 +455,17 @@ async def register(data: RegisterIn, request: Request, response: Response):
     await db.register_attempts.insert_one({"ip": ip, "created_at": datetime.now(timezone.utc).isoformat()})
     if await db.users.find_one({"email": email}):
         raise HTTPException(status_code=400, detail="Ese correo ya tiene una cuenta. Inicia sesión.")
+    trial_end = (datetime.now(timezone.utc) + timedelta(days=TRIAL_DAYS)).isoformat()
     doc = {
         "email": email, "name": name, "password_hash": hash_password(data.password),
-        "role": "user", "active": False, "self_registered": True, "token_version": 0,
+        "role": "user", "active": True, "self_registered": True, "token_version": 0,
+        "unlocked_by": "trial", "trial_ends_at": trial_end, "access_expires_at": trial_end,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     res = await db.users.insert_one(doc)
     uid = str(res.inserted_id)
     set_auth_cookies(response, create_access_token(uid, email, 0), create_refresh_token(uid, 0))
-    return {"id": uid, "email": email, "name": name, "role": "user", "blocked": True}
+    return {"id": uid, "email": email, "name": name, "role": "user", "blocked": False, "trial_ends_at": trial_end}
 
 
 @api_router.post("/auth/login")
@@ -596,7 +599,10 @@ async def logout(response: Response):
 
 @api_router.get("/auth/me")
 async def me(user: CurrentUserAny):
-    return {"id": user["_id"], "email": user["email"], "name": user.get("name", ""), "role": user.get("role", "user"), "blocked": user.get("blocked", False)}
+    on_trial = user.get("unlocked_by") == "trial" and not user.get("blocked")
+    return {"id": user["_id"], "email": user["email"], "name": user.get("name", ""), "role": user.get("role", "user"),
+            "blocked": user.get("blocked", False), "trial_ends_at": user.get("trial_ends_at") if on_trial else None,
+            "trial_used": user.get("unlocked_by") == "trial"}
 
 
 # ---------------------------------------------------------------------------
@@ -2018,6 +2024,10 @@ async def admin_update_mayordomo(uid: str, data: MayordomoUpdate, user: CurrentU
         upd["role"] = data.role
     if data.active is not None:
         upd["active"] = data.active
+        if data.active and data.access_days is None and existing.get("unlocked_by") == "trial":
+            # Admin unblock ends the free-trial countdown
+            upd["access_expires_at"] = None
+            upd["unlocked_by"] = "admin"
     if data.password:
         upd["password_hash"] = hash_password(data.password)
         upd["token_version"] = (existing.get("token_version", 0) or 0) + 1

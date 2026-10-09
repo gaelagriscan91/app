@@ -64,7 +64,7 @@ export function AuthProvider({ children }) {
     try {
       const { data } = await api.post("/auth/register", { name, email, password });
       setUser(data);
-      setBlocked(true);
+      setBlocked(!!data?.blocked);
       return { ok: true };
     } catch (e) {
       return { ok: false, error: formatApiErrorDetail(e.response?.data?.detail) || e.message };

@@ -1,11 +1,26 @@
 import { useEffect } from "react";
 import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
-import { ClipboardList, CalendarCheck, FileSpreadsheet, Boxes, LogOut, Home, ScanLine, Lock } from "lucide-react";
+import { ClipboardList, CalendarCheck, FileSpreadsheet, Boxes, LogOut, Home, ScanLine, Lock, Gift } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import LogoHandCherry from "@/components/LogoHandCherry";
 import PaywallDialog from "@/components/PaywallDialog";
+
+function TrialBanner({ endsAt, onPay }) {
+  const ms = new Date(endsAt).getTime() - Date.now();
+  const days = Math.max(0, Math.floor(ms / 86400000));
+  const hours = Math.max(0, Math.floor((ms % 86400000) / 3600000));
+  const left = days > 0 ? `${days} día${days !== 1 ? "s" : ""}${hours ? ` ${hours} h` : ""}` : `${hours} h`;
+  return (
+    <button onClick={onPay} className="shrink-0 w-full bg-[#ECFDF5] border-b-2 border-[#10B981] px-4 py-2.5 flex items-center justify-between gap-2 text-left hover:bg-[#D1FAE5] transition-colors" data-testid="trial-banner">
+      <span className="flex items-center gap-2 text-sm font-bold text-[#065F46] min-w-0 whitespace-nowrap">
+        <Gift className="w-4 h-4 shrink-0" /> <span className="truncate">Prueba gratis: quedan <span data-testid="trial-time-left">{left}</span></span>
+      </span>
+      <span className="shrink-0 bg-[#FFC439] text-[#003087] text-xs font-extrabold px-3 py-1.5 rounded-full">Activar plan</span>
+    </button>
+  );
+}
 
 const navItems = [
   { to: "/", label: "Inicio", icon: Home, testid: "nav-dashboard" },
@@ -104,11 +119,12 @@ export default function AppLayout() {
           data-testid="blocked-banner"
         >
           <span className="flex items-center gap-2 text-sm font-bold text-[#92400E]">
-            <Lock className="w-4 h-4 shrink-0" /> Cuenta bloqueada — solo puedes ver
+            <Lock className="w-4 h-4 shrink-0" /> {user?.trial_used ? "Tu prueba gratis terminó" : "Cuenta bloqueada — solo puedes ver"}
           </span>
           <span className="shrink-0 bg-[#FFC439] text-[#003087] text-xs font-extrabold px-3 py-1.5 rounded-full">Pagar $29.99/mes</span>
         </button>
       )}
+      {!blocked && user?.trial_ends_at && <TrialBanner endsAt={user.trial_ends_at} onPay={() => setPaywallOpen(true)} />}
       <PaywallDialog />
 
       {/* Content */}
