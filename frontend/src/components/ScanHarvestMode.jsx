@@ -559,20 +559,7 @@ export default function ScanHarvestMode() {
           </div>
         </div>
 
-        {/* Floating PRICE card (top-left) */}
-        <button
-          onClick={() => setEditPrice(true)}
-          className="absolute top-4 left-3 bg-white rounded-xl shadow-xl px-3 py-2 text-left border border-black/5 active:scale-[0.98]"
-          data-testid="scan-price-chip"
-        >
-          <div className="text-[10px] font-bold uppercase tracking-wider text-[#556047] leading-none">Precio</div>
-          <div className="font-mono-stat text-2xl text-[#1A2210] leading-tight mt-0.5">
-            {pricePerUnit ? `$${pricePerUnit}` : <span className="text-red-500">—</span>}
-          </div>
-          <div className="text-[10px] font-bold text-[#889078] leading-none">
-            / {unitLabel}
-          </div>
-        </button>
+        {/* Price auto-loaded from Check In session — chip removed from camera UI */}
 
         {/* Pause/Resume floating button (top-right) */}
         <button
