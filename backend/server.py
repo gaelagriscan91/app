@@ -177,6 +177,10 @@ async def ensure_not_blocked(user: dict):
 
 
 async def get_current_user(request: Request) -> dict:
+    return await _load_user(request, allow_blocked=False)
+
+
+async def _load_user(request: Request, allow_blocked: bool) -> dict:
     token = request.cookies.get("access_token")
     if not token:
         auth_header = request.headers.get("Authorization", "")
@@ -193,7 +197,13 @@ async def get_current_user(request: Request) -> dict:
             raise HTTPException(status_code=401, detail="Usuario no encontrado")
         if payload.get("ver", 0) != user.get("token_version", 0):
             raise HTTPException(status_code=401, detail="Sesión expirada")
-        await ensure_not_blocked(user)
+        try:
+            await ensure_not_blocked(user)
+            user["blocked"] = False
+        except HTTPException:
+            if not allow_blocked:
+                raise
+            user["blocked"] = True
         user["_id"] = str(user["_id"])
         user.pop("password_hash", None)
         return user
@@ -203,7 +213,13 @@ async def get_current_user(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="Token inválido")
 
 
+async def get_current_user_any(request: Request) -> dict:
+    """Like get_current_user but lets blocked accounts through (flagged with blocked=True)."""
+    return await _load_user(request, allow_blocked=True)
+
+
 CurrentUser = Annotated[dict, Depends(get_current_user)]
+CurrentUserAny = Annotated[dict, Depends(get_current_user_any)]
 
 
 # ---------------------------------------------------------------------------
@@ -460,16 +476,14 @@ async def login(data: LoginIn, request: Request, response: Response):
     uid = str(user["_id"])
     ver = user.get("token_version", 0)
     access, refresh = create_access_token(uid, email, ver), create_refresh_token(uid, ver)
-    # Blocked/expired accounts keep their cookies so the app shows the blocked screen
-    # and lets them in automatically once an admin unblocks them.
+    # Blocked/expired accounts can enter the app, but every section is locked
     try:
         await ensure_not_blocked(user)
-    except HTTPException as e:
-        blocked = JSONResponse({"detail": e.detail}, status_code=e.status_code)
-        set_auth_cookies(blocked, access, refresh)
-        return blocked
+        is_blocked = False
+    except HTTPException:
+        is_blocked = True
     set_auth_cookies(response, access, refresh)
-    return {"id": uid, "email": email, "name": user.get("name", ""), "role": user.get("role", "user")}
+    return {"id": uid, "email": email, "name": user.get("name", ""), "role": user.get("role", "user"), "blocked": is_blocked}
 
 
 @api_router.post("/auth/refresh")
@@ -572,15 +586,15 @@ async def reset_password(data: ResetPasswordIn):
 
 
 @api_router.post("/auth/logout")
-async def logout(response: Response, user: CurrentUser):
-    response.delete_cookie("access_token", path="/")
-    response.delete_cookie("refresh_token", path="/")
+async def logout(response: Response):
+    response.delete_cookie("access_token", path="/", secure=True, httponly=True, samesite="none")
+    response.delete_cookie("refresh_token", path="/", secure=True, httponly=True, samesite="none")
     return {"ok": True}
 
 
 @api_router.get("/auth/me")
-async def me(user: CurrentUser):
-    return {"id": user["_id"], "email": user["email"], "name": user.get("name", ""), "role": user.get("role", "user")}
+async def me(user: CurrentUserAny):
+    return {"id": user["_id"], "email": user["email"], "name": user.get("name", ""), "role": user.get("role", "user"), "blocked": user.get("blocked", False)}
 
 
 # ---------------------------------------------------------------------------

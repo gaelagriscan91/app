@@ -14,7 +14,6 @@ import ListaDia from "@/pages/ListaDia";
 import Reportes from "@/pages/Reportes";
 import Modulos from "@/pages/Modulos";
 import Asistencia from "@/pages/Asistencia";
-import BlockedAccount from "@/pages/BlockedAccount";
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -37,8 +36,6 @@ function PublicOnly({ children }) {
 }
 
 function AppRoutes() {
-  const { blocked } = useAuth();
-  if (blocked) return <BlockedAccount />;
   return (
     <Routes>
       <Route path="/login" element={<PublicOnly><Login /></PublicOnly>} />

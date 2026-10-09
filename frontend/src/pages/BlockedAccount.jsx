@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Lock, Mail, RefreshCw, LogOut, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
-import LogoHandCherry from "@/components/LogoHandCherry";
 
 const SUPPORT_EMAIL = "gaelagriscan@gmail.com";
 
@@ -19,11 +18,8 @@ export default function BlockedAccount() {
   };
 
   return (
-    <div className="min-h-screen bg-[#1F2E52] flex flex-col items-center justify-center px-6 py-10" data-testid="blocked-account-screen">
-      <LogoHandCherry size={110} light className="mb-1" />
-      <h1 className="text-2xl font-bold text-white mb-8" style={{ fontFamily: "Outfit, sans-serif" }}>AgriScan</h1>
-
-      <div className="w-full max-w-sm bg-white rounded-3xl p-7 text-center shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="min-h-full flex flex-col items-center justify-center px-5 py-8" data-testid="blocked-account-screen">
+      <div className="w-full max-w-sm bg-white rounded-3xl p-7 text-center shadow-xl border-2 border-[#E2DDD0] animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="mx-auto w-16 h-16 rounded-full bg-[#FEF3C7] flex items-center justify-center mb-4">
           <Lock className="w-8 h-8 text-[#B45309]" />
         </div>
@@ -31,7 +27,7 @@ export default function BlockedAccount() {
           Cuenta bloqueada
         </h2>
         <p className="text-sm text-[#556047] font-medium mb-5">
-          Tu cuenta está en espera de aprobación. Escríbenos para desbloquearla y empezar a usar AgriScan.
+          Esta sección está bloqueada. Tu cuenta está en espera de aprobación; escríbenos para desbloquearla y usar AgriScan.
         </p>
 
         <a

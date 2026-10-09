@@ -26,8 +26,6 @@ export default function Login() {
       try { localStorage.setItem(LAST_EMAIL_KEY, email.trim()); } catch (_) {}
       toast.success("Bienvenido de vuelta");
       navigate("/");
-    } else if (res.blocked) {
-      try { localStorage.setItem(LAST_EMAIL_KEY, email.trim()); } catch (_) {}
     } else {
       setError(res.error);
       toast.error(res.error);

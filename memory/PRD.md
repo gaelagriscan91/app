@@ -16,6 +16,7 @@ App de registro de cosecha estilo PickTrace para equipos agrícolas:
 - Android: Capacitor (`/app/frontend/android`) con CI por GitHub Actions
 
 ## Implementado (estado actual tras reseteo 10/2026)
+- **Bloqueados dentro de la app** (2026-10-09): la cuenta bloqueada entra a la app (login 200 con `blocked:true`, `/auth/me` usa `CurrentUserAny`), ve encabezado y barra con candados; cada sección muestra la tarjeta "Cuenta bloqueada" con gaelagriscan@gmail.com. Todos los demás endpoints siguen respondiendo 403. `/auth/logout` ya no requiere sesión válida.
 - **Registro de mayordomos + sesi\u00f3n de 30 d\u00edas** (2026-10-09): `/register` p\u00fablico (nombre, correo, contrase\u00f1a) crea cuenta bloqueada; aparece en M\u00f3dulos \u2192 Mayordomos para desbloquear. Bloqueados pueden entrar/salir pero solo ven la pantalla "Cuenta bloqueada" con gaelagriscan@gmail.com y bot\u00f3n "Ya me desbloquearon"; el backend responde 403 en todo. Sesi\u00f3n deslizante de 30 d\u00edas (refresh rota cookies; axios reintenta en 401). Sin PIN (el usuario prefiri\u00f3 sesi\u00f3n abierta hasta cerrar sesi\u00f3n).
 - **Login extras** (2026-10-09): ojito para mostrar/ocultar contraseña, recuerda el último correo (localStorage `agriscan.lastEmail`), mano del logo en blanco sobre el azul (`/assets/logo-light.png`, prop `light` en LogoHandCherry).
 - **Portada / Login nuevo** (2026-10-09): fondo azul marino, logo cereza + "AgriScan" sin cambios, campos con línea inferior, "¿Olvidaste?" a la derecha, botón verde "Entrar", diagonal blanca abajo con logo pequeño y ©.

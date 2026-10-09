@@ -1,7 +1,8 @@
 import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
-import { ClipboardList, CalendarCheck, FileSpreadsheet, Boxes, LogOut, Home, ScanLine } from "lucide-react";
+import { ClipboardList, CalendarCheck, FileSpreadsheet, Boxes, LogOut, Home, ScanLine, Lock } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import LogoHandCherry from "@/components/LogoHandCherry";
+import BlockedAccount from "@/pages/BlockedAccount";
 
 const navItems = [
   { to: "/", label: "Inicio", icon: Home, testid: "nav-dashboard" },
@@ -13,10 +14,10 @@ const navItems = [
 ];
 
 export default function AppLayout() {
-  const { user, logout } = useAuth();
+  const { user, logout, blocked } = useAuth();
   const navigate = useNavigate();
   // Inicio is a full-bleed column (list scrolls inside, action panel pinned above the nav)
-  const fullBleed = useLocation().pathname === "/";
+  const fullBleed = useLocation().pathname === "/" && !blocked;
 
   const handleLogout = async () => {
     await logout();
@@ -72,7 +73,7 @@ export default function AppLayout() {
       {/* Content */}
       <div className={`flex-1 min-h-0 ${fullBleed ? "flex flex-col" : "overflow-y-auto"}`}>
         <main className={fullBleed ? "flex-1 min-h-0 w-full max-w-5xl mx-auto flex flex-col" : "max-w-5xl mx-auto px-4 py-5 sm:py-7"}>
-          <Outlet />
+          {blocked ? <BlockedAccount /> : <Outlet />}
         </main>
       </div>
 
@@ -95,8 +96,13 @@ export default function AppLayout() {
             >
               {({ isActive }) => (
                 <>
-                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all ${isActive ? "bg-[#1D4ED8] text-white shadow-md scale-105" : "bg-transparent"}`}>
+                  <div className={`relative w-11 h-11 rounded-xl flex items-center justify-center transition-all ${isActive ? "bg-[#1D4ED8] text-white shadow-md scale-105" : "bg-transparent"} ${blocked ? "opacity-50" : ""}`}>
                     <Icon className="w-5 h-5" strokeWidth={2.3} />
+                    {blocked && (
+                      <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[#B45309] text-white flex items-center justify-center shadow" data-testid={`${testid}-lock`}>
+                        <Lock className="w-3 h-3" strokeWidth={2.8} />
+                      </span>
+                    )}
                   </div>
                   <span className="text-[11px] font-semibold leading-tight">{label}</span>
                 </>

@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
-import api, { formatApiErrorDetail, isBlockedError } from "@/lib/api";
+import api, { formatApiErrorDetail } from "@/lib/api";
 
 const AuthContext = createContext(null);
 
@@ -12,11 +12,11 @@ export function AuthProvider({ children }) {
     try {
       const { data } = await api.get("/auth/me");
       setUser(data);
-      setBlocked(false);
-      return true;
+      setBlocked(!!data?.blocked);
+      return !data?.blocked;
     } catch (e) {
       setUser(null);
-      if (isBlockedError(e)) setBlocked(true);
+      setBlocked(false);
       return false;
     } finally {
       setLoading(false);
@@ -25,7 +25,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     fetchMe();
-    const onBlocked = () => { setUser(null); setBlocked(true); };
+    const onBlocked = () => { fetchMe(); };
     window.addEventListener("agriscan:blocked", onBlocked);
     return () => window.removeEventListener("agriscan:blocked", onBlocked);
   }, [fetchMe]);
@@ -34,10 +34,9 @@ export function AuthProvider({ children }) {
     try {
       const { data } = await api.post("/auth/login", { email, password });
       setUser(data);
-      setBlocked(false);
+      setBlocked(!!data?.blocked);
       return { ok: true };
     } catch (e) {
-      if (isBlockedError(e)) { setBlocked(true); return { ok: false, blocked: true }; }
       return { ok: false, error: formatApiErrorDetail(e.response?.data?.detail) || e.message };
     }
   };
@@ -62,7 +61,8 @@ export function AuthProvider({ children }) {
 
   const register = async (name, email, password) => {
     try {
-      await api.post("/auth/register", { name, email, password });
+      const { data } = await api.post("/auth/register", { name, email, password });
+      setUser(data);
       setBlocked(true);
       return { ok: true };
     } catch (e) {
