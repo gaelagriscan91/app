@@ -4,9 +4,7 @@ import { toast } from "sonner";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
-const SUPPORT_EMAIL = "gaelagriscan@gmail.com";
-const SUPPORT_PHONE = "5093173565";
-const WHATSAPP_URL = `https://wa.me/1${SUPPORT_PHONE}?text=${encodeURIComponent("Hola AgriScan, necesito ayuda con mi cuenta.")}`;
+import { SUPPORT_EMAIL, WHATSAPP_URL } from "@/lib/support";
 
 function ContactCard() {
   return (

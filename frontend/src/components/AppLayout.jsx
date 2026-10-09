@@ -1,11 +1,27 @@
 import { useEffect } from "react";
 import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
-import { ClipboardList, CalendarCheck, FileSpreadsheet, Boxes, LogOut, Home, ScanLine, Lock, Gift } from "lucide-react";
+import { ClipboardList, CalendarCheck, FileSpreadsheet, Boxes, LogOut, Home, ScanLine, Lock, Gift, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import LogoHandCherry from "@/components/LogoHandCherry";
 import PaywallDialog from "@/components/PaywallDialog";
+import { WHATSAPP_URL } from "@/lib/support";
+
+function WhatsAppFab() {
+  return (
+    <a
+      href={WHATSAPP_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Ayuda por WhatsApp"
+      className="fixed right-4 bottom-[calc(96px+env(safe-area-inset-bottom))] z-50 w-14 h-14 rounded-full bg-[#25D366] hover:bg-[#1EBE5A] text-white shadow-[0_8px_24px_rgba(37,211,102,0.45)] flex items-center justify-center transition-[background-color,transform] hover:scale-105 active:scale-95"
+      data-testid="whatsapp-help-fab"
+    >
+      <MessageCircle className="w-7 h-7" strokeWidth={2.2} />
+    </a>
+  );
+}
 
 function TrialBanner({ endsAt, onPay }) {
   const ms = new Date(endsAt).getTime() - Date.now();
@@ -126,6 +142,7 @@ export default function AppLayout() {
       )}
       {!blocked && user?.trial_ends_at && <TrialBanner endsAt={user.trial_ends_at} onPay={() => setPaywallOpen(true)} />}
       <PaywallDialog />
+      {user?.role !== "admin" && <WhatsAppFab />}
 
       {/* Content */}
       <div className={`flex-1 min-h-0 ${fullBleed ? "flex flex-col" : "overflow-y-auto"}`}>

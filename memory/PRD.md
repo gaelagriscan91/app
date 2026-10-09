@@ -16,6 +16,7 @@ App de registro de cosecha estilo PickTrace para equipos agrícolas:
 - Android: Capacitor (`/app/frontend/android`) con CI por GitHub Actions
 
 ## Implementado (estado actual tras reseteo 10/2026)
+- **Botón flotante de WhatsApp** (2026-10-09): en todas las pantallas para usuarios (no admin), abajo a la derecha; abre wa.me/15093173565 con el texto "Gracias por contactar AgriScan, ¿cómo te puedo ayudar?" (constantes en `src/lib/support.js`, también usadas en Mi plan).
 - **Contacto en Mi plan** (2026-10-09): tarjeta "Contactar AgriScan — ¿Cómo te puedo ayudar?" con WhatsApp (509) 317-3565 (wa.me/15093173565, mensaje listo) y correo gaelagriscan@gmail.com.
 - **Datos privados por cuenta** (2026-10-09): `scope_filter` ya no da acceso global al admin; cada cuenta (admin incluido) solo ve sus datos. Módulos → Mayordomos (admin) ahora es lista de usuarios con estado (Bloqueado / Prueba gratis / Pagado / Activo) y botones Bloquear/Desbloquear y Eliminar (borra la cuenta y todos sus datos). Sin crear/editar ni contadores.
 - **Guardar antes de borrar** (2026-10-09): Reportes → Borrar todo exige guardar recibo primero. GET `/api/harvests/reset-check` indica si hay actividad sin recibo guardado (compara última cosecha/asistencia con `receipts_history.saved_at`); POST `/api/harvests/reset` responde 409 si falta guardar. El modal muestra "Guardar recibo" y luego permite borrar.
