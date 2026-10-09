@@ -20,16 +20,19 @@ App de registro de cosecha estilo PickTrace para equipos agrícolas:
 - Mayordomos con fecha de expiración y bloqueo manual
 - Check-In (Asistencia.jsx) con campos editables inline que persisten en `localStorage`
 - Escáner QR fullscreen (ScanHarvestMode.jsx) estilo nativo (flash/zoom/flip)
+  - Lee `?from=cosecha` y regresa a `/cosecha?prompt=save` cuando se abre desde la pestaña Cosecha
 - Dashboard (Inicio) con botón SCAN central siempre visible
-- Barra inferior: Empleado activo · SCAN · Pieza; GUARDAR siempre accesible y fracciones (1/4, 1/2, 3/4) cuando hay escaneo pendiente
+- Barra inferior: Empleado activo · SCAN · Pieza; GUARDAR siempre accesible
 - Bottom-sheet "¿Guardar recibo?" con botón GUARDAR siempre disponible
-- GUARDAR idempotente: refresca datos, marca local savedIds, snapshot backend (si no existe), toast verde siempre
-- Filas de escaneo rediseñadas: nombre grande, badge QR/MANUAL/GRUPO, fecha+hora am/pm, precio azul, N/PZA
-- Inicio solo muestra escaneos **del día** que ya fueron guardados vía SAVE (`agriscan.savedIds` en localStorage)
-- Cada escaneo es una fila independiente, mismo trabajador puede aparecer N veces, nuevos arriba empujan viejos abajo
-- Reportes y Lista del Día simplificados
-- Módulos: Trabajadores, Cuadrilla, Registro, Mayordomos
-- **Pestaña Cosecha** ("Mis escaneo") con historial completo de todos los escaneos guardados (ordenados por hora desc, fecha + hora am/pm + empleado), check-out rojo arriba, barra inferior Empleado activo · SCAN · Pieza
+- GUARDAR idempotente: refresca datos, marca local savedIds, snapshot backend
+- Inicio solo muestra escaneos **del día** guardados vía SAVE (`agriscan.savedIds` en localStorage)
+- Cada escaneo es una fila independiente, mismo trabajador puede aparecer N veces
+- **Pestaña Cosecha** rediseñada:
+  - Card blanco **"REGISTRO DE ESCÁNEO"** con ícono scan-line azul y contador a la derecha
+  - Card ocupa toda la pantalla disponible entre header y barra SCAN (siempre visible)
+  - Lista scrollea internamente, header pegado arriba
+  - Filas: nombre grande + badge QR/MANUAL/GRUPO azul claro + hora am/pm; precio azul + N/PZA
+  - Al volver del scanner con `?prompt=save` refresca lista y muestra toast "Registro guardado"
 - Navegación inferior con 5 tabs: Inicio · Cosecha · Día · Reportes · Módulos
 
 ## Backlog priorizado
