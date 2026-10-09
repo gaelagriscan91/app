@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Loader2, ScanLine } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import api, { formatCurrency, formatNumber } from "@/lib/api";
+import api, { formatCurrency, formatNumber, todayISO } from "@/lib/api";
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
+const todayStr = () => todayISO();
 const scanLogKey = (d) => `agriscan.scanlog.${d}`;
 const sessionKey = (d) => `agriscan.session.${d}`;
 

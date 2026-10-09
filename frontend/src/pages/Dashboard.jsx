@@ -5,7 +5,7 @@ import {
   SlidersHorizontal, Search, Trash2, LogOut,
 } from "lucide-react";
 import { toast } from "sonner";
-import api, { formatCurrency, formatNumber } from "@/lib/api";
+import api, { formatCurrency, formatNumber, todayISO } from "@/lib/api";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -22,7 +22,7 @@ export default function Dashboard() {
   });
   const [savedIds, setSavedIds] = useState(() => {
     try {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayISO();
       const raw = JSON.parse(localStorage.getItem("agriscan.savedIds") || "{}");
       return new Set(raw[today] || []);
     } catch (_) { return new Set(); }
@@ -69,7 +69,7 @@ export default function Dashboard() {
   };
 
   const rows = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayISO();
     // Only show today's scans that have been SAVEd at least once
     const list = (data?.month_records || []).filter((r) => {
       if (r.pending) return false;
@@ -82,12 +82,12 @@ export default function Dashboard() {
   }, [data, search, savedIds]);
 
   const todayCount = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayISO();
     return (data?.month_records || []).filter((r) => r.date === today && !r.pending).length;
   }, [data]);
 
   const activeWorkers = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayISO();
     const set = new Set();
     (data?.month_records || []).forEach((r) => {
       if (!r.pending && r.date === today && r.worker_id) set.add(r.worker_id);
@@ -126,7 +126,7 @@ export default function Dashboard() {
 
   // SAVE — snapshot today's receipts into history AND mark local scans as visible
   const saveReceipt = async () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayISO();
     setSavingReceipt(true);
     // Refresh data first so we snapshot the latest harvests
     let latest = data;
