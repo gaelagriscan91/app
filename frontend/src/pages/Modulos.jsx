@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, UserCog, Shield, FileText, CreditCard } from "lucide-react";
+import { Users, UserCog, Shield, FileText, LifeBuoy } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import WorkersTab from "@/components/modules/WorkersTab";
 import MayordomoReceiptsTab from "@/components/modules/MayordomoReceiptsTab";
@@ -18,7 +18,7 @@ export default function Modulos() {
   const isAdmin = user?.role === "admin";
   const tabs = isAdmin
     ? [...baseTabs, { id: "mayordomos", label: "Mayordomos", Icon: Shield, testid: "tab-mayordomos" }]
-    : [...baseTabs, { id: "plan", label: "Mi plan", Icon: CreditCard, testid: "tab-plan" }];
+    : [...baseTabs, { id: "plan", label: "Soporte", Icon: LifeBuoy, testid: "tab-plan" }];
   const [tab, setTab] = useState(() => new URLSearchParams(window.location.search).get("tab") || "workers");
   return (
     <div className="space-y-5" data-testid="modulos-page">
