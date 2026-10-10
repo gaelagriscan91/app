@@ -63,13 +63,25 @@ jobs:
             echo "No keystore secrets: AAB will be unsigned"
           fi
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      # gradle-wrapper.jar may be missing from the repo: regenerate it
+      - name: Ensure Gradle wrapper
+        working-directory: frontend/android
+        run: |
+          if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
+            gradle wrapper --gradle-version 8.11.1 --distribution-type all
+          fi
+          chmod +x gradlew
+
       - name: Build AAB
         working-directory: frontend/android
         env:
           VERSION_CODE: ${{ github.run_number }}
-        run: |
-          chmod +x gradlew
-          ./gradlew bundleRelease --no-daemon
+        run: ./gradlew bundleRelease --no-daemon
 
       - name: Upload AAB
         uses: actions/upload-artifact@v5
