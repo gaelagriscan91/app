@@ -25,9 +25,6 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
       # yarn + yarn.lock (npm install breaks ajv / ajv-keywords versions)
       - name: Install dependencies
         working-directory: frontend
