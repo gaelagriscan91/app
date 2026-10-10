@@ -3,6 +3,7 @@ import { Plus, Pencil, Trash2, Loader2, UserPlus, X, Save, QrCode, Printer, Refr
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import api from "@/lib/api";
+import { escapeHtml, openHtmlWindow } from "@/lib/printHtml";
 
 const EMPTY = { first_name: "", last_name: "", document_id: "", phone: "", role: "Cosechador", active: true };
 const splitName = (n = "") => {
@@ -84,9 +85,8 @@ export default function WorkersTab() {
     if (!qrWorker) return;
     const svg = document.querySelector("#qr-print-svg");
     const svgData = svg ? new XMLSerializer().serializeToString(svg) : "";
-    const win = window.open("", "_blank", "width=400,height=600");
-    win.document.write(`
-      <html><head><title>QR ${qrWorker.name}</title>
+    const html = `
+      <html><head><meta charset="utf-8"><title>QR ${escapeHtml(qrWorker.name)}</title>
       <style>
         body { font-family: Arial, sans-serif; text-align:center; padding:24px; }
         h1 { font-size: 22px; margin: 0 0 4px; }
@@ -95,14 +95,14 @@ export default function WorkersTab() {
         .qr { margin: 20px auto; }
       </style></head>
       <body>
-        <h1>${qrWorker.name}</h1>
-        <div class="doc">${qrWorker.document_id || ""} ${qrWorker.role ? "• " + qrWorker.role : ""}</div>
+        <h1>${escapeHtml(qrWorker.name)}</h1>
+        <div class="doc">${escapeHtml(qrWorker.document_id)} ${qrWorker.role ? "• " + escapeHtml(qrWorker.role) : ""}</div>
         <div class="qr">${svgData}</div>
-        <div class="code">${qrWorker.qr_code}</div>
+        <div class="code">${escapeHtml(qrWorker.qr_code)}</div>
         <script>window.onload = () => { window.print(); setTimeout(() => window.close(), 300); }</script>
       </body></html>
-    `);
-    win.document.close();
+    `;
+    if (!openHtmlWindow(html, "width=400,height=600")) toast.error("Permite ventanas emergentes para imprimir");
   };
 
   const printAllQr = () => {
@@ -116,10 +116,10 @@ export default function WorkersTab() {
     });
     const cards = withQr.map((w) => `
       <div class="card">
-        <h3>${w.name}</h3>
-        <div class="meta">${w.document_id || "sin ID"}${w.role ? " • " + w.role : ""}</div>
+        <h3>${escapeHtml(w.name)}</h3>
+        <div class="meta">${escapeHtml(w.document_id || "sin ID")}${w.role ? " • " + escapeHtml(w.role) : ""}</div>
         <div class="qr">${svgs[w.id] || ""}</div>
-        <div class="code">${w.qr_code}</div>
+        <div class="code">${escapeHtml(w.qr_code)}</div>
       </div>
     `).join("");
     const html = `
@@ -148,11 +148,9 @@ export default function WorkersTab() {
         </div>
         <div class="grid">${cards}</div>
       </body></html>`;
-    const win = window.open("", "_blank", "width=820,height=900");
+    const win = openHtmlWindow(html, "width=820,height=900");
     if (!win) { toast.error("Permite ventanas emergentes para imprimir"); return; }
-    win.document.write(html);
-    win.document.close();
-    setTimeout(() => { try { win.focus(); } catch (_) {} }, 400);
+    setTimeout(() => { try { win.focus(); } catch (err) { console.warn("focus print window", err); } }, 400);
   };
 
   return (

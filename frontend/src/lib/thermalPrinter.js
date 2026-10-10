@@ -174,6 +174,7 @@ export function buildReceiptLines(receipt, options = {}) {
 
 /** HTML template for ticket-format printing (narrow 80mm) via browser print */
 export function receiptTicketHtml(receipt, businessName = "AgriScan") {
+  const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const fmtMoney = (n) =>
     Number(n || 0).toLocaleString("es-MX", { style: "currency", currency: "MXN" });
   const fmtDate = (iso) => {
@@ -183,8 +184,8 @@ export function receiptTicketHtml(receipt, businessName = "AgriScan") {
     } catch (_) { return iso; }
   };
   const harvRows = (receipt.harvests || []).map((h) => `
-    <div class="row"><span>${fmtDate(h.date)} ${h.product_name.slice(0, 10)}</span><span>${fmtMoney(h.payment)}</span></div>
-    <div class="sub">${h.kilos ? h.kilos.toFixed(2) + "Kg " : ""}${h.units ? Math.round(h.units) + " " + h.unit_label : ""}</div>
+    <div class="row"><span>${fmtDate(h.date)} ${esc((h.product_name || "").slice(0, 10))}</span><span>${fmtMoney(h.payment)}</span></div>
+    <div class="sub">${h.kilos ? h.kilos.toFixed(2) + "Kg " : ""}${h.units ? Math.round(h.units) + " " + esc(h.unit_label) : ""}</div>
   `).join("");
 
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Ticket</title>
@@ -208,12 +209,12 @@ export function receiptTicketHtml(receipt, businessName = "AgriScan") {
   .print-btn { position: fixed; top: 8px; right: 8px; background: #1D4ED8; color: white; padding: 6px 10px; border: none; border-radius: 4px; font-weight: bold; font-size: 11px; }
 </style></head><body>
   <button class="print-btn no-print" onclick="window.print()">Imprimir</button>
-  <h1>${businessName}</h1>
+  <h1>${esc(businessName)}</h1>
   <div class="sub-brand">RECIBO DE PAGO</div>
   <div class="range">${fmtDate(receipt.date_from)} - ${fmtDate(receipt.date_to)}</div>
   <hr>
-  <div class="worker">${receipt.worker_name}</div>
-  <div class="meta">${receipt.document_id || "sin ID"}${receipt.role ? " / " + receipt.role : ""}</div>
+  <div class="worker">${esc(receipt.worker_name)}</div>
+  <div class="meta">${esc(receipt.document_id || "sin ID")}${receipt.role ? " / " + esc(receipt.role) : ""}</div>
   <hr>
   <div class="row"><span>Horas trab.:</span><span>${(receipt.total_hours || 0).toFixed(2)} h</span></div>
   <div class="row"><span>Dias trab.:</span><span>${receipt.days_worked || 0}</span></div>

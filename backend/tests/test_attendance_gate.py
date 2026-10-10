@@ -11,8 +11,8 @@ import pytest
 BASE_URL = os.environ.get(
     "REACT_APP_BACKEND_URL", "https://harvest-track-94.preview.emergentagent.com"
 ).rstrip("/")
-ADMIN_EMAIL = "gaelmartin158@gmail.com"
-ADMIN_PASS = "agriscan2026"
+ADMIN_EMAIL = os.environ["TEST_ADMIN_EMAIL"]
+ADMIN_PASS = os.environ["TEST_ADMIN_PASSWORD"]
 TODAY = datetime.now(timezone.utc).date().isoformat()
 
 

@@ -390,7 +390,7 @@ export default function Reportes() {
                             {r.harvests.map((h, idx) => {
                               const price = h.price_per_unit || (h.units > 0 ? h.payment / h.units : 0);
                               return (
-                                <div key={idx} className="py-1.5 flex items-start justify-between gap-2">
+                                <div key={h.id || `${h.date}-${idx}`} className="py-1.5 flex items-start justify-between gap-2">
                                   <div className="min-w-0 flex-1">
                                     <div className="text-xs font-extrabold text-[#1A2210]">{h.date}</div>
                                     <div className="text-[11px] text-[#556047] font-semibold truncate">
@@ -414,7 +414,7 @@ export default function Reportes() {
                           <div className="text-[10px] font-bold uppercase tracking-wider text-[#556047] mb-1.5">Horas</div>
                           <div className="divide-y divide-[#E2DDD0]">
                             {r.attendance.map((a, idx) => (
-                              <div key={idx} className="py-1.5 flex items-center justify-between gap-2">
+                              <div key={a.id || `${a.date}-${a.check_in || idx}`} className="py-1.5 flex items-center justify-between gap-2">
                                 <div className="text-xs font-extrabold text-[#1A2210]">{a.date}</div>
                                 <div className="text-[11px] font-mono-stat text-[#1A2210] font-semibold">
                                   {a.check_in || "--:--"} → {a.check_out || "--:--"}

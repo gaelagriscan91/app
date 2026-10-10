@@ -30,7 +30,9 @@ api.interceptors.response.use(
         refreshing = refreshing || api.post("/auth/refresh").finally(() => { refreshing = null; });
         await refreshing;
         return api(cfg);
-      } catch (_) {}
+      } catch (err) {
+        console.warn("session refresh failed", err);
+      }
     }
     return Promise.reject(error);
   }
@@ -63,11 +65,13 @@ export async function fetchCheckinSession(date) {
   try {
     const { data } = await api.get("/checkin-session");
     if (data && Object.keys(data).length) {
-      try { localStorage.setItem(key, JSON.stringify(data)); } catch {}
+      try { localStorage.setItem(key, JSON.stringify(data)); } catch (err) { console.warn("cache check-in session", err); }
       return data;
     }
-    if (Object.keys(local).length) api.put("/checkin-session", local).catch(() => {});
-  } catch {}
+    if (Object.keys(local).length) api.put("/checkin-session", local).catch((err) => console.warn("sync check-in session", err));
+  } catch (err) {
+    console.warn("load check-in session", err);
+  }
   return local;
 }
 

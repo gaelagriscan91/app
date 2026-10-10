@@ -3,6 +3,7 @@ import { Printer, Loader2, Calendar, Users, Clock, DollarSign, FileText, Printer
 import { toast } from "sonner";
 import api, { formatCurrency, formatNumber, sessionExportParams } from "@/lib/api";
 import { thermalPrinter, buildReceiptLines, receiptTicketHtml } from "@/lib/thermalPrinter";
+import { escapeHtml, openHtmlWindow } from "@/lib/printHtml";
 
 function startOfMonthISO() {
   const d = new Date();
@@ -33,16 +34,16 @@ function receiptHtml(receipt, businessName = "AgriScan") {
   const harvRows = (receipt.harvests || []).map((h) => `
     <tr>
       <td>${fmtDate(h.date)}</td>
-      <td>${h.product_name}</td>
-      <td>${h.parcel_name}</td>
+      <td>${escapeHtml(h.product_name)}</td>
+      <td>${escapeHtml(h.parcel_name)}</td>
       <td class="right">${h.kilos ? h.kilos.toFixed(2) + " Kg" : "—"}</td>
-      <td class="right">${h.units ? Math.round(h.units) + " " + h.unit_label : "—"}</td>
+      <td class="right">${h.units ? Math.round(h.units) + " " + escapeHtml(h.unit_label) : "—"}</td>
       <td class="right">${fmtMoney(h.payment)}</td>
     </tr>`).join("");
 
   return `
 <!doctype html>
-<html lang="es"><head><meta charset="utf-8"><title>Recibo — ${receipt.worker_name}</title>
+<html lang="es"><head><meta charset="utf-8"><title>Recibo — ${escapeHtml(receipt.worker_name)}</title>
 <style>
   * { box-sizing: border-box; }
   body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #1a2210; padding: 32px; max-width: 780px; margin: 0 auto; }
@@ -83,7 +84,7 @@ function receiptHtml(receipt, businessName = "AgriScan") {
   <button class="print-btn no-print" onclick="window.print()">🖨 Imprimir</button>
   <div class="header">
     <div>
-      <div class="brand">${businessName}<small>Control de cosechas</small></div>
+      <div class="brand">${escapeHtml(businessName)}<small>Control de cosechas</small></div>
     </div>
     <div class="doc-title">
       <h2>RECIBO DE PAGO</h2>
@@ -93,8 +94,8 @@ function receiptHtml(receipt, businessName = "AgriScan") {
   </div>
 
   <div class="worker">
-    <h3>${receipt.worker_name}</h3>
-    <div class="meta">${receipt.document_id || "sin ID"}${receipt.role ? " • " + receipt.role : ""}</div>
+    <h3>${escapeHtml(receipt.worker_name)}</h3>
+    <div class="meta">${escapeHtml(receipt.document_id || "sin ID")}${receipt.role ? " • " + escapeHtml(receipt.role) : ""}</div>
   </div>
 
   <div class="stats">
@@ -341,13 +342,7 @@ export default function RecibosTab() {
   const printReceipt = (receipt) => {
     const html = format === "ticket" ? receiptTicketHtml(receipt) : receiptHtml(receipt);
     const w = format === "ticket" ? 380 : 820;
-    const win = window.open("", "_blank", `width=${w},height=900`);
-    if (!win) {
-      toast.error("Permite ventanas emergentes para imprimir");
-      return;
-    }
-    win.document.write(html);
-    win.document.close();
+    if (!openHtmlWindow(html, `width=${w},height=900`)) toast.error("Permite ventanas emergentes para imprimir");
   };
 
   const printAll = () => {
@@ -361,21 +356,16 @@ export default function RecibosTab() {
         <style>@page{size:80mm auto;margin:4mm} .page{page-break-after:always}</style></head><body>
         ${rows.map((r) => `<div class="page">${receiptTicketHtml(r).replace(/<!doctype[\s\S]*?<body>/, "").replace(/<\/body><\/html>$/, "")}</div>`).join("")}
         </body></html>`;
-      const win = window.open("", "_blank", "width=400,height=900");
-      if (!win) { toast.error("Permite ventanas emergentes para imprimir"); return; }
-      win.document.write(html);
-      win.document.close();
+      if (!openHtmlWindow(html, "width=400,height=900")) toast.error("Permite ventanas emergentes para imprimir");
       return;
     }
     const html = `
       <!doctype html><html lang="es"><head><meta charset="utf-8"><title>Recibos en lote</title></head>
       <body>${rows.map((r) => receiptHtml(r).replace(/<!doctype[\s\S]*?<body>/, "").replace(/<\/body><\/html>$/, "") + '<div style="page-break-after: always;"></div>').join("")}</body></html>
     `;
-    const win = window.open("", "_blank", "width=820,height=900");
+    const win = openHtmlWindow(html, "width=820,height=900");
     if (!win) { toast.error("Permite ventanas emergentes para imprimir"); return; }
-    win.document.write(html);
-    win.document.close();
-    setTimeout(() => { try { win.print(); } catch (_) {} }, 400);
+    setTimeout(() => { try { win.print(); } catch (err) { console.warn("print window", err); } }, 800);
   };
 
   const connectBluetooth = async () => {

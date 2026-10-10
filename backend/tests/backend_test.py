@@ -7,8 +7,8 @@ from datetime import datetime, timezone
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://harvest-track-94.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api"
-ADMIN_EMAIL = "gaelmartin158@gmail.com"
-ADMIN_PASSWORD = "agriscan2026"
+ADMIN_EMAIL = os.environ["TEST_ADMIN_EMAIL"]
+ADMIN_PASSWORD = os.environ["TEST_ADMIN_PASSWORD"]
 
 
 @pytest.fixture(scope="session")

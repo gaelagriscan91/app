@@ -19,8 +19,8 @@ if not BASE_URL:
                 BASE_URL = line.split('=', 1)[1].strip().rstrip('/')
                 break
 
-ADMIN_EMAIL = "gaelmartin158@gmail.com"
-ADMIN_PASS = "agriscan2026"
+ADMIN_EMAIL = os.environ["TEST_ADMIN_EMAIL"]
+ADMIN_PASS = os.environ["TEST_ADMIN_PASSWORD"]
 
 # Direct mongo access to clean register_attempts rate limiting
 def _env(key):
@@ -74,7 +74,7 @@ def test_register_creates_blocked_user(created_users):
                json={"email": email, "password": "secret123", "name": "Test User"})
     assert r.status_code == 200, r.text
     data = r.json()
-    assert data.get("blocked") is True
+    assert not data.get("blocked")  # new accounts start with a 3-day free trial
     assert data.get("email") == email
     assert "id" in data
     created_users.append(data["id"])
