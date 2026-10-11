@@ -4,7 +4,12 @@ on:
   push:
     branches: [ main ]
     tags: [ 'v*' ]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: 'versionCode (vacío = número de ejecución)'
+        required: false
+        default: '67'
 
 jobs:
   build:
@@ -44,21 +49,22 @@ jobs:
         working-directory: frontend
         run: npx cap sync android
 
-      - name: Signing config (only if secrets exist)
+      - name: Decode keystore and signing config
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > frontend/android/app/agriscan.jks
-            printf "storeFile=agriscan.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n" \
-              "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > frontend/android/keystore.properties
-            echo "Signing enabled"
-          else
-            echo "No keystore secrets: AAB will be unsigned"
-          fi
+          for v in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!v}" ]; then echo "::error::Falta el secret ANDROID_${v#ANDROID_}"; exit 1; fi
+          done
+          echo "$KEYSTORE_BASE64" | tr -d '\r\n ' | base64 -d > frontend/android/app/agriscan.jks
+          printf "storeFile=agriscan.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n" \
+            "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > frontend/android/keystore.properties
+          keytool -list -keystore frontend/android/app/agriscan.jks -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" > /dev/null \
+            || { echo "::error::El keystore, la contraseña o el alias no coinciden"; exit 1; }
+          echo "Keystore OK"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -77,8 +83,17 @@ jobs:
       - name: Build AAB
         working-directory: frontend/android
         env:
-          VERSION_CODE: ${{ github.run_number }}
-        run: ./gradlew bundleRelease --no-daemon
+          VERSION_CODE: ${{ github.event.inputs.version_code || github.run_number }}
+        run: |
+          echo "versionCode = $VERSION_CODE"
+          ./gradlew bundleRelease --no-daemon
+
+      - name: Verify AAB signature
+        working-directory: frontend/android
+        run: |
+          AAB=$(ls app/build/outputs/bundle/release/*.aab)
+          jarsigner -verify "$AAB" | tee /tmp/verify.txt
+          grep -q "jar verified" /tmp/verify.txt || { echo "::error::El AAB no quedó firmado"; exit 1; }
 
       - name: Upload AAB
         uses: actions/upload-artifact@v5
