@@ -8,10 +8,10 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace "com.agriscan.app"
+    namespace "com.agriscan.gael91.app"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.agriscan.app"
+        applicationId "com.agriscan.gael91.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode((System.getenv("VERSION_CODE") ?: "1").toInteger())
