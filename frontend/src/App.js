@@ -8,7 +8,6 @@ import Register from "@/pages/Register";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 import AppLayout from "@/components/AppLayout";
-import Dashboard from "@/pages/Dashboard";
 import RegistrarCosecha from "@/pages/RegistrarCosecha";
 import ListaDia from "@/pages/ListaDia";
 import Reportes from "@/pages/Reportes";
@@ -49,7 +48,7 @@ function AppRoutes() {
           </Protected>
         }
       >
-        <Route path="/" element={<Dashboard />} />
+        <Route path="/" element={<Navigate to="/registrar" replace />} />
         <Route path="/registrar" element={<RegistrarCosecha />} />
         <Route path="/asistencia" element={<Asistencia />} />
         <Route path="/dia" element={<ListaDia />} />

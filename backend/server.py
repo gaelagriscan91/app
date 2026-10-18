@@ -11,6 +11,8 @@ import uuid
 import logging
 import secrets as _secrets
 import hashlib
+import hmac
+from zoneinfo import ZoneInfo
 import bcrypt
 import jwt
 import httpx
@@ -2301,6 +2303,57 @@ async def startup_event():
         logger.info("Object storage inicializado")
     except Exception as e:
         logger.warning(f"Storage init opcional falló: {e}")
+
+
+PACIFIC = ZoneInfo("America/Los_Angeles")
+
+
+async def _daily_close():
+    """Save a receipt per owner/day for past days, then delete those harvests."""
+    today = datetime.now(PACIFIC).date().isoformat()
+    groups = await db.harvests.aggregate([
+        {"$match": {"date": {"$lt": today}}},
+        {"$group": {"_id": {"owner": "$owner_id", "date": "$date"}}},
+    ]).to_list(10000)
+    for g in groups:
+        owner, day = g["_id"]["owner"], g["_id"]["date"]
+        if not owner or not day:
+            continue
+        user = {"_id": owner}
+        try:
+            rows = await receipts(user=user, date_from=day, date_to=day, worker_id=None, crew_id=None)
+            if rows:
+                await db.receipts_history.insert_one({
+                    "owner_id": owner, "saved_by_email": "", "saved_by_name": "Cierre automático",
+                    "saved_by_role": "system", "saved_at": datetime.now(timezone.utc).isoformat(),
+                    "date_from": day, "date_to": day, "worker_id": None, "crew_id": None,
+                    "note": "Cierre automático 12am", **_snapshot_fields(rows),
+                })
+            await db.harvests.delete_many({"owner_id": owner, "date": day})
+        except Exception as e:
+            logger.error(f"daily close failed owner={owner} date={day}: {e}")
+
+
+@api_router.post("/cron/daily-close")
+async def cron_daily_close(request: Request, background_tasks: BackgroundTasks):
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    auth = request.headers.get("authorization", "")
+    expected = os.environ.get("WEBHOOK_CRON_SECRET", "")
+    if not expected or not auth.startswith("Bearer ") or not hmac.compare_digest(auth[7:], expected):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Invalid body")
+    run_id = request.headers.get("x-webhook-id") or body.get("run_id") or datetime.now(PACIFIC).date().isoformat()
+    try:
+        await db.cron_runs.insert_one({"_id": f"daily-close:{run_id}", "at": datetime.now(timezone.utc).isoformat()})
+    except Exception:
+        return {"ok": True, "duplicate": True}
+    background_tasks.add_task(_daily_close)
+    return {"ok": True}
 
 
 @app.on_event("shutdown")

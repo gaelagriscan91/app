@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
-import { ClipboardList, CalendarCheck, FileSpreadsheet, Boxes, LogOut, Home, ScanLine, Lock, Gift } from "lucide-react";
+import { ClipboardList, CalendarCheck, FileSpreadsheet, Boxes, LogOut, ScanLine, Lock, Gift } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
@@ -23,7 +23,6 @@ function TrialBanner({ endsAt, onPay }) {
 }
 
 const navItems = [
-  { to: "/", label: "Inicio", icon: Home, testid: "nav-dashboard" },
   { to: "/registrar", label: "Cosechar", icon: ClipboardList, testid: "nav-registrar-cosecha" },
   { to: "/asistencia", label: "Asistencia", icon: ScanLine, testid: "nav-asistencia" },
   { to: "/dia", label: "Día", icon: CalendarCheck, testid: "nav-lista-dia" },
@@ -136,7 +135,7 @@ export default function AppLayout() {
 
       {/* Bottom nav (mobile + desktop) */}
       <nav className="shrink-0 relative pb-[env(safe-area-inset-bottom)] bg-white border-t-2 border-[#E2DDD0] shadow-[0_-6px_24px_rgba(30,70,32,0.08)] z-40">
-        <div className="max-w-5xl mx-auto grid grid-cols-6">
+        <div className="max-w-5xl mx-auto grid grid-cols-5">
           {navItems.map(({ to, label, icon: Icon, testid }) => (
             <NavLink
               key={to}

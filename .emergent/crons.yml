@@ -1,0 +1,9 @@
+crons:
+  - name: daily-close
+    description: "A las 12am (Pacífico) guarda recibo de cada día y borra los registros de cosecha"
+    cron: "0 0 * * *"
+    timezone: "America/Los_Angeles"
+    endpoint: "{{BASE_URL}}/api/cron/daily-close"
+    method: POST
+    # Cron endpoints must ack 2xx immediately; enqueue/background the actual work.
+    enabled: true

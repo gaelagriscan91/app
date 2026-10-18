@@ -324,7 +324,7 @@ export default function Asistencia() {
         {/* Top row: back + synced chip */}
         <div className="flex items-center justify-between">
           <button
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/registrar")}
             className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center"
             data-testid="hub-back-button"
           >
