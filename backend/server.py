@@ -1015,6 +1015,8 @@ async def update_harvest(hid: str, data: HarvestIn, user: CurrentUser):
     }
     await db.harvests.update_one({"_id": ObjectId(hid)}, {"$set": upd})
     await _resync_receipts(existing, user)
+    if upd["date"] != existing.get("date") or upd["worker_id"] != str(existing.get("worker_id")):
+        await _resync_receipts(upd, user)
     row = await db.harvests.find_one({"_id": ObjectId(hid)})
     return await _enrich_harvest(row)
 

@@ -14,7 +14,9 @@ const unitOf = (h) => (TIPO[h.unit_type] || (h.price_mode === "hour" ? "Horas" :
 async function printWorkerTicket(rec, rows) {
   const mine = rows.filter((r) => r.worker_id === rec.worker_id).slice().reverse();
   const total = mine.reduce((s, r) => s + Number(r.payment || 0), 0);
-  const totalQty = mine.reduce((s, r) => s + Number(r.units || 0), 0);
+  const byUnit = {};
+  mine.forEach((r) => { byUnit[unitOf(r)] = (byUnit[unitOf(r)] || 0) + Number(r.units || 0); });
+  const totalQty = Object.entries(byUnit).map(([u, q]) => `${Math.round(q * 100) / 100} ${u}`).join(" · ");
   const lines = mine.map((r) => ({ when: fmtStamp(r), qty: `${r.units} ${unitOf(r)} x ${formatCurrency(r.price_per_unit)}`, pay: formatCurrency(r.payment) }));
   if (thermalPrinter.isSupported?.()) {
     try {
@@ -26,7 +28,7 @@ async function printWorkerTicket(rec, rows) {
         { text: rec.date, align: "center" }, { text: sep },
         { text: rec.worker_name, bold: true }, { text: sep },
         ...lines.flatMap((l) => [{ text: l.when }, { text: pad("  " + l.qty, l.pay) }]),
-        { text: sep }, { text: pad("Total:", `${totalQty} ${unitOf(rec)}`) },
+        { text: sep }, { text: pad("Total:", totalQty) },
         { text: "GANO", align: "center", bold: true },
         { text: formatCurrency(total), align: "center", size: "double", bold: true },
       ]);
@@ -37,7 +39,7 @@ async function printWorkerTicket(rec, rows) {
     }
   }
   const body = lines.map((l) => `<div>${escapeHtml(l.when)}</div><div class="r"><span>${escapeHtml(l.qty)}</span><span>${escapeHtml(l.pay)}</span></div>`).join("");
-  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Ticket</title><style>@page{size:58mm auto;margin:3mm}body{font-family:'Courier New',monospace;font-size:12px;width:52mm;margin:0 auto}h1{text-align:center;font-size:16px;margin:4px 0}.c{text-align:center}.r{display:flex;justify-content:space-between;margin-bottom:4px}hr{border:none;border-top:1px dashed #000}.big{font-size:20px;font-weight:bold;text-align:center}</style></head><body><h1>AgriScan</h1><div class="c">${escapeHtml(rec.date)}</div><hr><b>${escapeHtml(rec.worker_name)}</b><hr>${body}<hr><div class="r"><span>Total:</span><span>${totalQty} ${unitOf(rec)}</span></div><div class="c"><b>GANÓ</b></div><div class="big">${escapeHtml(formatCurrency(total))}</div><script>window.onload=()=>setTimeout(()=>window.print(),300)</script></body></html>`;
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Ticket</title><style>@page{size:58mm auto;margin:3mm}body{font-family:'Courier New',monospace;font-size:12px;width:52mm;margin:0 auto}h1{text-align:center;font-size:16px;margin:4px 0}.c{text-align:center}.r{display:flex;justify-content:space-between;margin-bottom:4px}hr{border:none;border-top:1px dashed #000}.big{font-size:20px;font-weight:bold;text-align:center}</style></head><body><h1>AgriScan</h1><div class="c">${escapeHtml(rec.date)}</div><hr><b>${escapeHtml(rec.worker_name)}</b><hr>${body}<hr><div class="r"><span>Total:</span><span>${escapeHtml(totalQty)}</span></div><div class="c"><b>GANÓ</b></div><div class="big">${escapeHtml(formatCurrency(total))}</div><script>window.onload=()=>setTimeout(()=>window.print(),300)</script></body></html>`;
   if (!openHtmlWindow(html, "width=400,height=700")) toast.error("Permite ventanas emergentes para imprimir");
 }
 

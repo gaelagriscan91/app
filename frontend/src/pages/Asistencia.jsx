@@ -773,7 +773,7 @@ function CheckInView(props) {
           <div className="flex items-center gap-1.5 shrink-0">
             {[
               { k: "pieza", l: "Pieza" },
-              { k: "libra", l: "libra" },
+              { k: "libra", l: "Libra" },
               { k: "horas", l: "Horas" },
             ].map(({ k, l }) => (
               <button

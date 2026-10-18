@@ -87,17 +87,18 @@ def test_unauth_delete_rejected(ctx):
     assert r.status_code in (401, 403)
 
 
-def test_locked_by_receipt(ctx, client):
-    # Harvest included in saved receipt -> DELETE blocked (400); PUT should also be blocked for consistency
+def test_delete_covered_by_receipt_allowed(ctx, client):
+    # Lock removed (iteration 10): DELETE on harvest in saved receipt is allowed and snapshot is rebuilt
     h = client.post(f"{BASE_URL}/harvests", json=_payload(ctx, 1)).json()
     rc = client.post(f"{BASE_URL}/receipts/history", json={"date_from": TODAY, "date_to": TODAY, "worker_id": ctx["worker"]["id"], "note": "TEST_lock"})
     assert rc.status_code == 200, rc.text
     rid = rc.json()["id"]
     try:
-        d = client.delete(f"{BASE_URL}/harvests/{h['id']}")
-        assert d.status_code == 400 and "recibo" in d.json()["detail"]
         u = client.put(f"{BASE_URL}/harvests/{h['id']}", json=_payload(ctx, 5))
-        assert u.status_code == 400, f"PUT on locked record returned {u.status_code} (edit allowed, receipt snapshot diverges)"
+        assert u.status_code == 200
+        d = client.delete(f"{BASE_URL}/harvests/{h['id']}")
+        assert d.status_code == 200
+        assert client.get(f"{BASE_URL}/receipts/history/{rid}").json()["total_payment"] == 0
     finally:
         client.delete(f"{BASE_URL}/receipts/history/{rid}")
         client.delete(f"{BASE_URL}/harvests/{h['id']}")
