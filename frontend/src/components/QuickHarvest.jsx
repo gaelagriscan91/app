@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { QrCode, Printer, Loader2, ArrowLeft } from "lucide-react";
+import { QrCode, Printer, Loader2, ArrowLeft, Trash2, X, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatApiErrorDetail, formatCurrency, todayISO, fetchCheckinSession } from "@/lib/api";
 import QrScanner from "@/components/QrScanner";
@@ -17,7 +17,95 @@ function Row({ label, children, testid }) {
   );
 }
 
-function Records({ rows, loading, onBack }) {
+function EmployeeInput({ worker, workers, onPick, onClear }) {
+  const [text, setText] = useState("");
+  const [open, setOpen] = useState(false);
+  useEffect(() => { setText(worker?.name || ""); }, [worker]);
+  const q = text.trim().toLowerCase();
+  const matches = q ? workers.filter((w) => w.name.toLowerCase().includes(q)).slice(0, 6) : [];
+  const exact = workers.some((w) => w.name.toLowerCase() === q);
+  const pick = (w) => { onPick(w); setOpen(false); };
+  const createNew = async () => {
+    try {
+      const { data } = await api.post("/workers", { name: text.trim() });
+      pick({ id: data.id, name: data.name });
+      toast.success(`Empleado agregado: ${data.name}`);
+    } catch (e) {
+      toast.error(formatApiErrorDetail(e.response?.data?.detail) || "No se pudo agregar");
+    }
+  };
+  return (
+    <div className="relative flex-1 min-w-0 flex justify-end items-center gap-1">
+      <input
+        value={text}
+        onChange={(e) => { setText(e.target.value); setOpen(true); if (worker) onClear(); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder="Empleado"
+        className="w-full text-right text-[19px] bg-transparent outline-none text-[#111827] placeholder:text-[#C4C4C4]"
+        data-testid="quick-employee-input"
+      />
+      {text && <button onClick={() => { setText(""); onClear(); }} className="text-[#9CA3AF]" data-testid="quick-employee-clear"><X className="w-4 h-4" /></button>}
+      {open && q && !worker && (
+        <div className="absolute right-0 top-full mt-2 w-64 max-w-[80vw] bg-white rounded-xl shadow-lg border border-[#E5E7EB] z-20 overflow-hidden" data-testid="quick-employee-suggestions">
+          {matches.map((w) => (
+            <button key={w.id} onMouseDown={() => pick(w)} className="block w-full text-left px-4 py-3 hover:bg-[#F3F4F6] text-[#111827] border-b border-[#F3F4F6]" data-testid={`quick-employee-option-${w.id}`}>{w.name}</button>
+          ))}
+          {!exact && (
+            <button onMouseDown={createNew} className="flex items-center gap-2 w-full text-left px-4 py-3 text-[#1D4ED8] font-semibold hover:bg-[#EFF6FF]" data-testid="quick-employee-create">
+              <UserPlus className="w-4 h-4" /> Agregar "{text.trim()}"
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EditRecord({ rec, onClose, onDone }) {
+  const [qty, setQty] = useState(String(rec.units));
+  const [busy, setBusy] = useState(false);
+  const run = async (fn, msg) => {
+    setBusy(true);
+    try { await fn(); toast.success(msg); onDone(); }
+    catch (e) { toast.error(formatApiErrorDetail(e.response?.data?.detail) || "No se pudo completar"); }
+    finally { setBusy(false); }
+  };
+  const update = () => {
+    const units = Number(qty);
+    if (!(units > 0)) { toast.error("Cantidad no válida"); return; }
+    run(() => api.put(`/harvests/${rec.id}`, {
+      worker_id: rec.worker_id, parcel_id: rec.parcel_id, product_id: rec.product_id,
+      kilos: rec.kilos || 0, units, price_per_kg: rec.price_per_kg || 0, price_per_unit: rec.price_per_unit,
+      date: rec.date, photo_path: rec.photo_path || "", notes: rec.notes || "",
+      block: rec.block || "", variety: rec.variety || "", mayordomo: rec.mayordomo || "",
+    }), "Registro corregido");
+  };
+  const remove = () => { if (window.confirm(`¿Borrar el registro de ${rec.worker_name}?`)) run(() => api.delete(`/harvests/${rec.id}`), "Registro borrado"); };
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center" onClick={onClose} data-testid="quick-edit-dialog">
+      <div className="bg-white w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold text-lg text-[#111827] truncate">{rec.worker_name}</h3>
+          <button onClick={onClose} data-testid="quick-edit-close"><X className="w-5 h-5 text-[#6B7280]" /></button>
+        </div>
+        <label className="block text-sm text-[#4B5563]">Cantidad</label>
+        <div className="flex gap-2">
+          {FRACTIONS.map(([l, v]) => (
+            <button key={l} onClick={() => setQty(String(v))} className={`px-3 py-1.5 rounded-md text-sm font-semibold ${Number(qty) === v ? "bg-[#9BC53D] text-white" : "bg-[#E5E7EB] text-[#6B7280]"}`} data-testid={`quick-edit-frac-${l.replace("/", "-")}`}>{l}</button>
+          ))}
+          <input value={qty} onChange={(e) => setQty(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="flex-1 min-w-0 border border-[#D1D5DB] rounded-md px-3 text-right text-lg outline-none focus:border-[#9BC53D]" data-testid="quick-edit-qty" />
+        </div>
+        <div className="flex gap-3 pt-2">
+          <button onClick={remove} disabled={busy} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-[#FEE2E2] text-[#B91C1C] font-bold disabled:opacity-60" data-testid="quick-edit-delete"><Trash2 className="w-4 h-4" /> Borrar</button>
+          <button onClick={update} disabled={busy} className="flex-1 py-3 rounded-xl bg-[#9BC53D] text-white font-bold disabled:opacity-60" data-testid="quick-edit-save">{busy ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "Guardar"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Records({ rows, loading, onBack, onSelect }) {
   return (
     <div className="flex-1 overflow-y-auto bg-[#E9E9E9]" data-testid="quick-records">
       <button onClick={onBack} className="flex items-center gap-2 px-4 py-3 text-[#1D4ED8] font-bold" data-testid="quick-records-back">
@@ -29,13 +117,13 @@ function Records({ rows, loading, onBack }) {
         <p className="text-center text-[#6B7280] py-10 font-semibold">Sin registros hoy</p>
       ) : (
         rows.map((h) => (
-          <div key={h.id} className="flex items-center justify-between bg-white px-4 py-3 border-b border-[#ECECEC]" data-testid={`quick-record-${h.id}`}>
+          <button key={h.id} onClick={() => onSelect(h)} className="w-full text-left flex items-center justify-between bg-white px-4 py-3 border-b border-[#ECECEC] hover:bg-[#F9FAFB]" data-testid={`quick-record-${h.id}`}>
             <div className="min-w-0">
               <div className="font-semibold text-[#111827] truncate">{h.worker_name}</div>
               <div className="text-xs text-[#6B7280]">{h.units} {h.unit_label || "pza"} · {formatCurrency(h.price_per_unit)}</div>
             </div>
             <div className="font-bold text-[#111827] font-mono-stat">{formatCurrency(h.payment)}</div>
-          </div>
+          </button>
         ))
       )}
     </div>
@@ -53,6 +141,8 @@ export default function QuickHarvest() {
   const [view, setView] = useState("scan");
   const [rows, setRows] = useState([]);
   const [loadingRows, setLoadingRows] = useState(false);
+  const [workers, setWorkers] = useState([]);
+  const [editing, setEditing] = useState(null);
   const scanLock = useRef(false);
 
   const mode = session.unitMode || "pieza";
@@ -72,6 +162,15 @@ export default function QuickHarvest() {
 
   useEffect(() => { fetchCheckinSession(today).then((s) => setSession(s || {})); }, [today]);
   useEffect(() => { if (view === "records") loadRows(); }, [view, loadRows]);
+  useEffect(() => {
+    api.get("/workers").then(({ data }) => setWorkers((data || []).filter((w) => w.active !== false))).catch((e) => console.error("workers", e));
+  }, []);
+
+  const pickWorker = (w) => {
+    if (!session.parcelId || !session.productId || price <= 0) { openScanner(); return; }
+    setWorker(w);
+    setQty("1");
+  };
 
   const openScanner = () => {
     if (!session.parcelId || !session.productId || price <= 0) {
@@ -98,7 +197,7 @@ export default function QuickHarvest() {
 
   const save = async () => {
     const units = Number(qty);
-    if (!worker || !(units > 0)) { toast.error("Escanea un empleado y pon la cantidad"); return; }
+    if (!worker || !(units > 0)) { toast.error("Escanea o escribe un empleado y pon la cantidad"); return; }
     setSaving(true);
     try {
       await api.post("/harvests", {
@@ -122,11 +221,11 @@ export default function QuickHarvest() {
   return (
     <div className="flex flex-col min-h-[calc(100dvh-170px)] bg-[#E9E9E9] -mx-4 -my-4 sm:mx-0 sm:my-0 sm:rounded-2xl overflow-hidden" data-testid="quick-harvest">
       {view === "records" ? (
-        <Records rows={rows} loading={loadingRows} onBack={() => setView("scan")} />
+        <Records rows={rows} loading={loadingRows} onBack={() => setView("scan")} onSelect={setEditing} />
       ) : (
         <div className="relative flex-1">
           <Row label="Empleado" testid="quick-employee">
-            <span className={`text-[19px] truncate ${worker ? "text-[#111827]" : "text-[#C4C4C4]"}`} data-testid="quick-employee-name">{worker?.name || "Empleado"}</span>
+            <EmployeeInput worker={worker} workers={workers} onPick={pickWorker} onClear={() => { setWorker(null); setQty(""); }} />
           </Row>
           <Row label="Cantidad" testid="quick-qty-row">
             <div className="flex items-center gap-1.5">
@@ -156,6 +255,7 @@ export default function QuickHarvest() {
         <Printer className="w-8 h-8" strokeWidth={1.4} />
         <span className="text-sm">Records</span>
       </button>
+      {editing && <EditRecord rec={editing} onClose={() => setEditing(null)} onDone={() => { setEditing(null); loadRows(); }} />}
     </div>
   );
 }
