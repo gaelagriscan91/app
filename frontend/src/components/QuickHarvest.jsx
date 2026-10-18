@@ -106,6 +106,12 @@ function EditRecord({ rec, onClose, onDone }) {
   );
 }
 
+function fmtStamp(h) {
+  const d = h.created_at ? new Date(h.created_at) : null;
+  if (!d || isNaN(d)) return h.date || "";
+  return `${d.toLocaleDateString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" })} · ${d.toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit", hour12: true })}`;
+}
+
 function Records({ rows, loading, onBack, onSelect }) {
   return (
     <div className="flex-1 overflow-y-auto bg-[#E9E9E9]" data-testid="quick-records">
@@ -121,9 +127,13 @@ function Records({ rows, loading, onBack, onSelect }) {
           <button key={h.id} onClick={() => onSelect(h)} className="w-full text-left flex items-center justify-between bg-white px-4 py-3 border-b border-[#ECECEC] hover:bg-[#F9FAFB]" data-testid={`quick-record-${h.id}`}>
             <div className="min-w-0">
               <div className="font-semibold text-[#111827] truncate">{h.worker_name}</div>
-              <div className="text-xs text-[#6B7280]">{h.units} {h.unit_label || "pza"} · {formatCurrency(h.price_per_unit)}</div>
+              <div className="text-xs text-[#6B7280]" data-testid={`quick-record-time-${h.id}`}>{fmtStamp(h)}</div>
+              <div className="text-xs text-[#4B5563]" data-testid={`quick-record-detail-${h.id}`}>{h.units} pieza · {formatCurrency(h.price_per_unit)} c/u</div>
             </div>
-            <div className="font-bold text-[#111827] font-mono-stat">{formatCurrency(h.payment)}</div>
+            <div className="text-right shrink-0">
+              <div className="text-[10px] uppercase tracking-wide text-[#6B7280]">Ganó</div>
+              <div className="font-bold text-[#15803D] font-mono-stat" data-testid={`quick-record-pay-${h.id}`}>{formatCurrency(h.payment)}</div>
+            </div>
           </button>
         ))
       )}
@@ -153,7 +163,7 @@ export default function QuickHarvest() {
     setLoadingRows(true);
     try {
       const { data } = await api.get("/harvests", { params: { date_from: today, date_to: today } });
-      setRows(data || []);
+      setRows([...(data || [])].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || ""))));
     } catch (e) {
       toast.error(formatApiErrorDetail(e.response?.data?.detail) || "No se pudieron cargar los registros");
     } finally {
