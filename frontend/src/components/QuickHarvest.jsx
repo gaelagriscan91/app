@@ -204,6 +204,9 @@ export default function QuickHarvest() {
   const [workers, setWorkers] = useState([]);
   const [editing, setEditing] = useState(null);
   const scanLock = useRef(false);
+  const qtyRef = useRef(null);
+  const startQty = () => (session.unitMode === "libra" ? "" : "1");
+  useEffect(() => { if (worker && session.unitMode === "libra") { setTimeout(() => qtyRef.current?.focus(), 100); } }, [worker, session.unitMode]);
 
   const mode = session.unitMode || "pieza";
   const price = Number(mode === "horas" ? session.pricePerHour : session.pricePerUnit) || 0;
@@ -229,7 +232,7 @@ export default function QuickHarvest() {
   const pickWorker = (w) => {
     if (!session.parcelId || !session.productId || price <= 0) { openScanner(); return; }
     setWorker(w);
-    setQty("1");
+    setQty(startQty());
   };
 
   const openScanner = () => {
@@ -249,7 +252,7 @@ export default function QuickHarvest() {
     try {
       const { data } = await api.post("/workers/resolve", { code });
       setWorker({ id: data.id, name: data.name });
-      setQty("1");
+      setQty(startQty());
     } catch (_) {
       toast.error("QR no registrado");
     }
@@ -293,7 +296,7 @@ export default function QuickHarvest() {
                 <button key={l} onClick={() => setQty(String(v))} disabled={!worker} className={`px-2 py-1 rounded-md text-xs font-semibold transition-colors ${Number(qty) === v ? "bg-[#9BC53D] text-white" : "bg-[#E5E7EB] text-[#6B7280]"} disabled:opacity-50`} data-testid={`quick-frac-${l.replace("/", "-")}`}>{l}</button>
               ))}
             </div>
-            <input value={qty} onChange={(e) => setQty(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder="Cantidad" disabled={!worker} className="w-20 text-right text-[19px] bg-transparent outline-none placeholder:text-[#C4C4C4] disabled:bg-transparent" data-testid="quick-qty-input" />
+            <input ref={qtyRef} value={qty} onChange={(e) => setQty(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder="Cantidad" disabled={!worker} className="w-20 text-right text-[19px] bg-transparent outline-none placeholder:text-[#C4C4C4] disabled:bg-transparent" data-testid="quick-qty-input" />
           </Row>
           <div className="h-6" />
           <Row label="Precio" testid="quick-price"><span className="text-[17px] text-[#111827]">{formatCurrency(price)}</span></Row>
