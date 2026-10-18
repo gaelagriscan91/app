@@ -1,10 +1,10 @@
-import ScanHarvestMode from "@/components/ScanHarvestMode";
+import QuickHarvest from "@/components/QuickHarvest";
 
-// Camera page. The single scan list lives in Cosecha (server data).
+// Cosechar: scan one employee QR, set quantity, SAVE; Records shows today's saved records
 export default function RegistrarCosecha() {
   return (
     <div data-testid="registrar-cosecha-page">
-      <ScanHarvestMode />
+      <QuickHarvest />
     </div>
   );
 }
