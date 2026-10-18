@@ -4,9 +4,42 @@ import { QrCode, Printer, Loader2, ArrowLeft, Trash2, X, UserPlus } from "lucide
 import { toast } from "sonner";
 import api, { formatApiErrorDetail, formatCurrency, todayISO, fetchCheckinSession } from "@/lib/api";
 import QrScanner from "@/components/QrScanner";
+import { thermalPrinter } from "@/lib/thermalPrinter";
+import { openHtmlWindow, escapeHtml } from "@/lib/printHtml";
 
 const FRACTIONS = [["1/4", 0.25], ["1/2", 0.5], ["3/4", 0.75]];
 const TIPO = { pieza: "Pieza", libra: "Libra", horas: "Horas" };
+const unitOf = (h) => (TIPO[h.unit_type] || (h.price_mode === "hour" ? "Horas" : "Pieza")).toLowerCase();
+
+async function printWorkerTicket(rec, rows) {
+  const mine = rows.filter((r) => r.worker_id === rec.worker_id).slice().reverse();
+  const total = mine.reduce((s, r) => s + Number(r.payment || 0), 0);
+  const totalQty = mine.reduce((s, r) => s + Number(r.units || 0), 0);
+  const lines = mine.map((r) => ({ when: fmtStamp(r), qty: `${r.units} ${unitOf(r)} x ${formatCurrency(r.price_per_unit)}`, pay: formatCurrency(r.payment) }));
+  if (thermalPrinter.isSupported?.()) {
+    try {
+      if (!thermalPrinter.isConnected()) await thermalPrinter.connect();
+      const sep = "-".repeat(32);
+      const pad = (l, r) => l + " ".repeat(Math.max(1, 32 - l.length - r.length)) + r;
+      await thermalPrinter.print([
+        { text: "AgriScan", align: "center", bold: true, size: "double" },
+        { text: rec.date, align: "center" }, { text: sep },
+        { text: rec.worker_name, bold: true }, { text: sep },
+        ...lines.flatMap((l) => [{ text: l.when }, { text: pad("  " + l.qty, l.pay) }]),
+        { text: sep }, { text: pad("Total:", `${totalQty} ${unitOf(rec)}`) },
+        { text: "GANO", align: "center", bold: true },
+        { text: formatCurrency(total), align: "center", size: "double", bold: true },
+      ]);
+      toast.success(`Ticket enviado: ${rec.worker_name}`);
+      return;
+    } catch (e) {
+      console.warn("bluetooth print", e);
+    }
+  }
+  const body = lines.map((l) => `<div>${escapeHtml(l.when)}</div><div class="r"><span>${escapeHtml(l.qty)}</span><span>${escapeHtml(l.pay)}</span></div>`).join("");
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Ticket</title><style>@page{size:58mm auto;margin:3mm}body{font-family:'Courier New',monospace;font-size:12px;width:52mm;margin:0 auto}h1{text-align:center;font-size:16px;margin:4px 0}.c{text-align:center}.r{display:flex;justify-content:space-between;margin-bottom:4px}hr{border:none;border-top:1px dashed #000}.big{font-size:20px;font-weight:bold;text-align:center}</style></head><body><h1>AgriScan</h1><div class="c">${escapeHtml(rec.date)}</div><hr><b>${escapeHtml(rec.worker_name)}</b><hr>${body}<hr><div class="r"><span>Total:</span><span>${totalQty} ${unitOf(rec)}</span></div><div class="c"><b>GANÓ</b></div><div class="big">${escapeHtml(formatCurrency(total))}</div><script>window.onload=()=>setTimeout(()=>window.print(),300)</script></body></html>`;
+  if (!openHtmlWindow(html, "width=400,height=700")) toast.error("Permite ventanas emergentes para imprimir");
+}
 
 function Row({ label, children, testid }) {
   return (
@@ -79,7 +112,7 @@ function EditRecord({ rec, onClose, onDone }) {
       worker_id: rec.worker_id, parcel_id: rec.parcel_id, product_id: rec.product_id,
       kilos: rec.kilos || 0, units, price_per_kg: rec.price_per_kg || 0, price_per_unit: rec.price_per_unit,
       date: rec.date, photo_path: rec.photo_path || "", notes: rec.notes || "",
-      block: rec.block || "", variety: rec.variety || "", mayordomo: rec.mayordomo || "",
+      block: rec.block || "", variety: rec.variety || "", mayordomo: rec.mayordomo || "", unit_type: rec.unit_type || "",
     }), "Registro corregido");
   };
   const remove = () => { if (window.confirm(`¿Borrar el registro de ${rec.worker_name}?`)) run(() => api.delete(`/harvests/${rec.id}`), "Registro borrado"); };
@@ -112,7 +145,17 @@ function fmtStamp(h) {
   return `${d.toLocaleDateString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" })} · ${d.toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit", hour12: true })}`;
 }
 
-function Records({ rows, loading, onBack, onSelect }) {
+function Records({ rows, loading, onBack, onSelect, onDeleted }) {
+  const remove = async (h) => {
+    if (!window.confirm(`¿Borrar el escaneo de ${h.worker_name}?`)) return;
+    try {
+      await api.delete(`/harvests/${h.id}`);
+      toast.success("Escaneo borrado");
+      onDeleted();
+    } catch (e) {
+      toast.error(formatApiErrorDetail(e.response?.data?.detail) || "No se pudo borrar");
+    }
+  };
   return (
     <div className="flex-1 overflow-y-auto bg-[#E9E9E9]" data-testid="quick-records">
       <button onClick={onBack} className="flex items-center gap-2 px-4 py-3 text-[#1D4ED8] font-bold" data-testid="quick-records-back">
@@ -124,17 +167,21 @@ function Records({ rows, loading, onBack, onSelect }) {
         <p className="text-center text-[#6B7280] py-10 font-semibold">Sin registros hoy</p>
       ) : (
         rows.map((h) => (
-          <button key={h.id} onClick={() => onSelect(h)} className="w-full text-left flex items-center justify-between bg-white px-4 py-3 border-b border-[#ECECEC] hover:bg-[#F9FAFB]" data-testid={`quick-record-${h.id}`}>
+          <div key={h.id} className="flex items-center bg-white border-b border-[#ECECEC]" data-testid={`quick-record-${h.id}`}>
+          <button onClick={() => onSelect(h)} className="flex-1 min-w-0 text-left flex items-center justify-between pl-4 pr-2 py-3 hover:bg-[#F9FAFB]" data-testid={`quick-record-edit-${h.id}`}>
             <div className="min-w-0">
               <div className="font-semibold text-[#111827] truncate">{h.worker_name}</div>
               <div className="text-xs text-[#6B7280]" data-testid={`quick-record-time-${h.id}`}>{fmtStamp(h)}</div>
-              <div className="text-xs text-[#4B5563]" data-testid={`quick-record-detail-${h.id}`}>{h.units} pieza · {formatCurrency(h.price_per_unit)} c/u</div>
+              <div className="text-xs text-[#4B5563]" data-testid={`quick-record-detail-${h.id}`}>{h.units} {unitOf(h)} · {formatCurrency(h.price_per_unit)} c/u</div>
             </div>
             <div className="text-right shrink-0">
               <div className="text-[10px] uppercase tracking-wide text-[#6B7280]">Ganó</div>
               <div className="font-bold text-[#15803D] font-mono-stat" data-testid={`quick-record-pay-${h.id}`}>{formatCurrency(h.payment)}</div>
             </div>
           </button>
+          <button onClick={() => printWorkerTicket(h, rows)} className="p-3 text-[#1D4ED8] hover:bg-[#EFF6FF]" aria-label="Imprimir" data-testid={`quick-record-print-${h.id}`}><Printer className="w-5 h-5" /></button>
+          <button onClick={() => remove(h)} className="p-3 pr-4 text-[#DC2626] hover:bg-[#FEF2F2]" aria-label="Borrar" data-testid={`quick-record-delete-${h.id}`}><Trash2 className="w-5 h-5" /></button>
+          </div>
         ))
       )}
     </div>
@@ -213,7 +260,7 @@ export default function QuickHarvest() {
     try {
       await api.post("/harvests", {
         worker_id: worker.id, parcel_id: session.parcelId, product_id: session.productId,
-        kilos: 0, units, price_per_kg: 0, price_per_unit: price, price_mode: "piece",
+        kilos: 0, units, price_per_kg: 0, price_per_unit: price, price_mode: mode === "horas" ? "hour" : "piece", unit_type: mode,
         date: today, photo_path: "", notes: "Cosecha escaneada",
         block: session.block || "", variety: session.variedad || "", mayordomo: session.mayordomo || "",
       });
@@ -232,7 +279,7 @@ export default function QuickHarvest() {
   return (
     <div className="flex flex-col min-h-[calc(100dvh-170px)] bg-[#E9E9E9] -mx-4 -my-4 sm:mx-0 sm:my-0 sm:rounded-2xl overflow-hidden" data-testid="quick-harvest">
       {view === "records" ? (
-        <Records rows={rows} loading={loadingRows} onBack={() => setView("scan")} onSelect={setEditing} />
+        <Records rows={rows} loading={loadingRows} onBack={() => setView("scan")} onSelect={setEditing} onDeleted={loadRows} />
       ) : (
         <div className="relative flex-1">
           <Row label="Empleado" testid="quick-employee">

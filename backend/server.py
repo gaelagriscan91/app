@@ -380,6 +380,7 @@ class HarvestIn(BaseModel):
     block: Optional[str] = ""
     variety: Optional[str] = ""
     mayordomo: Optional[str] = ""
+    unit_type: Optional[str] = ""
 
 
 # ---------------------------------------------------------------------------
@@ -958,6 +959,7 @@ async def create_harvest(data: HarvestIn, user: CurrentUser):
         "block": (data.block or "").strip(),
         "variety": (data.variety or "").strip(),
         "mayordomo": (data.mayordomo or "").strip(),
+        "unit_type": (data.unit_type or "").strip(),
         "created_by": user["_id"],
         "owner_id": owner_of(user),
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -974,14 +976,19 @@ def _oid(hid: str) -> ObjectId:
         raise HTTPException(status_code=400, detail="ID inválido")
 
 
-async def _harvest_locked(h: dict, user: dict):
+async def _resync_receipts(h: dict, user: dict):
+    """Rebuild saved receipts covering this harvest so edits/deletes are reflected."""
     hdate = h.get("date", "")
-    return await db.receipts_history.find_one({
+    cursor = db.receipts_history.find({
         **scope_filter(user),
         "date_from": {"$lte": hdate},
         "date_to": {"$gte": hdate},
         "rows.worker_id": str(h.get("worker_id", "")),
     })
+    async for snap in cursor:
+        rows = await receipts(user=user, date_from=snap["date_from"], date_to=snap["date_to"],
+                              worker_id=snap.get("worker_id"), crew_id=snap.get("crew_id"))
+        await db.receipts_history.update_one({"_id": snap["_id"]}, {"$set": _snapshot_fields(rows)})
 
 
 @api_router.put("/harvests/{hid}")
@@ -989,8 +996,6 @@ async def update_harvest(hid: str, data: HarvestIn, user: CurrentUser):
     existing = await db.harvests.find_one({"_id": _oid(hid), **scope_filter(user)})
     if not existing:
         raise HTTPException(status_code=404, detail="Cosecha no encontrada")
-    if await _harvest_locked(existing, user):
-        raise HTTPException(status_code=400, detail="No se puede corregir: este registro ya está incluido en un recibo guardado.")
     prod = await db.products.find_one({"_id": ObjectId(data.product_id)})
     if not prod:
         raise HTTPException(status_code=400, detail="Producto no válido")
@@ -1006,8 +1011,10 @@ async def update_harvest(hid: str, data: HarvestIn, user: CurrentUser):
         "block": (data.block or existing.get("block") or "").strip(),
         "variety": (data.variety or existing.get("variety") or "").strip(),
         "mayordomo": (data.mayordomo or existing.get("mayordomo") or "").strip(),
+        "unit_type": (data.unit_type or existing.get("unit_type") or "").strip(),
     }
     await db.harvests.update_one({"_id": ObjectId(hid)}, {"$set": upd})
+    await _resync_receipts(existing, user)
     row = await db.harvests.find_one({"_id": ObjectId(hid)})
     return await _enrich_harvest(row)
 
@@ -1017,12 +1024,8 @@ async def delete_harvest(hid: str, user: CurrentUser):
     existing = await db.harvests.find_one({"_id": _oid(hid), **scope_filter(user)})
     if not existing:
         raise HTTPException(status_code=404, detail="Cosecha no encontrada")
-    if await _harvest_locked(existing, user):
-        raise HTTPException(
-            status_code=400,
-            detail="No se puede borrar: este registro ya está incluido en un recibo guardado.",
-        )
     await db.harvests.delete_one({"_id": ObjectId(hid)})
+    await _resync_receipts(existing, user)
     return {"ok": True}
 
 
@@ -1601,6 +1604,28 @@ class ReceiptSaveIn(BaseModel):
     note: Optional[str] = ""
 
 
+def _snapshot_fields(rows: list) -> dict:
+    parcel_set, product_set = [], []
+    for r in rows:
+        for h in r.get("harvests", []) or []:
+            pn = (h.get("parcel_name") or "").strip()
+            if pn and pn != "—" and pn not in parcel_set:
+                parcel_set.append(pn)
+            prd = (h.get("product_name") or "").strip()
+            if prd and prd != "—" and prd not in product_set:
+                product_set.append(prd)
+    return {
+        "workers_count": len(rows),
+        "total_hours": round(sum(float(r.get("total_hours", 0)) for r in rows), 2),
+        "total_kilos": round(sum(float(r.get("total_kilos", 0)) for r in rows), 2),
+        "total_units": round(sum(float(r.get("total_units", 0)) for r in rows), 2),
+        "total_payment": round(sum(float(r.get("total_payment", 0)) for r in rows), 2),
+        "parcels": parcel_set,
+        "products": product_set,
+        "rows": rows,
+    }
+
+
 @api_router.post("/receipts/history")
 async def save_receipt_history(payload: ReceiptSaveIn, user: CurrentUser):
     """Store a snapshot of the current receipts for later review."""
@@ -1614,23 +1639,6 @@ async def save_receipt_history(payload: ReceiptSaveIn, user: CurrentUser):
     if not rows:
         raise HTTPException(status_code=400, detail="No hay actividad para guardar en este periodo")
 
-    total_hours = round(sum(float(r.get("total_hours", 0)) for r in rows), 2)
-    total_kilos = round(sum(float(r.get("total_kilos", 0)) for r in rows), 2)
-    total_units = round(sum(float(r.get("total_units", 0)) for r in rows), 2)
-    total_payment = round(sum(float(r.get("total_payment", 0)) for r in rows), 2)
-
-    # Collect unique parcel + product names across all workers' harvests
-    parcel_set = []
-    product_set = []
-    for r in rows:
-        for h in r.get("harvests", []) or []:
-            pn = (h.get("parcel_name") or "").strip()
-            if pn and pn != "—" and pn not in parcel_set:
-                parcel_set.append(pn)
-            prd = (h.get("product_name") or "").strip()
-            if prd and prd != "—" and prd not in product_set:
-                product_set.append(prd)
-
     doc = {
         "owner_id": user["_id"],
         "saved_by_email": user.get("email", ""),
@@ -1642,14 +1650,7 @@ async def save_receipt_history(payload: ReceiptSaveIn, user: CurrentUser):
         "worker_id": payload.worker_id,
         "crew_id": payload.crew_id,
         "note": (payload.note or "").strip(),
-        "workers_count": len(rows),
-        "total_hours": total_hours,
-        "total_kilos": total_kilos,
-        "total_units": total_units,
-        "total_payment": total_payment,
-        "parcels": parcel_set,
-        "products": product_set,
-        "rows": rows,
+        **_snapshot_fields(rows),
     }
     res = await db.receipts_history.insert_one(doc)
     doc["id"] = str(res.inserted_id)
