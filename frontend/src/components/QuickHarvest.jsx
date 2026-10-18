@@ -17,10 +17,10 @@ function Row({ label, children, testid }) {
   );
 }
 
-function EmployeeInput({ worker, workers, onPick, onClear }) {
+function EmployeeInput({ worker, workers, onPick, onClear, onCreated }) {
   const [text, setText] = useState("");
   const [open, setOpen] = useState(false);
-  useEffect(() => { setText(worker?.name || ""); }, [worker]);
+  useEffect(() => { if (worker) { setText(worker.name); } }, [worker]);
   const q = text.trim().toLowerCase();
   const matches = q ? workers.filter((w) => w.name.toLowerCase().includes(q)).slice(0, 6) : [];
   const exact = workers.some((w) => w.name.toLowerCase() === q);
@@ -28,6 +28,7 @@ function EmployeeInput({ worker, workers, onPick, onClear }) {
   const createNew = async () => {
     try {
       const { data } = await api.post("/workers", { name: text.trim() });
+      onCreated(data);
       pick({ id: data.id, name: data.name });
       toast.success(`Empleado agregado: ${data.name}`);
     } catch (e) {
@@ -225,7 +226,7 @@ export default function QuickHarvest() {
       ) : (
         <div className="relative flex-1">
           <Row label="Empleado" testid="quick-employee">
-            <EmployeeInput worker={worker} workers={workers} onPick={pickWorker} onClear={() => { setWorker(null); setQty(""); }} />
+            <EmployeeInput worker={worker} workers={workers} onPick={pickWorker} onClear={() => { setWorker(null); setQty(""); }} onCreated={(w) => setWorkers((prev) => [...prev, w])} />
           </Row>
           <Row label="Cantidad" testid="quick-qty-row">
             <div className="flex items-center gap-1.5">

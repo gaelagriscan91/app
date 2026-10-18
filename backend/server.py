@@ -967,11 +967,30 @@ async def create_harvest(data: HarvestIn, user: CurrentUser):
     return await _enrich_harvest(doc)
 
 
+def _oid(hid: str) -> ObjectId:
+    try:
+        return ObjectId(hid)
+    except Exception:
+        raise HTTPException(status_code=400, detail="ID inválido")
+
+
+async def _harvest_locked(h: dict, user: dict):
+    hdate = h.get("date", "")
+    return await db.receipts_history.find_one({
+        **scope_filter(user),
+        "date_from": {"$lte": hdate},
+        "date_to": {"$gte": hdate},
+        "rows.worker_id": str(h.get("worker_id", "")),
+    })
+
+
 @api_router.put("/harvests/{hid}")
 async def update_harvest(hid: str, data: HarvestIn, user: CurrentUser):
-    existing = await db.harvests.find_one({"_id": ObjectId(hid), **scope_filter(user)})
+    existing = await db.harvests.find_one({"_id": _oid(hid), **scope_filter(user)})
     if not existing:
         raise HTTPException(status_code=404, detail="Cosecha no encontrada")
+    if await _harvest_locked(existing, user):
+        raise HTTPException(status_code=400, detail="No se puede corregir: este registro ya está incluido en un recibo guardado.")
     prod = await db.products.find_one({"_id": ObjectId(data.product_id)})
     if not prod:
         raise HTTPException(status_code=400, detail="Producto no válido")
@@ -995,19 +1014,10 @@ async def update_harvest(hid: str, data: HarvestIn, user: CurrentUser):
 
 @api_router.delete("/harvests/{hid}")
 async def delete_harvest(hid: str, user: CurrentUser):
-    existing = await db.harvests.find_one({"_id": ObjectId(hid), **scope_filter(user)})
+    existing = await db.harvests.find_one({"_id": _oid(hid), **scope_filter(user)})
     if not existing:
         raise HTTPException(status_code=404, detail="Cosecha no encontrada")
-    # Protect harvests that are part of a saved receipt (immutable snapshot)
-    hdate = existing.get("date", "")
-    wid = str(existing.get("worker_id", ""))
-    locked = await db.receipts_history.find_one({
-        **scope_filter(user),
-        "date_from": {"$lte": hdate},
-        "date_to": {"$gte": hdate},
-        "rows.worker_id": wid,
-    })
-    if locked:
+    if await _harvest_locked(existing, user):
         raise HTTPException(
             status_code=400,
             detail="No se puede borrar: este registro ya está incluido en un recibo guardado.",
