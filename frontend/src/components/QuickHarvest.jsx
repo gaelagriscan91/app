@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { QrCode, Printer, Loader2, ArrowLeft, Trash2, X, UserPlus } from "lucide-react";
 import { toast } from "sonner";
-import api, { formatApiErrorDetail, formatCurrency, todayISO, fetchCheckinSession } from "@/lib/api";
+import api, { formatApiErrorDetail, formatCurrency, todayISO, fetchCheckinSession, saveCheckinSession } from "@/lib/api";
 import QrScanner from "@/components/QrScanner";
 import { thermalPrinter } from "@/lib/thermalPrinter";
 import { openHtmlWindow, escapeHtml } from "@/lib/printHtml";
@@ -26,7 +26,10 @@ async function printWorkerTicket(rec, rows) {
       await thermalPrinter.print([
         { text: "AgriScan", align: "center", bold: true, size: "double" },
         { text: rec.date, align: "center" }, { text: sep },
-        { text: rec.worker_name, bold: true }, { text: sep },
+        { text: rec.worker_name, bold: true },
+        ...(rec.mayordomo ? [{ text: `Mayordomo: ${rec.mayordomo}` }] : []),
+        ...(rec.grower ? [{ text: `Grower: ${rec.grower}` }] : []),
+        { text: sep },
         ...lines.flatMap((l) => [{ text: l.when }, { text: pad("  " + l.qty, l.pay) }]),
         { text: sep }, { text: pad("Total:", totalQty) },
         { text: "GANO", align: "center", bold: true },
@@ -39,7 +42,7 @@ async function printWorkerTicket(rec, rows) {
     }
   }
   const body = lines.map((l) => `<div>${escapeHtml(l.when)}</div><div class="r"><span>${escapeHtml(l.qty)}</span><span>${escapeHtml(l.pay)}</span></div>`).join("");
-  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Ticket</title><style>@page{size:58mm auto;margin:3mm}body{font-family:'Courier New',monospace;font-size:12px;width:52mm;margin:0 auto}h1{text-align:center;font-size:16px;margin:4px 0}.c{text-align:center}.r{display:flex;justify-content:space-between;margin-bottom:4px}hr{border:none;border-top:1px dashed #000}.big{font-size:20px;font-weight:bold;text-align:center}</style></head><body><h1>AgriScan</h1><div class="c">${escapeHtml(rec.date)}</div><hr><b>${escapeHtml(rec.worker_name)}</b><hr>${body}<hr><div class="r"><span>Total:</span><span>${escapeHtml(totalQty)}</span></div><div class="c"><b>GANÓ</b></div><div class="big">${escapeHtml(formatCurrency(total))}</div><script>window.onload=()=>setTimeout(()=>window.print(),300)</script></body></html>`;
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Ticket</title><style>@page{size:58mm auto;margin:3mm}body{font-family:'Courier New',monospace;font-size:12px;width:52mm;margin:0 auto}h1{text-align:center;font-size:16px;margin:4px 0}.c{text-align:center}.r{display:flex;justify-content:space-between;margin-bottom:4px}hr{border:none;border-top:1px dashed #000}.big{font-size:20px;font-weight:bold;text-align:center}</style></head><body><h1>AgriScan</h1><div class="c">${escapeHtml(rec.date)}</div><hr><b>${escapeHtml(rec.worker_name)}</b>${rec.mayordomo ? `<div>Mayordomo: ${escapeHtml(rec.mayordomo)}</div>` : ""}${rec.grower ? `<div>Grower: ${escapeHtml(rec.grower)}</div>` : ""}<hr>${body}<hr><div class="r"><span>Total:</span><span>${escapeHtml(totalQty)}</span></div><div class="c"><b>GANÓ</b></div><div class="big">${escapeHtml(formatCurrency(total))}</div><script>window.onload=()=>setTimeout(()=>window.print(),300)</script></body></html>`;
   if (!openHtmlWindow(html, "width=400,height=700")) toast.error("Permite ventanas emergentes para imprimir");
 }
 
@@ -224,6 +227,13 @@ export default function QuickHarvest() {
   }, [today]);
 
   useEffect(() => { fetchCheckinSession(today).then((s) => setSession(s || {})); }, [today]);
+  const setField = (k, v) => setSession((s) => ({ ...s, [k]: v }));
+  const commitField = (k) => {
+    const next = { ...session, [k]: (session[k] || "").trim() };
+    setSession(next);
+    try { localStorage.setItem(`agriscan.session.${today}`, JSON.stringify(next)); } catch (err) { console.warn("cache session", err); }
+    saveCheckinSession(next);
+  };
   useEffect(() => { if (view === "records") loadRows(); }, [view, loadRows]);
   useEffect(() => {
     api.get("/workers").then(({ data }) => setWorkers((data || []).filter((w) => w.active !== false))).catch((e) => console.error("workers", e));
@@ -267,7 +277,7 @@ export default function QuickHarvest() {
         worker_id: worker.id, parcel_id: session.parcelId, product_id: session.productId,
         kilos: 0, units, price_per_kg: 0, price_per_unit: price, price_mode: mode === "horas" ? "hour" : "piece", unit_type: mode,
         date: today, photo_path: "", notes: "Cosecha escaneada",
-        block: session.block || "", variety: session.variedad || "", mayordomo: session.mayordomo || "",
+        block: session.block || "", variety: session.variedad || "", mayordomo: (session.mayordomo || "").trim(), grower: (session.grower || "").trim(),
       });
       toast.success(`Guardado: ${worker.name} · ${units}`);
       setWorker(null);
@@ -302,6 +312,12 @@ export default function QuickHarvest() {
           <Row label="Precio" testid="quick-price"><span className="text-[17px] text-[#111827]">{formatCurrency(price)}</span></Row>
           <div className="h-2" />
           <Row label="Tipo" testid="quick-type"><span className="text-[17px] text-[#111827]">{TIPO[mode] || "Pieza"}</span></Row>
+          <div className="h-2" />
+          {[["mayordomo", "Mayordomo"], ["grower", "Grower"]].map(([k, l]) => (
+            <Row key={k} label={l} testid={`quick-${k}`}>
+              <input value={session[k] || ""} onChange={(e) => setField(k, e.target.value)} onBlur={() => commitField(k)} placeholder={l} className="flex-1 min-w-0 text-right text-[17px] bg-transparent outline-none text-[#111827] placeholder:text-[#C4C4C4]" data-testid={`quick-${k}-input`} />
+            </Row>
+          ))}
 
           <button
             onClick={worker ? save : openScanner}

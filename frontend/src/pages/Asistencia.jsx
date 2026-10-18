@@ -619,6 +619,7 @@ function CheckInView(props) {
     (parcels || []).find((p) => p.id === session?.parcelId)?.name || session?.ranchoName || ""
   );
   const [draftBlock, setDraftBlock] = useState(session?.block || "");
+  const [draftGrower, setDraftGrower] = useState(session?.grower || "");
   const [draftTrabajo, setDraftTrabajo] = useState(
     (products || []).find((p) => p.id === session?.productId)?.name || session?.trabajoName || ""
   );
@@ -638,6 +639,9 @@ function CheckInView(props) {
              c.boss?.name?.toLowerCase() === name.toLowerCase()
     );
     saveSession?.({ mayordomo: name, crewId: matched?.id || "" });
+  };
+  const commitGrower = () => {
+    saveSession?.({ grower: (draftGrower || "").trim() });
   };
   const commitBlock = () => {
     saveSession?.({ block: (draftBlock || "").trim() });
@@ -874,6 +878,19 @@ function CheckInView(props) {
                 placeholder="—"
                 className={inputCls}
                 data-testid="checkin-block-input"
+                autoComplete="off"
+              />
+            </div>
+            <div className={`${cellCls} col-span-2`}>
+              <div className={labelCls}>Grower</div>
+              <input
+                type="text"
+                value={draftGrower}
+                onChange={(e) => setDraftGrower(e.target.value)}
+                onBlur={commitGrower}
+                placeholder="—"
+                className={inputCls}
+                data-testid="checkin-grower-input"
                 autoComplete="off"
               />
             </div>

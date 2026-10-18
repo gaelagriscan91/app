@@ -382,6 +382,7 @@ class HarvestIn(BaseModel):
     block: Optional[str] = ""
     variety: Optional[str] = ""
     mayordomo: Optional[str] = ""
+    grower: Optional[str] = ""
     unit_type: Optional[str] = ""
 
 
@@ -961,6 +962,7 @@ async def create_harvest(data: HarvestIn, user: CurrentUser):
         "block": (data.block or "").strip(),
         "variety": (data.variety or "").strip(),
         "mayordomo": (data.mayordomo or "").strip(),
+        "grower": (data.grower or "").strip(),
         "unit_type": (data.unit_type or "").strip(),
         "created_by": user["_id"],
         "owner_id": owner_of(user),
@@ -1014,6 +1016,7 @@ async def update_harvest(hid: str, data: HarvestIn, user: CurrentUser):
         "variety": (data.variety or existing.get("variety") or "").strip(),
         "mayordomo": (data.mayordomo or existing.get("mayordomo") or "").strip(),
         "unit_type": (data.unit_type or existing.get("unit_type") or "").strip(),
+        "grower": (data.grower or existing.get("grower") or "").strip(),
     }
     await db.harvests.update_one({"_id": ObjectId(hid)}, {"$set": upd})
     await _resync_receipts(existing, user)
@@ -1241,7 +1244,7 @@ async def export_excel(
     ws = wb.active
     ws.title = "Cosechas"
     ws.append([
-        "Fecha", "Trabajador", "Parcela", "Block", "Producto", "Variedad",
+        "Fecha", "Trabajador", "Parcela", "Block", "Producto", "Variedad", "Mayordomo", "Grower",
         "Kilos", "Precio/Kg", "Unidades", "Precio/Unidad",
         "Pago Total ($)", "Notas"
     ])
@@ -1253,6 +1256,8 @@ async def export_excel(
             r.get("block", ""),
             r.get("product_name", ""),
             r.get("variety", ""),
+            r.get("mayordomo", ""),
+            r.get("grower", ""),
             float(r.get("kilos", 0)),
             float(r.get("price_per_kg", 0)),
             float(r.get("units", 0)),
@@ -1265,7 +1270,7 @@ async def export_excel(
     total_units = sum(float(r.get("units", 0)) for r in enriched)
     total_payment = sum(float(r.get("payment", 0)) for r in enriched)
     ws.append([])
-    ws.append(["TOTALES", "", "", "", "", "", total_kilos, "", total_units, "", total_payment, ""])
+    ws.append(["TOTALES", "", "", "", "", "", "", "", total_kilos, "", total_units, "", total_payment, ""])
 
     for col in ws.columns:
         length = max((len(str(c.value)) for c in col if c.value is not None), default=10)
@@ -1353,6 +1358,9 @@ async def receipts(
                 "block": h.get("block", ""),
                 "variety": h.get("variety", ""),
                 "mayordomo": h.get("mayordomo", ""),
+                "grower": h.get("grower", ""),
+                "unit_type": h.get("unit_type", ""),
+                "created_at": h.get("created_at", ""),
                 "kilos": float(h.get("kilos", 0)),
                 "units": float(h.get("units", 0)),
                 "unit_label": prod.get("unit_label", "u") if prod else "u",
@@ -1437,6 +1445,7 @@ async def receipts_export(
     block: Optional[str] = "",
     variety: Optional[str] = "",
     mayordomo: Optional[str] = "",
+    grower: Optional[str] = "",
     rancho: Optional[str] = "",
     trabajo: Optional[str] = "",
     price: Optional[float] = None,
@@ -1498,6 +1507,7 @@ async def receipts_export(
         "trabajo": _pick(sess.get("trabajoName") or trabajo, "product_name"),
         "variety": _pick(sess.get("variedad") or variety, "variety"),
         "mayordomo": _pick(sess.get("mayordomo") or mayordomo, "mayordomo"),
+        "grower": _pick(sess.get("grower") or grower, "grower"),
     }
 
     wb = Workbook()
@@ -1526,6 +1536,7 @@ async def receipts_export(
     _label("G2", "Trabajo", header_vals["trabajo"], "I2")
     _label("A3", "Variedad", header_vals["variety"], "B3")
     _label("C3", "Mayordomo", header_vals["mayordomo"], "F3")
+    _label("G3", "Grower", header_vals["grower"], "I3")
     ws.row_dimensions[2].height = 24
     ws.row_dimensions[3].height = 24
 
