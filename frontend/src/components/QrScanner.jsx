@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import jsQR from "jsqr";
 import { Camera, CameraOff, X } from "lucide-react";
 import { acquireCamera, releaseCamera } from "@/lib/cameraStream";
+import { playScanBeep } from "@/lib/sounds";
 
 export default function QrScanner({ onScan, active = true, fullscreen = false, onClose, title = "Enfoca el QR" }) {
   const videoRef = useRef(null);
@@ -34,6 +35,8 @@ export default function QrScanner({ onScan, active = true, fullscreen = false, o
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
       let last = 0;
+      let lastCode = "";
+      let lastAt = 0;
       const tick = (t) => {
         loopRef.current = requestAnimationFrame(tick);
         if (t - last < 100 || v.readyState < 2 || !v.videoWidth) return;
@@ -44,7 +47,12 @@ export default function QrScanner({ onScan, active = true, fullscreen = false, o
         ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
         const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const code = jsQR(img.data, img.width, img.height, { inversionAttempts: "dontInvert" });
-        if (code?.data) onScanRef.current?.(code.data);
+        if (code?.data) {
+          if (code.data !== lastCode || t - lastAt > 1500) playScanBeep();
+          lastCode = code.data;
+          lastAt = t;
+          onScanRef.current?.(code.data);
+        }
       };
       loopRef.current = requestAnimationFrame(tick);
     } catch (e) {

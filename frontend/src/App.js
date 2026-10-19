@@ -3,6 +3,7 @@ import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import { ConfirmHost } from "@/lib/confirm";
+import { installKeySounds } from "@/lib/sounds";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
@@ -62,6 +63,7 @@ function AppRoutes() {
 }
 
 function App() {
+  useEffect(() => installKeySounds(), []);
   return (
     <AuthProvider>
       <BrowserRouter>
