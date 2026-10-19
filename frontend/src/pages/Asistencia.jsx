@@ -744,17 +744,7 @@ function CheckInView(props) {
           </div>
 
           {/* Mayordomo pill + keyboard + camera */}
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <input
-              type="text"
-              value={draftMayordomo}
-              onChange={(e) => setDraftMayordomo(e.target.value)}
-              onBlur={commitMayordomo}
-              placeholder="Mayordomo"
-              className="h-11 flex-1 min-w-0 bg-white text-[#1A2210] px-4 rounded-full text-sm font-extrabold shadow-sm truncate placeholder-[#889078] outline-none border-0 focus:ring-2 focus:ring-white/60"
-              data-testid="checkin-mayordomo-input"
-              autoComplete="off"
-            />
+          <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
             <button
               onClick={requireFields(() => setManualOpen(true))}
               className="w-11 h-11 bg-white rounded-full flex items-center justify-center shadow-sm text-[#1A2210] shrink-0"
@@ -881,7 +871,20 @@ function CheckInView(props) {
                 autoComplete="off"
               />
             </div>
-            <div className={`${cellCls} col-span-2`}>
+            <div className={cellCls}>
+              <div className={labelCls}>Mayordomo</div>
+              <input
+                type="text"
+                value={draftMayordomo}
+                onChange={(e) => setDraftMayordomo(e.target.value)}
+                onBlur={commitMayordomo}
+                placeholder="—"
+                className={inputCls}
+                data-testid="checkin-mayordomo-input"
+                autoComplete="off"
+              />
+            </div>
+            <div className={cellCls}>
               <div className={labelCls}>Grower</div>
               <input
                 type="text"
