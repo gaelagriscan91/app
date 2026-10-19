@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import jsQR from "jsqr";
 import { Camera, CameraOff, X } from "lucide-react";
-import { acquireCamera, releaseCamera } from "@/lib/cameraStream";
+import { acquireCamera, releaseCamera, resetCamera } from "@/lib/cameraStream";
 import { playScanBeep } from "@/lib/sounds";
 
 export default function QrScanner({ onScan, active = true, fullscreen = false, onClose, title = "Enfoca el QR" }) {
@@ -22,15 +22,34 @@ export default function QrScanner({ onScan, active = true, fullscreen = false, o
     setRunning(false);
   };
 
+  const attach = async (v, stream) => {
+    v.muted = true;
+    v.setAttribute("muted", "");
+    v.setAttribute("playsinline", "");
+    v.setAttribute("webkit-playsinline", "");
+    v.srcObject = stream;
+    try { await v.play(); } catch (err) { if (err?.name !== "AbortError") throw err; }
+    // iOS can hand back a reused stream that shows only black frames: wait for real frames
+    for (let i = 0; i < 20; i++) {
+      if (v.videoWidth > 0 && v.readyState >= 2) return true;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    return false;
+  };
+
   const start = async () => {
     setError("");
     setStarting(true);
     try {
-      const stream = await acquireCamera();
+      let stream = await acquireCamera();
       const v = videoRef.current;
       if (!v) return;
-      v.srcObject = stream;
-      try { await v.play(); } catch (err) { if (err?.name !== "AbortError") throw err; }
+      if (!(await attach(v, stream))) {
+        resetCamera();
+        stream = await acquireCamera();
+        if (!videoRef.current) return;
+        await attach(v, stream);
+      }
       setRunning(true);
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d", { willReadFrequently: true });

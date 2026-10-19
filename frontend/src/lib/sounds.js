@@ -26,7 +26,26 @@ function tone(freq, ms, volume, type = "sine") {
 }
 
 export const playScanBeep = () => tone(1760, 140, 0.35, "square");
-export const playKeyClick = () => tone(900, 30, 0.12, "triangle");
+
+// Short filtered noise burst, like the phone keyboard tick
+export function playKeyClick() {
+  const a = audio();
+  if (!a) return;
+  const len = Math.floor(a.sampleRate * 0.025);
+  const buf = a.createBuffer(1, len, a.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 4);
+  const src = a.createBufferSource();
+  src.buffer = buf;
+  const filter = a.createBiquadFilter();
+  filter.type = "bandpass";
+  filter.frequency.value = 3200;
+  filter.Q.value = 0.8;
+  const gain = a.createGain();
+  gain.gain.value = 0.6;
+  src.connect(filter).connect(gain).connect(a.destination);
+  src.start();
+}
 
 export function installKeySounds() {
   const onInput = (e) => {

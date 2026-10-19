@@ -5,7 +5,13 @@ let stream = null;
 let pending = null;
 let idleTimer = null;
 
-const isLive = (s) => s && s.getVideoTracks().some((t) => t.readyState === "live");
+const isLive = (s) => s && s.getVideoTracks().some((t) => t.readyState === "live" && !t.muted && t.enabled);
+
+export function resetCamera() {
+  clearTimeout(idleTimer);
+  if (stream) stream.getTracks().forEach((t) => t.stop());
+  stream = null;
+}
 
 export async function acquireCamera() {
   clearTimeout(idleTimer);
