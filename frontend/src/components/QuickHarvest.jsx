@@ -150,15 +150,35 @@ function fmtStamp(h) {
   return `${d.toLocaleDateString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" })} · ${d.toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit", hour12: true })}`;
 }
 
-function Records({ rows, loading, onBack, onSelect, onDeleted }) {
+function DayTotals({ rows, mode }) {
+  const label = TIPO[mode] || "Pieza";
+  const mine = rows.filter((r) => unitOf(r) === label.toLowerCase());
+  const sum = Math.round(mine.reduce((s, r) => s + Number(r.units || 0), 0) * 100) / 100;
+  return (
+    <div className="m-4 inline-block bg-white rounded-xl shadow-sm px-4 py-3 text-[#111827] space-y-1" data-testid="quick-day-totals">
+      {mode === "libra" && (
+        <div className="flex gap-3 justify-between text-sm"><span>Unidad</span><b data-testid="quick-total-units">{mine.length}</b></div>
+      )}
+      <div className="flex gap-3 justify-between text-sm"><span>{label}</span><b data-testid="quick-total-qty">{sum}</b></div>
+    </div>
+  );
+}
+
+function Records({ rows, setRows, loading, onBack, onSelect }) {
+  const [deleting, setDeleting] = useState(() => new Set());
   const remove = async (h) => {
-    if (!window.confirm(`¿Borrar el escaneo de ${h.worker_name}?`)) return;
+    if (deleting.has(h.id) || !window.confirm(`¿Borrar el escaneo de ${h.worker_name}?`)) return;
+    setDeleting((s) => new Set(s).add(h.id));
+    const prev = rows;
+    setRows((list) => list.filter((r) => r.id !== h.id));
     try {
       await api.delete(`/harvests/${h.id}`);
       toast.success("Escaneo borrado");
-      onDeleted();
     } catch (e) {
+      setRows(prev);
       toast.error(formatApiErrorDetail(e.response?.data?.detail) || "No se pudo borrar");
+    } finally {
+      setDeleting((s) => { const n = new Set(s); n.delete(h.id); return n; });
     }
   };
   return (
@@ -166,7 +186,7 @@ function Records({ rows, loading, onBack, onSelect, onDeleted }) {
       <button onClick={onBack} className="flex items-center gap-2 px-4 py-3 text-[#1D4ED8] font-bold" data-testid="quick-records-back">
         <ArrowLeft className="w-5 h-5" /> Escanear
       </button>
-      {loading ? (
+      {loading && rows.length === 0 ? (
         <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-[#1D4ED8]" /></div>
       ) : rows.length === 0 ? (
         <p className="text-center text-[#6B7280] py-10 font-semibold">Sin registros hoy</p>
@@ -185,7 +205,7 @@ function Records({ rows, loading, onBack, onSelect, onDeleted }) {
             </div>
           </button>
           <button onClick={() => printWorkerTicket(h, rows)} className="p-3 text-[#1D4ED8] hover:bg-[#EFF6FF]" aria-label="Imprimir" data-testid={`quick-record-print-${h.id}`}><Printer className="w-5 h-5" /></button>
-          <button onClick={() => remove(h)} className="p-3 pr-4 text-[#DC2626] hover:bg-[#FEF2F2]" aria-label="Borrar" data-testid={`quick-record-delete-${h.id}`}><Trash2 className="w-5 h-5" /></button>
+          <button onClick={() => remove(h)} disabled={deleting.has(h.id)} className="p-3 pr-4 text-[#DC2626] hover:bg-[#FEF2F2] disabled:opacity-40" aria-label="Borrar" data-testid={`quick-record-delete-${h.id}`}><Trash2 className="w-5 h-5" /></button>
           </div>
         ))
       )}
@@ -207,9 +227,8 @@ export default function QuickHarvest() {
   const [workers, setWorkers] = useState([]);
   const [editing, setEditing] = useState(null);
   const scanLock = useRef(false);
-  const qtyRef = useRef(null);
+  const [resetKey, setResetKey] = useState(0);
   const startQty = () => (session.unitMode === "libra" ? "" : "1");
-  useEffect(() => { if (worker && session.unitMode === "libra") { setTimeout(() => qtyRef.current?.focus(), 100); } }, [worker, session.unitMode]);
 
   const mode = session.unitMode || "pieza";
   const price = Number(mode === "horas" ? session.pricePerHour : session.pricePerUnit) || 0;
@@ -234,7 +253,7 @@ export default function QuickHarvest() {
     try { localStorage.setItem(`agriscan.session.${today}`, JSON.stringify(next)); } catch (err) { console.warn("cache session", err); }
     saveCheckinSession(next);
   };
-  useEffect(() => { if (view === "records") loadRows(); }, [view, loadRows]);
+  useEffect(() => { loadRows(); }, [view, loadRows]);
   useEffect(() => {
     api.get("/workers").then(({ data }) => setWorkers((data || []).filter((w) => w.active !== false))).catch((e) => console.error("workers", e));
   }, []);
@@ -282,6 +301,8 @@ export default function QuickHarvest() {
       toast.success(`Guardado: ${worker.name} · ${units}`);
       setWorker(null);
       setQty("");
+      setResetKey((k) => k + 1);
+      loadRows();
     } catch (e) {
       toast.error(formatApiErrorDetail(e.response?.data?.detail) || "No se pudo guardar");
     } finally {
@@ -294,11 +315,11 @@ export default function QuickHarvest() {
   return (
     <div className="flex flex-col min-h-[calc(100dvh-170px)] bg-[#E9E9E9] -mx-4 -my-4 sm:mx-0 sm:my-0 sm:rounded-2xl overflow-hidden" data-testid="quick-harvest">
       {view === "records" ? (
-        <Records rows={rows} loading={loadingRows} onBack={() => setView("scan")} onSelect={setEditing} onDeleted={loadRows} />
+        <Records rows={rows} setRows={setRows} loading={loadingRows} onBack={() => setView("scan")} onSelect={setEditing} />
       ) : (
         <div className="relative flex-1">
           <Row label="Empleado" testid="quick-employee">
-            <EmployeeInput worker={worker} workers={workers} onPick={pickWorker} onClear={() => { setWorker(null); setQty(""); }} onCreated={(w) => setWorkers((prev) => [...prev, w])} />
+            <EmployeeInput key={resetKey} worker={worker} workers={workers} onPick={pickWorker} onClear={() => { setWorker(null); setQty(""); }} onCreated={(w) => setWorkers((prev) => [...prev, w])} />
           </Row>
           <Row label="Cantidad" testid="quick-qty-row">
             <div className="flex items-center gap-1.5">
@@ -306,7 +327,7 @@ export default function QuickHarvest() {
                 <button key={l} onClick={() => setQty(String(v))} disabled={!worker} className={`px-2 py-1 rounded-md text-xs font-semibold transition-colors ${Number(qty) === v ? "bg-[#9BC53D] text-white" : "bg-[#E5E7EB] text-[#6B7280]"} disabled:opacity-50`} data-testid={`quick-frac-${l.replace("/", "-")}`}>{l}</button>
               ))}
             </div>
-            <input ref={qtyRef} value={qty} onChange={(e) => setQty(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder="Cantidad" disabled={!worker} className="w-20 text-right text-[19px] bg-transparent outline-none placeholder:text-[#C4C4C4] disabled:bg-transparent" data-testid="quick-qty-input" />
+            <input value={qty} onChange={(e) => setQty(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder="Cantidad" disabled={!worker} className="w-20 text-right text-[19px] bg-transparent outline-none placeholder:text-[#C4C4C4] disabled:bg-transparent" data-testid="quick-qty-input" />
           </Row>
           <div className="h-6" />
           <Row label="Precio" testid="quick-price"><span className="text-[17px] text-[#111827]">{formatCurrency(price)}</span></Row>
@@ -318,6 +339,7 @@ export default function QuickHarvest() {
               <input value={session[k] || ""} onChange={(e) => setField(k, e.target.value)} onBlur={() => commitField(k)} placeholder={l} className="flex-1 min-w-0 text-right text-[17px] bg-transparent outline-none text-[#111827] placeholder:text-[#C4C4C4]" data-testid={`quick-${k}-input`} />
             </Row>
           ))}
+          <DayTotals rows={rows} mode={mode} />
 
           <button
             onClick={worker ? save : openScanner}

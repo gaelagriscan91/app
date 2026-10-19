@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Camera, CameraOff, Keyboard, Users, Loader2, Trash2, X, ArrowLeft, UserPlus,
-  Search, CheckCircle2, Sun, Moon, ShoppingBasket, CloudCheck, ChevronRight, MapPin, UserCircle2, Share2, LogOut,
+  Camera, CameraOff, Keyboard, Users, Loader2, X, ArrowLeft, UserPlus,
+  Search, Sun, Moon, ShoppingBasket, CloudCheck, ChevronRight, MapPin, UserCircle2, LogOut,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import api, { formatApiErrorDetail, formatCurrency, formatNumber, todayISO, formatHHMM, sessionExportParams, fetchCheckinSession, saveCheckinSession } from "@/lib/api";
+import api, { formatApiErrorDetail, formatCurrency, formatNumber, todayISO, formatHHMM, fetchCheckinSession, saveCheckinSession } from "@/lib/api";
 import QrScanner from "@/components/QrScanner";
 import QuickAddWorker from "@/components/QuickAddWorker";
+import { HubRow, AttendanceRow, ManualWorkerRow, Tile, MiniStat, SummaryCell, SummaryView, usePaged, ShowMore, PAGE_SIZE } from "@/components/asistencia/AsistenciaParts";
 
 const SESSION_KEY = (date) => `agriscan.session.${date}`;
 
@@ -31,12 +32,6 @@ export default function Asistencia() {
   const [harvestsToday, setHarvestsToday] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
-  const [nowTick, setNowTick] = useState(Date.now());
-  // Live clock — refresh elapsed time every 30s
-  useEffect(() => {
-    const id = setInterval(() => setNowTick(Date.now()), 30000);
-    return () => clearInterval(id);
-  }, []);
 
   // Session (persisted in localStorage per-date)
   const [session, setSession] = useState(() => loadSession(todayISO()));
@@ -103,6 +98,8 @@ export default function Asistencia() {
   const presentCount = data.rows.length;
   const openCount = data.rows.filter((r) => !r.check_out).length;
   const presentWorkerIds = useMemo(() => new Set(data.rows.map((r) => r.worker_id)), [data.rows]);
+  const workerMap = useMemo(() => new Map(workers.map((w) => [w.id, w])), [workers]);
+  const hubPage = usePaged(data.rows, [data.rows.length]);
 
   const nowGreeting = () => {
     const h = new Date().getHours();
@@ -143,6 +140,10 @@ export default function Asistencia() {
     try { await api.delete(`/attendance/${id}`); toast.success("Eliminado"); load(); }
     catch (e) { toast.error("No se pudo eliminar"); }
   };
+  const actionsRef = useRef({});
+  actionsRef.current = { submitCode, removeAttendance };
+  const onRowCheckout = useCallback((code) => actionsRef.current.submitCode(code), []);
+  const onRowDelete = useCallback((id) => actionsRef.current.removeAttendance(id), []);
 
   const moveCrew = async (crew) => {
     setShowCrewPicker(false);
@@ -281,7 +282,7 @@ export default function Asistencia() {
       products={products}
       crews={crews}
       handleScan={handleScan}
-      removeAttendance={removeAttendance}
+      removeAttendance={onRowDelete}
       setManualOpen={setManualOpen}
       setShowCrewPicker={setShowCrewPicker}
       goBack={() => setView("hub")}
@@ -404,62 +405,20 @@ export default function Asistencia() {
           </div>
         ) : (
           <div className="space-y-2">
-            {data.rows.map((r) => {
-              const w = workers.find((x) => x.id === r.worker_id);
-              const shortId = (w?.id_document || w?.id || "").toString().slice(-3) || "—";
-              // Live elapsed time since check-in (or final duration if checked out)
-              let elapsedLabel = "—";
-              const open = !r.check_out && r.check_in;
-              if (r.check_out && r.check_in) {
-                const h = Number(r.hours) || 0;
-                const hh = Math.floor(h);
-                const mm = Math.round((h % 1) * 60);
-                elapsedLabel = hh > 0 ? `${hh}h ${mm}m` : `${mm}m`;
-              } else if (open) {
-                const ms = nowTick - new Date(r.check_in).getTime();
-                const mins = Math.max(0, Math.floor(ms / 60000));
-                const hh = Math.floor(mins / 60);
-                const mm = mins % 60;
-                elapsedLabel = hh > 0 ? `${hh}h ${mm}m` : `${mm}m`;
-              }
+            {hubPage.visible.map((r) => {
+              const w = workerMap.get(r.worker_id);
               return (
-                <div
+                <HubRow
                   key={r.id}
-                  className="bg-white border border-[#E2DDD0] rounded-2xl p-3 flex items-center gap-3"
-                  data-testid={`hub-row-${r.id}`}
-                >
-                  <div className="w-10 h-10 rounded-xl bg-[#F0EDE1] flex items-center justify-center text-[#1E2746] font-mono-stat text-sm">
-                    {shortId}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="font-bold text-[#1A2210] truncate">{r.worker_name}</div>
-                    <div className="text-[11px] text-[#889078] font-semibold font-mono-stat">
-                      {formatHHMM(r.check_in) || "—"}{formatHHMM(r.check_out) ? ` → ${formatHHMM(r.check_out)}` : " →"}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider leading-none">
-                      {open ? "En campo" : "Jornada"}
-                    </div>
-                    <div className={`font-mono-stat text-base font-extrabold mt-0.5 ${open ? "text-[#1D4ED8]" : "text-[#5A4A98]"}`}>
-                      {elapsedLabel}
-                    </div>
-                  </div>
-                  {open ? (
-                    <button
-                      onClick={() => submitCode(w?.qr_code || w?.id || r.worker_id)}
-                      disabled={processing}
-                      className="h-10 px-3 bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold rounded-xl text-xs flex items-center gap-1 shrink-0 disabled:opacity-60"
-                      data-testid={`hub-checkout-${r.id}`}
-                    >
-                      Salida
-                    </button>
-                  ) : (
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#5A4A98] shrink-0" />
-                  )}
-                </div>
+                  r={r}
+                  shortId={(w?.id_document || w?.id || "").toString().slice(-3) || "—"}
+                  checkoutCode={w?.qr_code || w?.id || r.worker_id}
+                  processing={processing}
+                  onCheckout={onRowCheckout}
+                />
               );
             })}
+            <ShowMore remaining={hubPage.remaining} onClick={hubPage.more} testid="hub-show-more" />
           </div>
         )}
       </div>
@@ -551,52 +510,6 @@ export default function Asistencia() {
   );
 }
 
-/* =========================== Sub-components =========================== */
-
-function Tile({ label, icon, onClick, colorFrom, colorTo, badge, testid }) {
-  return (
-    <button
-      onClick={onClick}
-      data-testid={testid}
-      className="flex flex-col items-center group"
-    >
-      <div
-        className="w-full aspect-square rounded-[22px] flex items-center justify-center text-white shadow-lg active:scale-[0.97] transition-transform relative"
-        style={{ background: `linear-gradient(145deg, ${colorFrom}, ${colorTo})` }}
-      >
-        {icon}
-        {badge ? (
-          <span className="absolute -top-1.5 -right-1.5 bg-white text-[#1A2210] font-mono-stat text-xs min-w-[24px] h-6 rounded-full px-1.5 flex items-center justify-center shadow-md border-2 border-white">
-            {badge}
-          </span>
-        ) : null}
-      </div>
-      <div className="mt-2 text-white text-sm font-bold text-center" style={{ fontFamily: "Outfit, sans-serif" }}>
-        {label}
-      </div>
-    </button>
-  );
-}
-
-function MiniStat({ label, value, color }) {
-  return (
-    <div className="bg-white rounded-xl border border-[#E2DDD0] px-3 py-2">
-      <div className="text-[10px] font-bold uppercase tracking-wider text-[#889078]">{label}</div>
-      <div className="font-mono-stat text-xl" style={{ color }}>{value}</div>
-    </div>
-  );
-}
-
-function SummaryCell({ label, value }) {
-  return (
-    <div className="bg-[#F7F5EE] border border-[#E2DDD0] rounded-xl px-3 py-2 text-center">
-      <div className="text-[10px] font-bold uppercase tracking-wider text-[#889078]">{label}</div>
-      <div className="font-mono-stat text-xl text-[#1A2210]">{value}</div>
-    </div>
-  );
-}
-
-
 /* ======================= Check-In Sub-View (Orange) ======================= */
 function CheckInView(props) {
   const {
@@ -612,6 +525,9 @@ function CheckInView(props) {
     showCheckoutMenu, setShowCheckoutMenu, openCount, setConfirmCheckout, setView,
   } = props;
   const [unitMode, setUnitMode] = useState(session?.unitMode || "pieza"); // "pieza" | "libra" | "horas"
+  const attPage = usePaged(data.rows, [data.rows.length]);
+  const [manualLimit, setManualLimit] = useState(PAGE_SIZE);
+  const place = `${selectedParcel?.name || "—"}, ${selectedProduct?.name || "—"}`;
 
   // Inline draft state for every editable field in the header
   const [draftMayordomo, setDraftMayordomo] = useState(session?.mayordomo || "");
@@ -823,7 +739,7 @@ function CheckInView(props) {
                       if (openCount === 0) { toast.info("No hay trabajadores con jornada abierta"); return; }
                       setView("hub");
                       setTimeout(() => {
-                        document.querySelector('[data-testid^="hub-checkout-"]')?.scrollIntoView({ behavior: "smooth", block: "center" });
+                        document.querySelector('[data-testid^="hub-checkout-"]')?.scrollIntoView({ behavior: "auto", block: "nearest" });
                       }, 100);
                     }}
                     className="w-full text-left px-4 py-3 text-sm font-bold text-[#1A2210] hover:bg-[#F7F5EE] flex items-center gap-2"
@@ -992,35 +908,10 @@ function CheckInView(props) {
             Aún no hay trabajadores registrados hoy
           </p>
         ) : (
-          data.rows.map((r) => (
-            <div
-              key={r.id}
-              className="bg-white border border-[#E2DDD0] rounded-xl p-3 flex items-start gap-3"
-              data-testid={`attendance-row-${r.id}`}
-            >
-              <div className="min-w-[70px]">
-                <div className="text-xs text-[#889078] font-semibold uppercase tracking-wider">Hora</div>
-                <div className="font-bold text-[#1A2210] text-base">{formatHHMM(r.check_in) || "—"}</div>
-                {r.check_out && (
-                  <div className="text-xs text-red-700 font-bold mt-0.5">↓ {formatHHMM(r.check_out)}</div>
-                )}
-              </div>
-              <div className="min-w-0 flex-1 border-l border-[#E2DDD0] pl-3">
-                <div className="text-xs text-[#889078] font-semibold uppercase tracking-wider">Trabajador</div>
-                <div className="font-bold text-[#1A2210]">{r.worker_name}</div>
-                <div className="text-xs text-[#556047] font-semibold mt-0.5 truncate">
-                  {selectedParcel?.name || "—"}, {selectedProduct?.name || "—"} — Picking
-                </div>
-              </div>
-              <button
-                onClick={() => removeAttendance(r.id)}
-                className="w-8 h-8 rounded-lg hover:bg-red-50 text-red-600 flex items-center justify-center"
-                data-testid={`attendance-delete-${r.id}`}
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          ))
+          <>
+            {attPage.visible.map((r) => <AttendanceRow key={r.id} r={r} place={place} onDelete={removeAttendance} />)}
+            <ShowMore remaining={attPage.remaining} onClick={attPage.more} testid="attendance-show-more" />
+          </>
         )}
       </div>
 
@@ -1035,12 +926,6 @@ function CheckInView(props) {
           const next = new Set(manualSelected);
           if (allSelected) list.forEach((w) => next.delete(w.id));
           else list.forEach((w) => next.add(w.id));
-          setManualSelected(next);
-        };
-        const toggleOne = (id) => {
-          const next = new Set(manualSelected);
-          if (next.has(id)) next.delete(id);
-          else next.add(id);
           setManualSelected(next);
         };
         const closeModal = () => {
@@ -1096,24 +981,12 @@ function CheckInView(props) {
                   <li className="px-4 py-6 text-center text-sm text-[#556047] font-semibold">
                     {eligible.length === 0 ? "Todos los trabajadores ya tienen entrada hoy." : "Sin coincidencias."}
                   </li>
-                ) : list.map((w) => {
-                  const sel = manualSelected.has(w.id);
-                  return (
-                    <li key={w.id}>
-                      <button
-                        type="button"
-                        onClick={() => toggleOne(w.id)}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 text-left ${sel ? "bg-[#EFF6FF]" : "hover:bg-[#F7F5EE]"}`}
-                        data-testid={`manual-worker-${w.id}`}
-                      >
-                        <span className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 ${sel ? "bg-[#1D4ED8] border-[#1D4ED8]" : "border-[#889078]"}`}>
-                          {sel ? <CheckCircle2 className="w-3.5 h-3.5 text-white" /> : null}
-                        </span>
-                        <span className="font-bold text-sm text-[#1A2210] truncate flex-1">{w.name}</span>
-                      </button>
-                    </li>
-                  );
-                })}
+                ) : list.slice(0, manualLimit).map((w) => (
+                  <ManualWorkerRow key={w.id} w={w} selected={manualSelected.has(w.id)} setSelected={setManualSelected} />
+                ))}
+                {list.length > manualLimit && (
+                  <li><button onClick={() => setManualLimit((l) => l + PAGE_SIZE)} className="w-full py-3 text-[#1D4ED8] font-bold text-sm" data-testid="manual-show-more">Ver más ({list.length - manualLimit})</button></li>
+                )}
               </ul>
               <div className="flex gap-2 mt-3">
                 <button
@@ -1177,194 +1050,3 @@ function CheckInView(props) {
   );
 }
 
-/* ========================= Summary Sub-View (Blue) ========================= */
-function SummaryView({ data, selectedParcel, harvestsToday = [], date, onClose }) {
-  // Aggregate pieces/kilos/payment per worker from today's harvests
-  const byWorker = {};
-  harvestsToday.forEach((h) => {
-    const id = h.worker_id;
-    if (!byWorker[id]) byWorker[id] = { pieces: 0, kilos: 0, payment: 0 };
-    byWorker[id].pieces += Number(h.units || 0);
-    byWorker[id].kilos += Number(h.kilos || 0);
-    byWorker[id].payment += Number(h.payment || 0);
-  });
-
-  const groupedByLocation = {};
-  data.rows.forEach((r) => {
-    const key = selectedParcel?.name || "Sin ubicación";
-    if (!groupedByLocation[key]) groupedByLocation[key] = [];
-    groupedByLocation[key].push({ ...r, _agg: byWorker[r.worker_id] || { pieces: 0, kilos: 0, payment: 0 } });
-  });
-  const totalWorkers = data.rows.length;
-  const totalPieces = Object.values(byWorker).reduce((a, b) => a + b.pieces, 0);
-  const totalKilos = Object.values(byWorker).reduce((a, b) => a + b.kilos, 0);
-  const totalPayment = Object.values(byWorker).reduce((a, b) => a + b.payment, 0);
-  const totalHoursAll = data.rows.reduce((a, b) => a + (Number(b.hours) || 0), 0);
-
-  const formatHours = (h) => {
-    if (!h) return "0min";
-    const hh = Math.floor(h);
-    const mm = Math.round((h % 1) * 60);
-    return hh > 0 ? `${hh}h ${mm}min` : `${mm}min`;
-  };
-  const fmtMoney = (n) => Number(n || 0).toLocaleString("es-MX", { style: "currency", currency: "MXN" });
-
-  const [sharing, setSharing] = useState(false);
-  const shareSummary = async () => {
-    if (data.rows.length === 0) { toast.error("Sin trabajadores para compartir"); return; }
-    setSharing(true);
-    try {
-      const text = [
-        "📋 AgriScan — Resumen de jornada",
-        `${date} · ${selectedParcel?.name || "Sin ubicación"}`,
-        `👥 ${totalWorkers} trabajadores · ⏱  ${formatHours(totalHoursAll)}`,
-        `🧺 ${totalPieces.toFixed(2)} piezas · ⚖️ ${totalKilos.toFixed(2)}Kg`,
-        `💵 Total: ${fmtMoney(totalPayment)}`,
-      ].join("\n");
-
-      // Try to attach the Excel file (same format as Recibos share)
-      let blob = null;
-      try {
-        const resp = await api.get("/receipts/export", {
-          params: { date_from: date, date_to: date, tz_offset: -new Date().getTimezoneOffset(), ...sessionExportParams(date) },
-          responseType: "blob",
-        });
-        blob = resp.data;
-      } catch (_) {}
-
-      const filename = `resumen_${date}.xlsx`;
-      if (blob && navigator.canShare) {
-        const file = new File([blob], filename, {
-          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        });
-        if (navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({ title: "Resumen de jornada", text, files: [file] });
-            toast.success("Resumen compartido");
-            return;
-          } catch (err) { if (err?.name === "AbortError") return; }
-        }
-      }
-      // Fallback: share only text
-      if (navigator.share) {
-        try {
-          await navigator.share({ title: "Resumen de jornada", text });
-          toast.success("Resumen compartido (texto). Descarga el Excel para adjuntarlo también.");
-          return;
-        } catch (err) { if (err?.name === "AbortError") return; }
-      }
-      // Last fallback: download the file + copy text
-      if (blob) {
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url; a.download = filename;
-        document.body.appendChild(a); a.click(); a.remove();
-        window.URL.revokeObjectURL(url);
-      }
-      try { await navigator.clipboard.writeText(text); toast.success("Excel descargado y resumen copiado"); }
-      catch (_) { toast.error("No se pudo compartir"); }
-    } finally { setSharing(false); }
-  };
-
-  return (
-    <div className="min-h-[calc(100vh-5rem)] -mx-4 -my-5 sm:-mx-0 sm:-my-0" data-testid="crew-summary-view">
-      <div className="bg-[#1e40af] text-white px-5 pt-5 pb-6 rounded-b-xl">
-        <div className="flex items-center justify-between mb-5">
-          <button onClick={onClose} className="flex items-center gap-1" data-testid="close-summary">
-            <X className="w-6 h-6" />
-          </button>
-          <h2 className="text-xl font-extrabold flex-1 pl-2" style={{ fontFamily: "Outfit, sans-serif" }}>
-            Resumen
-          </h2>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={shareSummary}
-              disabled={sharing}
-              className="bg-white text-[#1e40af] px-4 h-9 rounded-full text-sm font-bold flex items-center gap-1.5 disabled:opacity-60"
-              data-testid="summary-share-button"
-            >
-              {sharing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />} Compartir
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="px-4 pt-5">
-        <div className="grid grid-cols-4 gap-3 pb-5 border-b border-[#E2DDD0]">
-          <Stat label="Trabajadores" value={totalWorkers} />
-          <Stat label="Horas" value={formatHours(totalHoursAll)} smallValue />
-          <Stat label="Piezas" value={totalPieces % 1 === 0 ? totalPieces : totalPieces.toFixed(2)} />
-          <Stat label="Pago" value={fmtMoney(totalPayment)} smallValue />
-        </div>
-
-        <div className="py-3 text-sm text-[#556047] font-semibold">
-          Agrupado por: <span className="text-[#1e40af] font-bold border-b-2 border-[#1e40af]">Ubicación</span>
-        </div>
-
-        {Object.entries(groupedByLocation).map(([loc, rows]) => (
-          <div key={loc} className="mt-2">
-            <div className="text-sm font-bold text-[#1A2210] py-2" style={{ fontFamily: "Outfit, sans-serif" }}>
-              {loc} ({rows.length})
-            </div>
-            <div className="space-y-2">
-              {rows.map((r) => (
-                <div
-                  key={r.id}
-                  className="bg-white border border-[#E2DDD0] rounded-xl p-4 border-l-4 border-l-[#2563EB]"
-                  data-testid={`summary-row-${r.id}`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Nombre</div>
-                      <div className="font-bold text-[#1A2210] text-base truncate">{r.worker_name}</div>
-                      <div className="text-[11px] text-[#556047] font-semibold font-mono-stat mt-0.5">
-                        {formatHHMM(r.check_in) || "—"}{formatHHMM(r.check_out) ? ` → ${formatHHMM(r.check_out)}` : " → en campo"}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Pago</div>
-                      <div className="font-mono-stat text-base font-extrabold text-[#1D4ED8]">
-                        {fmtMoney(r._agg.payment)}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-[#F0EDE1]">
-                    <div>
-                      <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Horas</div>
-                      <div className="font-mono-stat text-sm text-[#1A2210] mt-0.5">{formatHours(r.hours)}</div>
-                    </div>
-                    <div>
-                      <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Piezas</div>
-                      <div className="font-mono-stat text-sm text-[#1A2210] mt-0.5">
-                        {r._agg.pieces % 1 === 0 ? r._agg.pieces : r._agg.pieces.toFixed(2)}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-[10px] text-[#889078] font-bold uppercase tracking-wider">Kg</div>
-                      <div className="font-mono-stat text-sm text-[#1A2210] mt-0.5">
-                        {r._agg.kilos ? r._agg.kilos.toFixed(2) : "—"}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-
-        {data.rows.length === 0 && (
-          <p className="text-center text-[#556047] font-semibold py-8">Sin registros</p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Stat({ label, value, smallValue = false }) {
-  return (
-    <div>
-      <div className="text-[10px] text-[#556047] font-semibold uppercase tracking-wider">{label}</div>
-      <div className={`font-mono-stat text-[#1A2210] mt-1 ${smallValue ? "text-base font-extrabold" : "text-2xl"}`}>{value}</div>
-    </div>
-  );
-}
