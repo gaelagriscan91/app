@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Plus, Pencil, Trash2, Loader2, UserPlus, X, Save, QrCode, Printer, RefreshCw, PrinterIcon } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
+import { confirmAction } from "@/lib/confirm";
 import api from "@/lib/api";
 import { escapeHtml, openHtmlWindow } from "@/lib/printHtml";
 
@@ -48,10 +49,10 @@ export default function WorkersTab() {
     try {
       if (editing === "new") {
         await api.post("/workers", payload);
-        toast.success("Trabajador agregado — QR generado");
+        toast.success("Empleado agregado — QR generado");
       } else {
         await api.put(`/workers/${editing}`, payload);
-        toast.success("Trabajador actualizado");
+        toast.success("Empleado actualizado");
       }
       await load();
       cancel();
@@ -63,7 +64,7 @@ export default function WorkersTab() {
   };
 
   const remove = async (id) => {
-    if (!window.confirm("¿Eliminar este trabajador?")) return;
+    if (!(await confirmAction("¿Eliminar este empleado?", "Eliminar"))) return;
     try {
       await api.delete(`/workers/${id}`);
       toast.success("Eliminado");
@@ -72,7 +73,7 @@ export default function WorkersTab() {
   };
 
   const regenQr = async (id) => {
-    if (!window.confirm("¿Generar un nuevo QR? El anterior quedará invalidado.")) return;
+    if (!(await confirmAction("¿Generar un nuevo QR? El anterior quedará invalidado.", "Generar"))) return;
     try {
       const { data } = await api.post(`/workers/${id}/regenerate-qr`);
       toast.success("Nuevo QR generado");
@@ -143,7 +144,7 @@ export default function WorkersTab() {
       </style></head><body>
         <button class="print-btn no-print" onclick="window.print()">🖨 Imprimir</button>
         <div class="header">
-          <h1>AgriScan — Credenciales de Trabajador</h1>
+          <h1>AgriScan — Credenciales de Empleado</h1>
           <p>Escanea el QR en el módulo de Asistencia o Cosechar para registrar actividad</p>
         </div>
         <div class="grid">${cards}</div>
@@ -164,7 +165,7 @@ export default function WorkersTab() {
 
       <div className="flex flex-col sm:flex-row gap-2">
         <button onClick={startNew} className="field-btn-primary sm:flex-1" data-testid="add-worker-button">
-          <UserPlus className="w-5 h-5" /> Agregar trabajador
+          <UserPlus className="w-5 h-5" /> Agregar empleado
         </button>
         <button
           onClick={printAllQr}
@@ -179,7 +180,7 @@ export default function WorkersTab() {
       {editing && (
         <div className="field-card p-4 space-y-3" data-testid="worker-form">
           <div className="flex items-center justify-between">
-            <h3 className="font-bold text-[#1A2210]">{editing === "new" ? "Nuevo trabajador" : "Editar trabajador"}</h3>
+            <h3 className="font-bold text-[#1A2210]">{editing === "new" ? "Nuevo empleado" : "Editar empleado"}</h3>
             <button onClick={cancel} className="w-9 h-9 rounded-lg hover:bg-[#F0EDE1]"><X className="w-4 h-4 mx-auto" /></button>
           </div>
           <div className="grid grid-cols-1 gap-3">
@@ -208,7 +209,7 @@ export default function WorkersTab() {
         {loading ? (
           <div className="p-6 flex justify-center text-[#1D4ED8]"><Loader2 className="w-6 h-6 animate-spin" /></div>
         ) : rows.length === 0 ? (
-          <div className="p-6 text-center text-[#556047] font-semibold">Sin trabajadores</div>
+          <div className="p-6 text-center text-[#556047] font-semibold">Sin empleados</div>
         ) : (
           rows.map((r) => (
             <div key={r.id} className="p-3 flex items-center justify-between gap-3" data-testid={`worker-row-${r.id}`}>

@@ -228,7 +228,7 @@ export function receiptTicketHtml(receipt, businessName = "AgriScan") {
   <div class="section-title" style="text-align:center">TOTAL A PAGAR</div>
   <div class="big">${fmtMoney(receipt.total_payment)}</div>
   <hr>
-  <div class="sign">Firma trabajador:</div>
+  <div class="sign">Firma empleado:</div>
   <div class="sign">_______________________</div>
   <div class="footer">${new Date().toLocaleString("es-MX")}<br>Gracias por su trabajo!</div>
   <script>window.onload = () => setTimeout(() => window.print(), 300);</script>

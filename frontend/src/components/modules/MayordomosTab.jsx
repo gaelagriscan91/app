@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, Mail, Shield, Trash2, Ban, CheckCircle2, Pencil, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import { confirmAction } from "@/lib/confirm";
 import api, { formatApiErrorDetail } from "@/lib/api";
 
 const UNLOCK_DAYS = [3, 7, 15, 30];
@@ -84,7 +85,7 @@ export default function MayordomosTab() {
   const onToggleBlock = async (u) => {
     const willBlock = u.active !== false && !isExpired(u);
     if (!willBlock) { setEditing(null); setUnlocking(unlocking === u.id ? null : u.id); return; }
-    if (!window.confirm(`¿Bloquear a ${u.name}?`)) return;
+    if (!(await confirmAction(`¿Bloquear a ${u.name}?`, "Bloquear"))) return;
     try {
       await api.patch(`/admin/mayordomos/${u.id}`, { active: false, name: u.name });
       toast.success(`${u.name} bloqueado`);
@@ -95,7 +96,7 @@ export default function MayordomosTab() {
   };
 
   const onDelete = async (u) => {
-    if (!window.confirm(`¿Eliminar la cuenta de ${u.name}? Se borrará la cuenta y toda su información. No se puede deshacer.`)) return;
+    if (!(await confirmAction(`¿Eliminar la cuenta de ${u.name}? Se borrará la cuenta y toda su información. No se puede deshacer.`, "Eliminar"))) return;
     try {
       await api.delete(`/admin/mayordomos/${u.id}`);
       toast.success("Cuenta eliminada");

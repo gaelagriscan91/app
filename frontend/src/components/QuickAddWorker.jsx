@@ -40,7 +40,7 @@ export default function QuickAddWorker({ open, onClose, onCreated }) {
       reset();
       onClose?.();
     } catch (e) {
-      toast.error("No se pudo guardar el trabajador");
+      toast.error("No se pudo guardar el empleado");
     } finally {
       setSaving(false);
     }
@@ -59,7 +59,7 @@ export default function QuickAddWorker({ open, onClose, onCreated }) {
         <div className="flex items-start justify-between mb-4">
           <div>
             <h3 className="text-xl font-extrabold text-[#1A2210] flex items-center gap-2" style={{ fontFamily: "Outfit, sans-serif" }}>
-              <UserPlus className="w-5 h-5 text-[#1D4ED8]" /> Nuevo trabajador
+              <UserPlus className="w-5 h-5 text-[#1D4ED8]" /> Nuevo empleado
             </h3>
             <p className="text-xs text-[#556047] font-semibold mt-0.5">Se genera un QR automáticamente</p>
           </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Clock, AlertCircle } from "lucide-react";
+import { Loader2, Clock, AlertCircle, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import api, { formatNumber, todayISO } from "@/lib/api";
 
@@ -49,6 +49,23 @@ export default function ListaDia() {
     }
   };
 
+  const [sharing, setSharing] = useState(false);
+  const share = async () => {
+    if (attendance.length === 0 && harvestsByWorker.length === 0) { toast.error("No hay nada que compartir"); return; }
+    setSharing(true);
+    const lines = attendance.map((a) => `• ${a.worker_name}: ${a.check_in_hhmm || "--:--"}${a.check_out_hhmm ? ` → ${a.check_out_hhmm}` : ""}${a.hours ? ` (${formatNumber(a.hours, 2)} h)` : ""}`);
+    const text = [`📋 AgriScan — Lista del día ${date}`, `👥 ${attendance.length} empleado(s) con entrada`, ...lines,
+      ...(missingCheckIn.length ? ["", `⚠️ Sin entrada: ${missingCheckIn.map((w) => w.worker_name).join(", ")}`] : [])].join("\n");
+    try {
+      if (navigator.share) await navigator.share({ title: "Lista del día", text });
+      else { await navigator.clipboard.writeText(text); toast.success("Lista copiada"); }
+    } catch (e) {
+      if (e?.name !== "AbortError") window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+    } finally {
+      setSharing(false);
+    }
+  };
+
   return (
     <div className="space-y-5" data-testid="lista-dia-page">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
@@ -56,8 +73,9 @@ export default function ListaDia() {
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1A2210] tracking-tight" style={{ fontFamily: "Outfit, sans-serif" }}>
             Lista del día
           </h1>
-          <p className="text-sm text-[#556047] font-semibold">Entradas y horas de trabajadores</p>
+          <p className="text-sm text-[#556047] font-semibold">Entradas y horas de empleados</p>
         </div>
+        <div className="flex items-end gap-2">
         <div>
           <label className="block text-xs font-bold text-[#1A2210] mb-1.5 uppercase tracking-wider">Fecha</label>
           <input
@@ -67,6 +85,10 @@ export default function ListaDia() {
             className="field-input !h-12 !text-base"
             data-testid="dia-date-input"
           />
+        </div>
+        <button onClick={share} disabled={sharing} className="h-12 px-4 rounded-xl bg-[#1D4ED8] text-white font-bold flex items-center gap-2 disabled:opacity-60" data-testid="dia-share-button">
+          {sharing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />} Compartir
+        </button>
         </div>
       </div>
 

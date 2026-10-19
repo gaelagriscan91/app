@@ -75,9 +75,9 @@ export const AttendanceRow = memo(function AttendanceRow({ r, place, onDelete })
         {r.check_out && <div className="text-xs text-red-700 font-bold mt-0.5">↓ {formatHHMM(r.check_out)}</div>}
       </div>
       <div className="min-w-0 flex-1 border-l border-[#E2DDD0] pl-3">
-        <div className="text-xs text-[#889078] font-semibold uppercase tracking-wider">Trabajador</div>
+        <div className="text-xs text-[#889078] font-semibold uppercase tracking-wider">Empleado</div>
         <div className="font-bold text-[#1A2210]">{r.worker_name}</div>
-        <div className="text-xs text-[#556047] font-semibold mt-0.5 truncate">{place} — Picking</div>
+        <div className="text-xs text-[#556047] font-semibold mt-0.5 truncate">{place}</div>
       </div>
       <button onClick={() => onDelete(r.id)} className="w-8 h-8 rounded-lg hover:bg-red-50 text-red-600 flex items-center justify-center" data-testid={`attendance-delete-${r.id}`}>
         <Trash2 className="w-4 h-4" />
@@ -249,12 +249,12 @@ export function SummaryView({ data, selectedParcel, harvestsToday = [], date, on
 
   const [sharing, setSharing] = useState(false);
   const shareSummary = async () => {
-    if (data.rows.length === 0) { toast.error("Sin trabajadores para compartir"); return; }
+    if (data.rows.length === 0) { toast.error("Sin empleados para compartir"); return; }
     setSharing(true);
     const text = [
       "📋 AgriScan — Resumen de jornada",
       `${date} · ${loc}`,
-      `👥 ${totalWorkers} trabajadores · ⏱  ${formatHours(totalHoursAll)}`,
+      `👥 ${totalWorkers} empleados · ⏱  ${formatHours(totalHoursAll)}`,
       `🧺 ${totalPieces.toFixed(2)} piezas · ⚖️ ${totalKilos.toFixed(2)}Kg`,
       `💵 Total: ${fmtMoney(totalPayment)}`,
     ].join("\n");
@@ -275,7 +275,7 @@ export function SummaryView({ data, selectedParcel, harvestsToday = [], date, on
 
       <div className="px-4 pt-5">
         <div className="grid grid-cols-4 gap-3 pb-5 border-b border-[#E2DDD0]">
-          <Stat label="Trabajadores" value={totalWorkers} />
+          <Stat label="Empleados" value={totalWorkers} />
           <Stat label="Horas" value={formatHours(totalHoursAll)} smallValue />
           <Stat label="Piezas" value={fmtQty(totalPieces)} />
           <Stat label="Pago" value={fmtMoney(totalPayment)} smallValue />

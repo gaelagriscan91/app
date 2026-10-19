@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, Loader2, X, Save } from "lucide-react";
 import { toast } from "sonner";
+import { confirmAction } from "@/lib/confirm";
 import api from "@/lib/api";
 
 const EMPTY = { name: "", hectares: 0, crop_type: "", location: "", active: true };
@@ -37,7 +38,7 @@ export default function ParcelsTab() {
   };
 
   const remove = async (id) => {
-    if (!window.confirm("¿Eliminar esta parcela?")) return;
+    if (!(await confirmAction("¿Eliminar esta parcela?", "Eliminar"))) return;
     try { await api.delete(`/parcels/${id}`); toast.success("Eliminada"); load(); } catch (e) { toast.error("No se pudo eliminar"); }
   };
 

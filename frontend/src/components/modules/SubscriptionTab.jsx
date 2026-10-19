@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, Mail, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
+import { confirmAction } from "@/lib/confirm";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
@@ -33,7 +34,7 @@ export default function SubscriptionTab() {
   useEffect(() => { load(); }, []);
 
   const cancel = async () => {
-    if (!window.confirm("¿Cancelar tu suscripción de AgriScan? Seguirás teniendo acceso hasta el fin del mes pagado.")) return;
+    if (!(await confirmAction("¿Cancelar tu suscripción de AgriScan? Seguirás teniendo acceso hasta el fin del mes pagado.", "Cancelar suscripción"))) return;
     setCancelling(true);
     try {
       await api.post("/billing/cancel");

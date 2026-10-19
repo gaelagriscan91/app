@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Camera, CameraOff, Keyboard, Users, Loader2, X, ArrowLeft, UserPlus,
-  Search, Sun, Moon, ShoppingBasket, CloudCheck, ChevronRight, MapPin, UserCircle2, LogOut,
+  Search, Sun, Moon, CloudCheck, ChevronRight, MapPin, UserCircle2, LogOut,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { confirmAction } from "@/lib/confirm";
 import api, { formatApiErrorDetail, formatCurrency, formatNumber, todayISO, formatHHMM, fetchCheckinSession, saveCheckinSession } from "@/lib/api";
 import QrScanner from "@/components/QrScanner";
 import QuickAddWorker from "@/components/QuickAddWorker";
@@ -136,7 +137,7 @@ export default function Asistencia() {
   };
 
   const removeAttendance = async (id) => {
-    if (!window.confirm("¿Eliminar este registro?")) return;
+    if (!(await confirmAction("¿Eliminar este registro?", "Eliminar"))) return;
     try { await api.delete(`/attendance/${id}`); toast.success("Eliminado"); load(); }
     catch (e) { toast.error("No se pudo eliminar"); }
   };
@@ -163,7 +164,7 @@ export default function Asistencia() {
   const checkoutAll = async () => {
     const open = data.rows.filter((r) => !r.check_out);
     if (open.length === 0) {
-      toast.info("No hay trabajadores con jornada abierta");
+      toast.info("No hay empleados con jornada abierta");
       setConfirmCheckout(false);
       return;
     }
@@ -186,22 +187,11 @@ export default function Asistencia() {
     setView("checkin");
   };
 
-  const onPicking = () => {
-    if (presentCount === 0) {
-      toast.error("No puedes empezar a cosechar: aún no hay trabajadores con entrada registrada");
-      return;
-    }
-    // Navigate to QR harvest mode with session preloaded (if available)
-    const params = new URLSearchParams({ mode: "qr" });
-    if (session.parcelId) params.set("parcel", session.parcelId);
-    if (session.productId) params.set("product", session.productId);
-    navigate(`/registrar?${params.toString()}`);
-  };
 
   const onCheckOut = () => {
     // Go to the attendance list where each worker has an individual "Salida" button
     if (presentCount === 0) {
-      toast.info("Aún no hay trabajadores con entrada");
+      toast.info("Aún no hay empleados con entrada");
       return;
     }
     setView("checkin");
@@ -340,7 +330,7 @@ export default function Asistencia() {
         <div className="mt-4 text-sm text-white/70 font-semibold capitalize">{prettyDate}</div>
 
         {/* Three Tiles */}
-        <div className="mt-6 grid grid-cols-3 gap-3 sm:gap-4">
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 max-w-sm mx-auto">
           <Tile
             testid="tile-check-in"
             label="Check in"
@@ -349,14 +339,6 @@ export default function Asistencia() {
             colorTo="#2563EB"
             icon={<Sun className="w-9 h-9" strokeWidth={2.3} />}
             badge={presentCount > 0 ? presentCount : null}
-          />
-          <Tile
-            testid="tile-picking"
-            label="Picking"
-            onClick={onPicking}
-            colorFrom="#DD6B6B"
-            colorTo="#B23A3A"
-            icon={<ShoppingBasket className="w-9 h-9" strokeWidth={2.3} />}
           />
           <Tile
             testid="tile-check-out"
@@ -436,7 +418,7 @@ export default function Asistencia() {
             ) : (
               <>
                 <div className="grid grid-cols-2 gap-2 mt-4">
-                  <SummaryCell label="Trabajadores" value={endDaySummary.attendance} />
+                  <SummaryCell label="Empleados" value={endDaySummary.attendance} />
                   <SummaryCell label="Cosechas" value={endDaySummary.harvests} />
                   <SummaryCell label="Piezas" value={formatNumber(endDaySummary.units, 0)} />
                   <SummaryCell label="Horas" value={formatNumber(endDaySummary.total_hours, 2)} />
@@ -483,7 +465,7 @@ export default function Asistencia() {
             </div>
             <h3 className="font-extrabold text-xl text-center mt-3" style={{ fontFamily: "Outfit, sans-serif" }}>Finalizar jornada</h3>
             <p className="text-center text-sm text-[#556047] font-semibold mt-1">
-              Se marcará la salida de <b>{openCount}</b> trabajador(es) con jornada abierta.
+              Se marcará la salida de <b>{openCount}</b> empleado(s) con jornada abierta.
             </p>
             <div className="mt-5 grid grid-cols-2 gap-2">
               <button
@@ -725,7 +707,7 @@ function CheckInView(props) {
                   <button
                     onClick={() => {
                       setShowCheckoutMenu(false);
-                      if (openCount === 0) { toast.info("No hay trabajadores con jornada abierta"); return; }
+                      if (openCount === 0) { toast.info("No hay empleados con jornada abierta"); return; }
                       setConfirmCheckout(true);
                     }}
                     className="w-full text-left px-4 py-3 text-sm font-bold text-[#1A2210] hover:bg-[#F7F5EE] flex items-center gap-2 border-b border-[#F0EDE1]"
@@ -736,7 +718,7 @@ function CheckInView(props) {
                   <button
                     onClick={() => {
                       setShowCheckoutMenu(false);
-                      if (openCount === 0) { toast.info("No hay trabajadores con jornada abierta"); return; }
+                      if (openCount === 0) { toast.info("No hay empleados con jornada abierta"); return; }
                       setView("hub");
                       setTimeout(() => {
                         document.querySelector('[data-testid^="hub-checkout-"]')?.scrollIntoView({ behavior: "auto", block: "nearest" });
@@ -905,7 +887,7 @@ function CheckInView(props) {
           <div className="flex justify-center py-6 text-[#1D4ED8]"><Loader2 className="w-6 h-6 animate-spin" /></div>
         ) : data.rows.length === 0 ? (
           <p className="text-center text-[#556047] font-semibold py-6" data-testid="attendance-empty">
-            Aún no hay trabajadores registrados hoy
+            Aún no hay empleados registrados hoy
           </p>
         ) : (
           <>
@@ -959,7 +941,7 @@ function CheckInView(props) {
                 type="text"
                 value={manualSearch}
                 onChange={(e) => setManualSearch(e.target.value)}
-                placeholder="Buscar trabajador…"
+                placeholder="Buscar empleado…"
                 className="field-input !h-11 !text-base w-full mb-2"
                 data-testid="manual-search-input"
               />
@@ -979,7 +961,7 @@ function CheckInView(props) {
               <ul className="flex-1 overflow-y-auto divide-y divide-[#E2DDD0] -mx-1 border border-[#E2DDD0] rounded-xl" data-testid="manual-worker-list">
                 {list.length === 0 ? (
                   <li className="px-4 py-6 text-center text-sm text-[#556047] font-semibold">
-                    {eligible.length === 0 ? "Todos los trabajadores ya tienen entrada hoy." : "Sin coincidencias."}
+                    {eligible.length === 0 ? "Todos los empleados ya tienen entrada hoy." : "Sin coincidencias."}
                   </li>
                 ) : list.slice(0, manualLimit).map((w) => (
                   <ManualWorkerRow key={w.id} w={w} selected={manualSelected.has(w.id)} setSelected={setManualSelected} />
@@ -1018,7 +1000,7 @@ function CheckInView(props) {
               <h3 className="font-bold text-lg">Mover cuadrilla</h3>
               <button onClick={() => setShowCrewPicker2(false)}><X className="w-5 h-5" /></button>
             </div>
-            <p className="text-sm text-[#556047] mb-3 font-semibold">Registra la entrada de todos los trabajadores de una cuadrilla</p>
+            <p className="text-sm text-[#556047] mb-3 font-semibold">Registra la entrada de todos los empleados de una cuadrilla</p>
             <div className="space-y-2 max-h-80 overflow-auto">
               {crews.map((c) => (
                 <button
@@ -1029,7 +1011,7 @@ function CheckInView(props) {
                 >
                   <div className="font-bold text-[#1A2210]">{c.name}</div>
                   <div className="text-xs text-[#556047] font-semibold mt-0.5">
-                    {c.boss?.name ? `Jefe: ${c.boss.name} • ` : ""}{c.worker_count} trabajador(es)
+                    {c.boss?.name ? `Jefe: ${c.boss.name} • ` : ""}{c.worker_count} empleado(s)
                   </div>
                 </button>
               ))}

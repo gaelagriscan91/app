@@ -355,8 +355,7 @@ export default function Reportes() {
       {/* Resumen por trabajador — detailed */}
       <div className="field-card p-4 sm:p-5" data-testid="report-workers-summary">
         <h3 className="text-base font-bold text-[#1A2210] mb-3 flex items-center gap-2" style={{ fontFamily: "Outfit, sans-serif" }}>
-          <FileText className="w-5 h-5 text-[#1D4ED8]" /> Resumen por trabajador
-        </h3>
+          <FileText className="w-5 h-5 text-[#1D4ED8]" /> Resumen por empleado        </h3>
         {receipts.length === 0 ? (
           <div className="text-sm text-[#556047] font-semibold text-center py-4">Sin resultados</div>
         ) : (
@@ -458,7 +457,7 @@ export default function Reportes() {
             <p className="text-sm text-[#556047] font-semibold mb-3">
               Esta acción es <b className="text-red-700">irreversible</b>. Se eliminarán todas las cosechas
               {resetIncludeAttendance ? " y las asistencias" : ""} de tu cuenta.
-              Los trabajadores, parcelas y productos NO se tocan.
+              Los empleados, parcelas y productos NO se tocan.
             </p>
             <label className="flex items-center gap-2 text-sm font-semibold text-[#1A2210] mb-3 cursor-pointer select-none">
               <input

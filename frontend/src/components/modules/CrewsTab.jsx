@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, Loader2, Users, X, Save, UserCog } from "lucide-react";
 import { toast } from "sonner";
+import { confirmAction } from "@/lib/confirm";
 import api from "@/lib/api";
 
 const EMPTY = { name: "", boss_worker_id: "", worker_ids: [], notes: "", active: true };
@@ -62,7 +63,7 @@ export default function CrewsTab() {
   };
 
   const remove = async (id) => {
-    if (!window.confirm("¿Eliminar esta cuadrilla? Los trabajadores no se eliminan.")) return;
+    if (!(await confirmAction("¿Eliminar esta cuadrilla? Los empleados no se eliminan.", "Eliminar"))) return;
     try { await api.delete(`/crews/${id}`); toast.success("Eliminada"); load(); }
     catch (e) { toast.error("No se pudo eliminar"); }
   };
@@ -94,10 +95,10 @@ export default function CrewsTab() {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-[#1A2210] mb-1 uppercase tracking-wider">Trabajadores ({form.worker_ids.length})</label>
+            <label className="block text-xs font-bold text-[#1A2210] mb-1 uppercase tracking-wider">Empleados ({form.worker_ids.length})</label>
             <div className="max-h-56 overflow-y-auto rounded-xl border-2 border-[#E2DDD0] p-2 space-y-1 bg-white">
               {workers.length === 0 ? (
-                <p className="text-sm text-[#556047] font-semibold p-2">Primero crea trabajadores</p>
+                <p className="text-sm text-[#556047] font-semibold p-2">Primero crea empleados</p>
               ) : (
                 workers.map((w) => (
                   <label key={w.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-[#F7F5EE] cursor-pointer">
@@ -137,7 +138,7 @@ export default function CrewsTab() {
           <div className="field-card p-6 flex justify-center text-[#1D4ED8]"><Loader2 className="w-6 h-6 animate-spin" /></div>
         ) : rows.length === 0 ? (
           <div className="field-card p-6 text-center text-[#556047] font-semibold">
-            Sin cuadrillas aún. Crea una para agrupar trabajadores con su jefe.
+            Sin cuadrillas aún. Crea una para agrupar empleados con su jefe.
           </div>
         ) : (
           rows.map((r) => (
@@ -155,7 +156,7 @@ export default function CrewsTab() {
                     </div>
                   )}
                   <div className="text-xs text-[#556047] font-semibold mt-2 flex items-center gap-1">
-                    <Users className="w-3.5 h-3.5" /> {r.worker_count} trabajador{r.worker_count !== 1 ? "es" : ""}
+                    <Users className="w-3.5 h-3.5" /> {r.worker_count} empleado{r.worker_count !== 1 ? "s" : ""}
                   </div>
                   {r.workers?.length > 0 && (
                     <div className="text-xs text-[#889078] mt-1 truncate">

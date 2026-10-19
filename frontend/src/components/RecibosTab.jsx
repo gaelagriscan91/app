@@ -148,7 +148,7 @@ function receiptHtml(receipt, businessName = "AgriScan") {
   ` : ""}
 
   <div class="signature">
-    <div class="sign-box">Firma del trabajador</div>
+    <div class="sign-box">Firma del empleado</div>
     <div class="sign-box">Firma del supervisor</div>
   </div>
 
@@ -262,7 +262,7 @@ export default function RecibosTab() {
         },
         responseType: "blob",
       })).data;
-      const filename = `recibo_${(r.worker_name || "trabajador").replace(/\s+/g, "_")}_${r.date_to || todayISO()}.xlsx`;
+      const filename = `recibo_${(r.worker_name || "empleado").replace(/\s+/g, "_")}_${r.date_to || todayISO()}.xlsx`;
       const text = buildReceiptText(r);
       const result = await shareOrDownloadBlob(blob, filename, text);
       if (result === "shared") toast.success("Recibo compartido");
@@ -296,7 +296,7 @@ export default function RecibosTab() {
       const text = [
         "📋 AgriScan — Recibos del periodo",
         `${dateFrom || "—"} → ${dateTo || "—"}`,
-        `${rows.length} trabajador${rows.length !== 1 ? "es" : ""} • Nómina: ${fmtMoney(totals.payment)}`,
+        `${rows.length} empleado${rows.length !== 1 ? "s" : ""} • Nómina: ${fmtMoney(totals.payment)}`,
       ].join("\n");
       const result = await shareOrDownloadBlob(blob, filename, text);
       if (result === "shared") toast.success("Recibos compartidos");
@@ -454,7 +454,7 @@ export default function RecibosTab() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-bold text-[#1A2210] mb-1 uppercase tracking-wider">Trabajador</label>
+            <label className="block text-xs font-bold text-[#1A2210] mb-1 uppercase tracking-wider">Empleado</label>
             <select value={workerId} onChange={(e) => setWorkerId(e.target.value)} className="field-input !h-12 !text-base" data-testid="recibos-worker">
               <option value="">Todos</option>
               {workers.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
@@ -553,7 +553,7 @@ export default function RecibosTab() {
             <div className="font-mono-stat text-xl sm:text-2xl mt-1">{formatNumber(totals.hours, 2)}</div>
           </div>
           <div className="rounded-2xl bg-white border-2 border-[#E2DDD0] text-[#1A2210] p-4 shadow-sm" data-testid="recibos-total-workers">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-[#556047] flex items-center gap-1"><Users className="w-3.5 h-3.5" /> Trabajadores</div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-[#556047] flex items-center gap-1"><Users className="w-3.5 h-3.5" /> Empleados</div>
             <div className="font-mono-stat text-xl sm:text-2xl mt-1">{rows.length}</div>
           </div>
           <div className="rounded-2xl bg-[#DC2626] text-white p-4 border-2 border-[#B91C1C] shadow-sm" data-testid="recibos-total-payment">

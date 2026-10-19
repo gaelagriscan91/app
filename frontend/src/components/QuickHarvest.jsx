@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { QrCode, Printer, Loader2, ArrowLeft, Trash2, X, UserPlus } from "lucide-react";
 import { toast } from "sonner";
+import { confirmAction } from "@/lib/confirm";
 import api, { formatApiErrorDetail, formatCurrency, todayISO, fetchCheckinSession, saveCheckinSession } from "@/lib/api";
 import QrScanner from "@/components/QrScanner";
 import { thermalPrinter } from "@/lib/thermalPrinter";
@@ -120,7 +121,7 @@ function EditRecord({ rec, onClose, onDone }) {
       block: rec.block || "", variety: rec.variety || "", mayordomo: rec.mayordomo || "", grower: rec.grower || "", unit_type: rec.unit_type || "",
     }), "Registro corregido");
   };
-  const remove = () => { if (window.confirm(`¿Borrar el registro de ${rec.worker_name}?`)) run(() => api.delete(`/harvests/${rec.id}`), "Registro borrado"); };
+  const remove = async () => { if (await confirmAction(`¿Borrar el registro de ${rec.worker_name}?`, "Borrar")) run(() => api.delete(`/harvests/${rec.id}`), "Registro borrado"); };
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center" onClick={onClose} data-testid="quick-edit-dialog">
       <div className="bg-white w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
@@ -167,7 +168,7 @@ function DayTotals({ rows, mode }) {
 function Records({ rows, setRows, loading, onBack, onSelect }) {
   const [deleting, setDeleting] = useState(() => new Set());
   const remove = async (h) => {
-    if (deleting.has(h.id) || !window.confirm(`¿Borrar el escaneo de ${h.worker_name}?`)) return;
+    if (deleting.has(h.id) || !(await confirmAction(`¿Borrar el escaneo de ${h.worker_name}?`, "Borrar"))) return;
     setDeleting((s) => new Set(s).add(h.id));
     const prev = rows;
     setRows((list) => list.filter((r) => r.id !== h.id));
@@ -182,7 +183,7 @@ function Records({ rows, setRows, loading, onBack, onSelect }) {
     }
   };
   return (
-    <div className="flex-1 overflow-y-auto bg-[#E9E9E9]" data-testid="quick-records">
+    <div className="flex-1 overflow-y-auto bg-white/40" data-testid="quick-records">
       <button onClick={onBack} className="flex items-center gap-2 px-4 py-3 text-[#1D4ED8] font-bold" data-testid="quick-records-back">
         <ArrowLeft className="w-5 h-5" /> Escanear
       </button>
@@ -313,7 +314,7 @@ export default function QuickHarvest() {
   if (scanning) return <QrScanner fullscreen active onScan={onScan} onClose={() => setScanning(false)} title="Escanea el QR del empleado" />;
 
   return (
-    <div className="flex flex-col min-h-[calc(100dvh-170px)] bg-[#E9E9E9] -mx-4 -my-4 sm:mx-0 sm:my-0 sm:rounded-2xl overflow-hidden" data-testid="quick-harvest">
+    <div className="flex flex-col min-h-[calc(100dvh-170px)] bg-white/30 -mx-4 -my-4 sm:mx-0 sm:my-0 sm:rounded-2xl overflow-hidden" data-testid="quick-harvest">
       {view === "records" ? (
         <Records rows={rows} setRows={setRows} loading={loadingRows} onBack={() => setView("scan")} onSelect={setEditing} />
       ) : (

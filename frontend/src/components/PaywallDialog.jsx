@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/compone
 
 export const SUPPORT_EMAIL = "gaelagriscan@gmail.com";
 
-const PERKS = ["Registrar cosechas y escanear QR", "Check in / Check out de trabajadores", "Exportar recibos y reportes a Excel"];
+const PERKS = ["Registrar cosechas y escanear QR", "Check in / Check out de empleados", "Exportar recibos y reportes a Excel"];
 
 export default function PaywallDialog() {
   const { paywallOpen, setPaywallOpen, refresh, user, blocked } = useAuth();

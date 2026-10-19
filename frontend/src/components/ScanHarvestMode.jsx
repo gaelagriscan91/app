@@ -6,6 +6,7 @@ import {
   DollarSign, X, UserPlus, ListChecks, Users, Check,
 } from "lucide-react";
 import { toast } from "sonner";
+import { confirmAction } from "@/lib/confirm";
 import api, { formatCurrency, formatNumber, formatApiErrorDetail, todayISO, fetchCheckinSession, saveCheckinSession } from "@/lib/api";
 
 // Short "ding" via Web Audio API
@@ -388,7 +389,7 @@ export default function ScanHarvestMode() {
   // Example: 1/2 -> delta = 0.5 - 1 = -0.5 so last entry becomes 0.5 instead of 1.
   const markLastAs = (fraction) => {
     if (!lastWorker) {
-      toast.error("Primero escanea un trabajador");
+      toast.error("Primero escanea un empleado");
       return;
     }
     if (shareMode) {
@@ -409,9 +410,9 @@ export default function ScanHarvestMode() {
     });
   };
 
-  const resetTally = () => {
+  const resetTally = async () => {
     if (Object.keys(tally).length === 0) return;
-    if (!window.confirm("¿Reiniciar conteos?")) return;
+    if (!(await confirmAction("¿Reiniciar conteos?"))) return;
     setTally({});
     setLastWorker(null);
   };
@@ -508,7 +509,7 @@ export default function ScanHarvestMode() {
         });
       }
       const totalPayment = entries.reduce((s, [, v]) => s + v.count * price, 0);
-      toast.success(`Guardado: ${entries.length} trabajador(es) · ${formatCurrency(totalPayment)}`, { duration: 2500 });
+      toast.success(`Guardado: ${entries.length} empleado(s) · ${formatCurrency(totalPayment)}`, { duration: 2500 });
       setTally({});
       setShareBuffer([]);
       setShareBaskets(0);
@@ -773,7 +774,7 @@ export default function ScanHarvestMode() {
           </div>
         ) : (
           <div className="px-4 py-5 text-center text-sm font-bold opacity-85" data-testid="scan-bottom-empty">
-            {shareMode ? "Escanea trabajadores para compartir la canasta…" : "Enfoca el QR del trabajador…"}
+            {shareMode ? "Escanea empleados para compartir la canasta…" : "Enfoca el QR del empleado…"}
           </div>
         )}
 
@@ -782,7 +783,7 @@ export default function ScanHarvestMode() {
           <div className="flex-1 bg-black/20 rounded-xl px-3 py-2">
             {shareMode && shareBuffer.length > 0 ? (
               <>
-                <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">Pago por trabajador</div>
+                <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">Pago por empleado</div>
                 <div className="flex items-center gap-3 mt-0.5">
                   <div className="font-mono-stat text-lg leading-none">
                     {shareBuffer.length}👤
@@ -871,7 +872,7 @@ export default function ScanHarvestMode() {
               data-testid="scan-manual-select"
               autoFocus
             >
-              <option value="">— Elegir trabajador —</option>
+              <option value="">— Elegir empleado —</option>
               {workers.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
             </select>
             <button

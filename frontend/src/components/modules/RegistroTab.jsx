@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, Trash2, Calendar, Users, Clock, DollarSign, FileText, ChevronRight, X } from "lucide-react";
 import { toast } from "sonner";
+import { confirmAction } from "@/lib/confirm";
 import api, { formatCurrency, formatNumber } from "@/lib/api";
 
 function fmtDate(iso) {
@@ -52,10 +53,10 @@ export default function RegistroTab() {
   };
 
   const deleteOne = async (id) => {
-    if (!window.confirm("¿Eliminar este recibo guardado?")) return;
+    if (!(await confirmAction("¿Mandar este recibo al Basurero? Podrás recuperarlo durante 60 días.", "Borrar"))) return;
     try {
       await api.delete(`/receipts/history/${id}`);
-      toast.success("Recibo eliminado");
+      toast.success("Recibo enviado al Basurero");
       setRows((prev) => prev.filter((r) => r.id !== id));
       if (selected?.id === id) setSelected(null);
     } catch (_) {
@@ -98,6 +99,7 @@ export default function RegistroTab() {
           {rows.map((r) => (
             <button
               key={r.id}
+              type="button"
               onClick={() => openDetail(r.id)}
               className="w-full text-left field-card p-4 hover:border-[#1D4ED8] transition-all"
               data-testid={`registro-item-${r.id}`}
@@ -123,14 +125,15 @@ export default function RegistroTab() {
                   )}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <button
+                  <span
+                    role="button"
                     onClick={(e) => { e.stopPropagation(); deleteOne(r.id); }}
-                    className="w-9 h-9 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center"
+                    className="w-11 h-11 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center cursor-pointer"
                     data-testid={`registro-delete-${r.id}`}
                     title="Eliminar"
                   >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                    <Trash2 className="w-5 h-5" />
+                  </span>
                   <ChevronRight className="w-5 h-5 text-[#889078]" />
                 </div>
               </div>
@@ -185,7 +188,7 @@ export default function RegistroTab() {
                     <div className="font-mono-stat text-base mt-0.5">{formatNumber(selected.total_hours, 2)}</div>
                   </div>
                   <div className="rounded-xl bg-white border-2 border-[#E2DDD0] p-2.5">
-                    <div className="text-[9px] font-bold uppercase tracking-wider text-[#556047]">Trab.</div>
+                    <div className="text-[9px] font-bold uppercase tracking-wider text-[#556047]">Emp.</div>
                     <div className="font-mono-stat text-base mt-0.5 text-[#1A2210]">{selected.workers_count}</div>
                   </div>
                   <div className="rounded-xl bg-white border-2 border-[#E2DDD0] p-2.5">

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, Loader2, X, Save, Scale, Hash, Package2 } from "lucide-react";
 import { toast } from "sonner";
+import { confirmAction } from "@/lib/confirm";
 import api, { formatCurrency } from "@/lib/api";
 
 const EMPTY = {
@@ -59,7 +60,7 @@ export default function ProductsTab() {
   };
 
   const remove = async (id) => {
-    if (!window.confirm("¿Eliminar este producto?")) return;
+    if (!(await confirmAction("¿Eliminar este producto?", "Eliminar"))) return;
     try { await api.delete(`/products/${id}`); toast.success("Eliminado"); load(); }
     catch (e) { toast.error("No se pudo eliminar"); }
   };

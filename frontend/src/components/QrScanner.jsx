@@ -115,7 +115,7 @@ export default function QrScanner({ onScan, active = true, fullscreen = false, o
       {!starting && !error && (
         <div className="flex items-center justify-center gap-2 text-xs text-[#556047] font-semibold">
           <Camera className="w-4 h-4" />
-          {running ? "Enfoca el QR del trabajador" : "Cámara detenida"}
+          {running ? "Enfoca el QR del empleado" : "Cámara detenida"}
         </div>
       )}
     </div>

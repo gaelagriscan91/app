@@ -66,7 +66,7 @@ export default function AppLayout() {
   };
 
   return (
-    <div className="app-shell flex flex-col bg-[#F7F5EE]">
+    <div className="app-shell flex flex-col field-bg">
       {/* Header */}
       <header className="bg-[#1D4ED8] text-white shrink-0 relative z-40 shadow-md">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">

@@ -1699,10 +1699,48 @@ async def get_receipt_history(hid: str, user: CurrentUser):
 
 @api_router.delete("/receipts/history/{hid}")
 async def delete_receipt_history(hid: str, user: CurrentUser):
-    try:
-        res = await db.receipts_history.delete_one({"_id": ObjectId(hid), **scope_filter(user)})
-    except Exception:
-        raise HTTPException(status_code=400, detail="ID inválido")
+    d = await db.receipts_history.find_one({"_id": _oid(hid), **scope_filter(user)})
+    if not d:
+        raise HTTPException(status_code=404, detail="No encontrado")
+    d["deleted_at"] = datetime.now(timezone.utc).isoformat()
+    await db.receipts_trash.insert_one(d)
+    await db.receipts_history.delete_one({"_id": d["_id"]})
+    return {"ok": True}
+
+
+TRASH_DAYS = 60
+
+
+async def _purge_trash():
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=TRASH_DAYS)).isoformat()
+    await db.receipts_trash.delete_many({"deleted_at": {"$lt": cutoff}})
+
+
+@api_router.get("/receipts/trash")
+async def list_receipt_trash(user: CurrentUser):
+    await _purge_trash()
+    out = []
+    async for d in db.receipts_trash.find({**scope_filter(user)}).sort("deleted_at", -1).limit(500):
+        d["id"] = str(d.pop("_id"))
+        d.pop("rows", None)
+        out.append(d)
+    return out
+
+
+@api_router.post("/receipts/trash/{hid}/restore")
+async def restore_receipt_trash(hid: str, user: CurrentUser):
+    d = await db.receipts_trash.find_one({"_id": _oid(hid), **scope_filter(user)})
+    if not d:
+        raise HTTPException(status_code=404, detail="No encontrado")
+    d.pop("deleted_at", None)
+    await db.receipts_history.insert_one(d)
+    await db.receipts_trash.delete_one({"_id": d["_id"]})
+    return {"ok": True}
+
+
+@api_router.delete("/receipts/trash/{hid}")
+async def purge_receipt_trash(hid: str, user: CurrentUser):
+    res = await db.receipts_trash.delete_one({"_id": _oid(hid), **scope_filter(user)})
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="No encontrado")
     return {"ok": True}
@@ -2321,6 +2359,7 @@ PACIFIC = ZoneInfo("America/Los_Angeles")
 
 async def _daily_close():
     """Save a receipt per owner/day for past days, then delete those harvests."""
+    await _purge_trash()
     today = datetime.now(PACIFIC).date().isoformat()
     groups = await db.harvests.aggregate([
         {"$match": {"date": {"$lt": today}}},

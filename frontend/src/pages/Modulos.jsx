@@ -1,15 +1,15 @@
 import { useState } from "react";
-import { Users, UserCog, Shield, FileText, LifeBuoy } from "lucide-react";
+import { Users, Trash2, Shield, FileText, LifeBuoy } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import WorkersTab from "@/components/modules/WorkersTab";
-import MayordomoReceiptsTab from "@/components/modules/MayordomoReceiptsTab";
+import BasureroTab from "@/components/modules/BasureroTab";
 import MayordomosTab from "@/components/modules/MayordomosTab";
 import RegistroTab from "@/components/modules/RegistroTab";
 import SubscriptionTab from "@/components/modules/SubscriptionTab";
 
 const baseTabs = [
-  { id: "workers", label: "Trabajadores", Icon: Users, testid: "tab-workers" },
-  { id: "crews", label: "Cuadrilla", Icon: UserCog, testid: "tab-crews" },
+  { id: "workers", label: "Empleados", Icon: Users, testid: "tab-workers" },
+  { id: "trash", label: "Basurero", Icon: Trash2, testid: "tab-trash" },
   { id: "registro", label: "Registro", Icon: FileText, testid: "tab-registro" },
 ];
 
@@ -47,7 +47,7 @@ export default function Modulos() {
       </div>
 
       {tab === "workers" && <WorkersTab />}
-      {tab === "crews" && <MayordomoReceiptsTab />}
+      {tab === "trash" && <BasureroTab />}
       {tab === "registro" && <RegistroTab />}
       {tab === "mayordomos" && isAdmin && <MayordomosTab />}
       {tab === "plan" && !isAdmin && <SubscriptionTab />}
