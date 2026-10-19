@@ -32,6 +32,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from bson import ObjectId
 from openpyxl import Workbook
+from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 
 # ---------------------------------------------------------------------------
@@ -1352,6 +1353,7 @@ async def receipts(
             prod = product_cache.get(h.get("product_id"))
             parc = parcel_cache.get(h.get("parcel_id"))
             harvest_lines.append({
+                "id": str(h.get("_id", "")),
                 "date": h.get("date"),
                 "product_name": prod["name"] if prod else "—",
                 "parcel_name": parc["name"] if parc else "—",
@@ -1434,6 +1436,126 @@ def _hhmm_local(iso_ts: Optional[str], tz_offset_minutes: int = 0) -> str:
 # ---------------------------------------------------------------------------
 # Receipts Export — aggregated per worker (one row per trabajador)
 # ---------------------------------------------------------------------------
+WEEKDAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+
+
+async def _payroll(user: dict, week: str, grower: str) -> dict:
+    from datetime import date as _date
+    try:
+        d0 = _date.fromisoformat(week)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Fecha inválida")
+    monday = d0 - timedelta(days=d0.weekday())
+    days = [(monday + timedelta(days=i)).isoformat() for i in range(7)]
+    seen, lines = set(), []
+
+    def add(wid, wname, h):
+        hd = h.get("date", "")
+        if hd not in days:
+            return
+        key = h.get("id") or (wid, hd, h.get("created_at", ""), h.get("units"), h.get("payment"))
+        if key in seen:
+            return
+        seen.add(key)
+        lines.append((wid, wname, h))
+
+    async for snap in db.receipts_history.find({**scope_filter(user), "date_from": {"$lte": days[-1]}, "date_to": {"$gte": days[0]}}):
+        for r in snap.get("rows", []) or []:
+            for h in r.get("harvests", []) or []:
+                add(r.get("worker_id"), r.get("worker_name"), h)
+    for r in await receipts(user=user, date_from=days[0], date_to=days[-1], worker_id=None, crew_id=None):
+        for h in r.get("harvests", []) or []:
+            add(r.get("worker_id"), r.get("worker_name"), h)
+
+    growers = sorted({(h.get("grower") or "").strip() for _, _, h in lines if (h.get("grower") or "").strip()})
+    g = (grower or "").strip().lower()
+    if g:
+        lines = [x for x in lines if (x[2].get("grower") or "").strip().lower() == g]
+
+    workers, prices, mayordomos = {}, {d: {} for d in days}, []
+    for wid, wname, h in lines:
+        w = workers.setdefault(wid, {"worker_name": wname, "days": {d: {"units": 0.0, "payment": 0.0} for d in days}})
+        cell = w["days"][h["date"]]
+        cell["units"] += float(h.get("units", 0) or h.get("kilos", 0) or 0)
+        cell["payment"] += float(h.get("payment", 0))
+        p = float(h.get("price_per_unit", 0) or h.get("price_per_kg", 0) or 0)
+        prices[h["date"]][p] = prices[h["date"]].get(p, 0) + 1
+        m = (h.get("mayordomo") or "").strip()
+        if m and m not in mayordomos:
+            mayordomos.append(m)
+
+    rows = []
+    for w in sorted(workers.values(), key=lambda x: (x["worker_name"] or "").lower()):
+        cells = [{"units": round(w["days"][d]["units"], 2), "payment": round(w["days"][d]["payment"], 2)} for d in days]
+        rows.append({"worker_name": w["worker_name"], "days": cells, "total": round(sum(c["payment"] for c in cells), 2)})
+    return {
+        "week_start": days[0], "week_end": days[-1],
+        "days": [{"date": d, "name": WEEKDAYS[i], "price": max(prices[d], key=prices[d].get) if prices[d] else 0} for i, d in enumerate(days)],
+        "growers": growers, "grower": grower or "", "mayordomo": ", ".join(mayordomos),
+        "rows": rows, "total": round(sum(r["total"] for r in rows), 2),
+    }
+
+
+@api_router.get("/payroll")
+async def payroll(user: CurrentUser, week: str, grower: Optional[str] = ""):
+    return await _payroll(user, week, grower)
+
+
+@api_router.get("/payroll/export")
+async def payroll_export(user: CurrentUser, week: str, grower: Optional[str] = ""):
+    await ensure_not_blocked(user)
+    data = await _payroll(user, week, grower)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Payroll"
+    bold = Font(bold=True)
+    gray = PatternFill("solid", fgColor="C0C0C0")
+    thin = Side(style="thin", color="999999")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    ws["A1"] = "Grower"; ws["A1"].font = Font(bold=True, size=14)
+    ws["B1"] = data["grower"] or "Todos"
+    ws["F1"] = "Mayordomo"; ws["F1"].font = Font(bold=True, size=14)
+    ws["H1"] = data["mayordomo"]
+    last = 2 + 7 * 2
+    for i, d in enumerate(data["days"]):
+        c = 2 + i * 2
+        ws.merge_cells(start_row=3, start_column=c, end_row=3, end_column=c + 1)
+        ws.merge_cells(start_row=4, start_column=c, end_row=4, end_column=c + 1)
+        ws.cell(3, c, d["name"])
+        ws.cell(4, c, datetime.fromisoformat(d["date"]).strftime("%m-%d-%y"))
+        ws.cell(5, c, "Pieza")
+        ws.cell(5, c + 1, f"Precio ${d['price']:.2f}" if d["price"] else "Precio")
+    ws.cell(4, 1, "Fecha"); ws.cell(5, 1, "Nombre Empleados"); ws.cell(3, last, "$")
+    ws.merge_cells(start_row=3, start_column=last, end_row=5, end_column=last)
+    for r in range(3, 6):
+        for c in range(1, last + 1):
+            cell = ws.cell(r, c)
+            cell.font = bold; cell.fill = gray; cell.border = border
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    ws.cell(4, 1).alignment = Alignment(horizontal="right")
+    row_i = 6
+    for r in data["rows"]:
+        ws.cell(row_i, 1, r["worker_name"])
+        for i, d in enumerate(r["days"]):
+            c = 2 + i * 2
+            if d["units"]:
+                ws.cell(row_i, c, d["units"])
+                ws.cell(row_i, c + 1, d["payment"]).number_format = '"$"#,##0.00'
+        ws.cell(row_i, last, r["total"]).number_format = '"$"#,##0.00'
+        for c in range(1, last + 1):
+            ws.cell(row_i, c).border = border
+        row_i += 1
+    ws.column_dimensions["A"].width = 24
+    for c in range(2, last + 1):
+        ws.column_dimensions[get_column_letter(c)].width = 10
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    name = f"payroll_{data['week_start']}.xlsx"
+    return StreamingResponse(buf, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                             headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
 @api_router.get("/receipts/export")
 async def receipts_export(
     user: CurrentUser,
