@@ -86,7 +86,7 @@ export default function ListaDia() {
             data-testid="dia-date-input"
           />
         </div>
-        <button onClick={share} disabled={sharing} className="h-12 px-4 rounded-xl bg-[#1D4ED8] text-white font-bold flex items-center gap-2 disabled:opacity-60" data-testid="dia-share-button">
+        <button onClick={share} disabled={sharing || loading} className="h-12 px-4 rounded-xl bg-[#1D4ED8] text-white font-bold flex items-center gap-2 disabled:opacity-60" data-testid="dia-share-button">
           {sharing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />} Compartir
         </button>
         </div>

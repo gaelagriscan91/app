@@ -28,13 +28,13 @@ export default function Modulos() {
         </h1>
       </div>
 
-      <div className="field-card p-1.5 flex gap-1.5 overflow-x-auto">
+      <div className="field-card p-1.5 grid grid-cols-2 sm:flex gap-1.5">
         {tabs.map(({ id, label, Icon, testid }) => (
           <button
             key={id}
             onClick={() => setTab(id)}
             data-testid={testid}
-            className={`flex-1 min-w-fit flex items-center justify-center gap-2 h-11 px-4 rounded-xl font-bold text-sm transition-all ${
+            className={`sm:flex-1 flex items-center justify-center gap-2 h-11 px-3 rounded-xl font-bold text-sm transition-all ${
               tab === id
                 ? "bg-[#1D4ED8] text-white shadow-md"
                 : "text-[#556047] hover:bg-[#F0EDE1]"

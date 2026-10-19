@@ -130,8 +130,15 @@ h4 {
 
 /* Farm field background for all screens */
 .field-bg {
+    position: relative;
+    isolation: isolate;
+}
+.field-bg::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
     background-image: linear-gradient(rgba(247, 245, 238, 0.78), rgba(247, 245, 238, 0.86)), url("./assets/field-bg.jpg");
     background-size: cover;
     background-position: center;
-    background-attachment: fixed;
 }

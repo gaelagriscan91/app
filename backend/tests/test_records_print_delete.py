@@ -20,6 +20,7 @@ def client():
     yield s
     for rid in s.created_receipts:
         s.delete(f"{BASE_URL}/receipts/history/{rid}")
+        s.delete(f"{BASE_URL}/receipts/trash/{rid}")
     for w in s.get(f"{BASE_URL}/workers").json():
         if w["name"].startswith("TEST_RPD"):
             for h in s.get(f"{BASE_URL}/harvests", params={"worker_id": w["id"]}).json():

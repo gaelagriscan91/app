@@ -101,4 +101,5 @@ def test_delete_covered_by_receipt_allowed(ctx, client):
         assert client.get(f"{BASE_URL}/receipts/history/{rid}").json()["total_payment"] == 0
     finally:
         client.delete(f"{BASE_URL}/receipts/history/{rid}")
+        client.delete(f"{BASE_URL}/receipts/trash/{rid}")
         client.delete(f"{BASE_URL}/harvests/{h['id']}")
