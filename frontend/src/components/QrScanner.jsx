@@ -1,29 +1,23 @@
 import { useEffect, useRef, useState } from "react";
-import { Html5Qrcode } from "html5-qrcode";
+import jsQR from "jsqr";
 import { Camera, CameraOff, X } from "lucide-react";
+import { acquireCamera, releaseCamera } from "@/lib/cameraStream";
 
-/**
- * QR Scanner component. Calls onScan(decodedText) on each successful scan.
- * The parent is responsible for stopping/restarting via `active` prop.
- * When `fullscreen` is true, renders as an overlay filling the viewport.
- */
 export default function QrScanner({ onScan, active = true, fullscreen = false, onClose, title = "Enfoca el QR" }) {
-  const containerId = "qr-reader-container";
-  const scannerRef = useRef(null);
+  const videoRef = useRef(null);
+  const loopRef = useRef(0);
+  const onScanRef = useRef(onScan);
+  onScanRef.current = onScan;
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
   const [running, setRunning] = useState(false);
 
-  const stop = async () => {
-    const s = scannerRef.current;
-    if (!s) return;
-    try {
-      if (s.getState && s.getState() === 2 /* SCANNING */) {
-        await s.stop();
-      }
-      await s.clear();
-    } catch (_) {}
-    scannerRef.current = null;
+  const stop = () => {
+    cancelAnimationFrame(loopRef.current);
+    loopRef.current = 0;
+    const v = videoRef.current;
+    if (v) { v.pause(); v.srcObject = null; }
+    releaseCamera();
     setRunning(false);
   };
 
@@ -31,20 +25,30 @@ export default function QrScanner({ onScan, active = true, fullscreen = false, o
     setError("");
     setStarting(true);
     try {
-      if (scannerRef.current) {
-        await stop();
-      }
-      const s = new Html5Qrcode(containerId, { verbose: false });
-      scannerRef.current = s;
-      await s.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 240, height: 240 }, aspectRatio: 1.0 },
-        (decodedText) => { onScan?.(decodedText); },
-        () => {}
-      );
+      const stream = await acquireCamera();
+      const v = videoRef.current;
+      if (!v) return;
+      v.srcObject = stream;
+      try { await v.play(); } catch (err) { if (err?.name !== "AbortError") throw err; }
       setRunning(true);
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      let last = 0;
+      const tick = (t) => {
+        loopRef.current = requestAnimationFrame(tick);
+        if (t - last < 100 || v.readyState < 2 || !v.videoWidth) return;
+        last = t;
+        const scale = Math.min(1, 640 / v.videoWidth);
+        canvas.width = Math.round(v.videoWidth * scale);
+        canvas.height = Math.round(v.videoHeight * scale);
+        ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+        const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(img.data, img.width, img.height, { inversionAttempts: "dontInvert" });
+        if (code?.data) onScanRef.current?.(code.data);
+      };
+      loopRef.current = requestAnimationFrame(tick);
     } catch (e) {
-      setError(typeof e === "string" ? e : e?.message || "No se pudo acceder a la cámara. Verifica permisos.");
+      setError(e?.name === "NotAllowedError" ? "Permiso de cámara denegado. Actívalo en Ajustes del navegador." : e?.message || "No se pudo acceder a la cámara. Verifica permisos.");
     } finally {
       setStarting(false);
     }
@@ -55,6 +59,8 @@ export default function QrScanner({ onScan, active = true, fullscreen = false, o
     return () => { stop(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
+
+  const video = <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted autoPlay data-testid="qr-video" />;
 
   if (fullscreen) {
     return (
@@ -73,7 +79,7 @@ export default function QrScanner({ onScan, active = true, fullscreen = false, o
           </button>
         </div>
         <div className="relative flex-1 overflow-hidden qr-square-wrap">
-          <div id={containerId} className="absolute inset-0" />
+          {video}
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <div className="relative w-[70%] max-w-sm aspect-square">
               <span className="absolute -top-0.5 -left-0.5 w-12 h-12 border-t-4 border-l-4 border-[#2563EB] rounded-tl-xl" />
@@ -96,7 +102,7 @@ export default function QrScanner({ onScan, active = true, fullscreen = false, o
   return (
     <div className="space-y-3" data-testid="qr-scanner-wrapper">
       <div className="relative w-full aspect-square max-w-sm mx-auto rounded-2xl overflow-hidden bg-[#1A2210] border-2 border-[#1A2210] shadow-inner qr-square-wrap">
-        <div id={containerId} className="absolute inset-0" />
+        {video}
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="relative w-[65%] aspect-square">
             <span className="absolute -top-0.5 -left-0.5 w-8 h-8 border-t-4 border-l-4 border-[#2563EB] rounded-tl-xl" />
