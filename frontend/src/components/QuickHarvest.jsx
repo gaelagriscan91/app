@@ -219,7 +219,9 @@ export default function QuickHarvest() {
   const today = todayISO();
   const [session, setSession] = useState({});
   const [scanning, setScanning] = useState(false);
-  const [worker, setWorker] = useState(null);
+  const [team, setTeam] = useState([]);
+  const worker = team[0] || null;
+  const MAX_TEAM = 6;
   const [qty, setQty] = useState("");
   const [saving, setSaving] = useState(false);
   const [view, setView] = useState("scan");
@@ -259,10 +261,20 @@ export default function QuickHarvest() {
     api.get("/workers").then(({ data }) => setWorkers((data || []).filter((w) => w.active !== false))).catch((e) => console.error("workers", e));
   }, []);
 
+  const addToTeam = (w) => {
+    setTeam((t) => {
+      if (t.some((x) => x.id === w.id)) { toast.info(`${w.name} ya está en esta pieza`); return t; }
+      if (t.length >= MAX_TEAM) { toast.error(`Máximo ${MAX_TEAM} empleados por pieza`); return t; }
+      return [...t, { id: w.id, name: w.name }];
+    });
+    setQty((q) => q || startQty());
+    setResetKey((k) => k + 1);
+  };
+  const removeFromTeam = (id) => setTeam((t) => t.filter((x) => x.id !== id));
+
   const pickWorker = (w) => {
     if (!session.parcelId || !session.productId || price <= 0) { openScanner(); return; }
-    setWorker(w);
-    setQty(startQty());
+    addToTeam(w);
   };
 
   const openScanner = () => {
@@ -281,26 +293,28 @@ export default function QuickHarvest() {
     setScanning(false);
     try {
       const { data } = await api.post("/workers/resolve", { code });
-      setWorker({ id: data.id, name: data.name });
-      setQty(startQty());
+      addToTeam({ id: data.id, name: data.name });
     } catch (_) {
       toast.error("QR no registrado");
     }
   };
 
   const save = async () => {
-    const units = Number(qty);
-    if (!worker || !(units > 0)) { toast.error("Escanea o escribe un empleado y pon la cantidad"); return; }
+    const total = Number(qty);
+    if (!team.length || !(total > 0)) { toast.error("Escanea o escribe un empleado y pon la cantidad"); return; }
+    const units = Math.round((total / team.length) * 10000) / 10000;
     setSaving(true);
     try {
-      await api.post("/harvests", {
-        worker_id: worker.id, parcel_id: session.parcelId, product_id: session.productId,
-        kilos: 0, units, price_per_kg: 0, price_per_unit: price, price_mode: mode === "horas" ? "hour" : "piece", unit_type: mode,
-        date: today, photo_path: "", notes: "Cosecha escaneada",
-        block: session.block || "", variety: session.variedad || "", mayordomo: (session.mayordomo || "").trim(), grower: (session.grower || "").trim(),
-      });
-      toast.success(`Guardado: ${worker.name} · ${units}`);
-      setWorker(null);
+      for (const w of team) {
+        await api.post("/harvests", {
+          worker_id: w.id, parcel_id: session.parcelId, product_id: session.productId,
+          kilos: 0, units, price_per_kg: 0, price_per_unit: price, price_mode: mode === "horas" ? "hour" : "piece", unit_type: mode,
+          date: today, photo_path: "", notes: team.length > 1 ? `Pieza compartida entre ${team.length}` : "Cosecha escaneada",
+          block: session.block || "", variety: session.variedad || "", mayordomo: (session.mayordomo || "").trim(), grower: (session.grower || "").trim(),
+        });
+      }
+      toast.success(team.length > 1 ? `Guardado: ${total} entre ${team.length} · ${units} c/u` : `Guardado: ${worker.name} · ${total}`);
+      setTeam([]);
       setQty("");
       setResetKey((k) => k + 1);
       loadRows();
@@ -320,14 +334,27 @@ export default function QuickHarvest() {
       ) : (
         <div className="relative flex-1">
           <Row label="Empleado" testid="quick-employee">
-            <EmployeeInput key={resetKey} worker={worker} workers={workers} onPick={pickWorker} onClear={() => { setWorker(null); setQty(""); }} onCreated={(w) => setWorkers((prev) => [...prev, w])} />
+            {team.length < MAX_TEAM ? (
+              <EmployeeInput key={resetKey} worker={null} workers={workers.filter((w) => !team.some((t) => t.id === w.id))} onPick={pickWorker} onClear={() => {}} onCreated={(w) => setWorkers((prev) => [...prev, w])} />
+            ) : <span className="text-sm text-[#6B7280]">Máximo {MAX_TEAM}</span>}
+            {team.length > 0 && team.length < MAX_TEAM && (
+              <button onClick={openScanner} className="w-9 h-9 rounded-full bg-[#9BC53D] text-white flex items-center justify-center shrink-0" aria-label="Escanear otro" data-testid="quick-scan-more"><QrCode className="w-5 h-5" /></button>
+            )}
           </Row>
-          <Row label="Cantidad" testid="quick-qty-row">
-            <div className="flex items-center gap-1.5">
-              {FRACTIONS.map(([l, v]) => (
-                <button key={l} onClick={() => setQty(String(v))} disabled={!worker} className={`px-2 py-1 rounded-md text-xs font-semibold transition-colors ${Number(qty) === v ? "bg-[#9BC53D] text-white" : "bg-[#E5E7EB] text-[#6B7280]"} disabled:opacity-50`} data-testid={`quick-frac-${l.replace("/", "-")}`}>{l}</button>
+          {team.length > 0 && (
+            <div className="bg-white px-4 pb-3 border-b border-[#ECECEC] flex flex-wrap gap-2 justify-end" data-testid="quick-team">
+              {team.map((w) => (
+                <span key={w.id} className="flex items-center gap-1 bg-[#EEF6DD] text-[#111827] rounded-full pl-3 pr-1.5 py-1 text-[15px]" data-testid={`quick-team-${w.id}`}>
+                  {w.name}
+                  <button onClick={() => removeFromTeam(w.id)} className="text-[#6B7280]" aria-label="Quitar" data-testid={`quick-team-remove-${w.id}`}><X className="w-4 h-4" /></button>
+                </span>
               ))}
             </div>
+          )}
+          <Row label="Cantidad" testid="quick-qty-row">
+            {team.length > 1 && Number(qty) > 0 && (
+              <span className="text-xs text-[#6B7280]" data-testid="quick-split-info">÷ {team.length} = {Math.round((Number(qty) / team.length) * 100) / 100} c/u</span>
+            )}
             <input value={qty} onChange={(e) => setQty(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" placeholder="Cantidad" disabled={!worker} className="w-20 text-right text-[19px] bg-transparent outline-none placeholder:text-[#C4C4C4] disabled:bg-transparent" data-testid="quick-qty-input" />
           </Row>
           <div className="h-6" />
