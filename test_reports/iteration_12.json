@@ -1,0 +1,23 @@
+{
+  "summary": "Frontend-only test at 390px of the /registrar day totals, clearing the employee after SAVE, optimistic delete in Records, no auto-focus on Cantidad, and the /asistencia refactor (memo rows, pagination, Salida individual). Everything requested works. Libra mode: quick-total-units went 0->1 and quick-total-qty went 0->2.5 after SAVE. Pieza mode (temporarily set on the session, then restored) shows only the 'Pieza' row, and quick-total-units is not rendered. After SAVE, quick-employee-input is '' and a new name can be typed with suggestions shown. After picking a worker, focus stays on the employee input and Cantidad is empty, not focused. Records trash + confirm: the row was gone within 150ms with no spinner, GET /api/harvests no longer has it, and totals went back to 0. Asistencia: in the manual modal the toggle (on/off/on) and 'Marcar (33)' worked. attendance-row, summary-row and hub-row render. Hub row shows 'EN CAMPO 0m'. hub-checkout set check_out (row turned 'JORNADA', button gone). attendance-delete removed the row and it is gone from the API. With 33 TEST workers, 'Ver más (3)' appeared on the attendance, summary and hub lists and in the manual modal ('Ver más (7)' unfiltered); clicking it expands to 33. With <=30 items no Ver más button. Salida individual switches to the hub with no smooth scroll. No console errors besides the expected pre-login 401s on /api/auth/me and /api/auth/refresh.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Asistencia.jsx line ~912: AttendanceRow gets onDelete={removeAttendance}, which is a new function each render. This defeats memo for attendance rows. Use the stable onRowDelete callback that is already defined at line 146 (it is unused).",
+    "HubRow gets processing={processing}, so every memoized hub row re-renders whenever a scan toggles processing. This is minor; it could be moved to a ref or context if lists get very long.",
+    "QuickHarvest Records.remove keeps `prev = rows` for rollback. If two deletes overlap and the first fails, the rollback brings back the second (already deleted) row too. A safer rollback re-inserts only the failed row, e.g. setRows(l => [...l, h].sort(...)).",
+    "Asistencia.jsx is still 1052 lines (>700). Consider moving the manual-entry modal and the check-in header cards into AsistenciaParts or separate files."
+  ],
+  "updated_files": ["/app/test_reports/iteration_12.json"],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "seed_data_creation": "Created TEST_Totals Uno plus 33 TEST_Page NN workers, 1 harvest and 34 attendance records. All deleted at the end. The check-in session unitMode was briefly set to pieza and restored to libra / $25 (verified).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login via the UI, then use fetch with credentials:'include' inside page.evaluate for setup and cleanup. Checkin session is read with GET /api/checkin-session?date=YYYY-MM-DD and set with PUT /api/checkin-session using a {date,...session} body. Clear localStorage 'agriscan.session.*' after changing it. Attendance GET returns {rows:[...]}. The manual modal needs the 'Check in' tile (tile-check-in) and then manual-open-button. confirm() dialogs need page.on('dialog') accept."
+}
