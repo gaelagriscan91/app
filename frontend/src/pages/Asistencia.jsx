@@ -738,13 +738,13 @@ function CheckInView(props) {
         {/* Row: CHECKED IN counter + controls */}
         <div className="flex items-start gap-3 mb-4">
           {/* Left: CHECKED IN counter */}
-          <div className="shrink-0">
+          <div className="shrink-0 min-w-[76px]">
             <div className="text-[11px] font-extrabold uppercase tracking-wider text-[#1A2210]/70">Checked in</div>
             <div className="font-mono-stat text-5xl text-[#1A2210] leading-none mt-1" data-testid="checkin-count">{data.rows.length}</div>
           </div>
 
           {/* Mayordomo pill + keyboard + camera */}
-          <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0 justify-end">
             <button
               onClick={requireFields(() => setManualOpen(true))}
               className="w-11 h-11 bg-white rounded-full flex items-center justify-center shadow-sm text-[#1A2210] shrink-0"
@@ -764,7 +764,7 @@ function CheckInView(props) {
           </div>
 
           {/* Right: Pieza / libra / Horas unit toggle */}
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             {[
               { k: "pieza", l: "Pieza" },
               { k: "libra", l: "Libra" },
@@ -773,7 +773,7 @@ function CheckInView(props) {
               <button
                 key={k}
                 onClick={() => { setUnitMode(k); saveSession?.({ unitMode: k }); }}
-                className={`h-11 px-3 rounded-full text-sm font-extrabold transition shadow-sm ${
+                className={`h-10 sm:h-11 px-2.5 sm:px-3 rounded-full text-xs sm:text-sm font-extrabold transition shadow-sm ${
                   unitMode === k ? "bg-[#1A2210] text-white" : "bg-white text-[#1A2210] hover:bg-[#F0F0F0]"
                 }`}
                 data-testid={`checkin-unit-${k}`}

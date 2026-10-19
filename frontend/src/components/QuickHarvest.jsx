@@ -117,7 +117,7 @@ function EditRecord({ rec, onClose, onDone }) {
       worker_id: rec.worker_id, parcel_id: rec.parcel_id, product_id: rec.product_id,
       kilos: rec.kilos || 0, units, price_per_kg: rec.price_per_kg || 0, price_per_unit: rec.price_per_unit,
       date: rec.date, photo_path: rec.photo_path || "", notes: rec.notes || "",
-      block: rec.block || "", variety: rec.variety || "", mayordomo: rec.mayordomo || "", unit_type: rec.unit_type || "",
+      block: rec.block || "", variety: rec.variety || "", mayordomo: rec.mayordomo || "", grower: rec.grower || "", unit_type: rec.unit_type || "",
     }), "Registro corregido");
   };
   const remove = () => { if (window.confirm(`¿Borrar el registro de ${rec.worker_name}?`)) run(() => api.delete(`/harvests/${rec.id}`), "Registro borrado"); };
@@ -226,7 +226,7 @@ export default function QuickHarvest() {
     }
   }, [today]);
 
-  useEffect(() => { fetchCheckinSession(today).then((s) => setSession(s || {})); }, [today]);
+  useEffect(() => { fetchCheckinSession(today).then((s) => setSession((prev) => ({ ...(s || {}), ...prev }))); }, [today]);
   const setField = (k, v) => setSession((s) => ({ ...s, [k]: v }));
   const commitField = (k) => {
     const next = { ...session, [k]: (session[k] || "").trim() };

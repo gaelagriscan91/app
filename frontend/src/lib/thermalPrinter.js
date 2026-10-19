@@ -141,6 +141,9 @@ export function buildReceiptLines(receipt, options = {}) {
   parts.push({ text: receipt.worker_name, bold: true });
   if (receipt.document_id) parts.push({ text: `ID: ${receipt.document_id}` });
   if (receipt.role) parts.push({ text: `Rol: ${receipt.role}` });
+  const uniq = (k) => [...new Set((receipt.harvests || []).map((h) => (h[k] || "").trim()).filter(Boolean))].join(", ");
+  if (uniq("mayordomo")) parts.push({ text: `Mayordomo: ${uniq("mayordomo")}` });
+  if (uniq("grower")) parts.push({ text: `Grower: ${uniq("grower")}` });
   parts.push({ text: sep });
 
   parts.push({ text: pad("Horas:", (receipt.total_hours || 0).toFixed(2) + " h") });

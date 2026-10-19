@@ -99,6 +99,10 @@ function receiptHtml(receipt, businessName = "AgriScan") {
   </div>
 
   <div class="stats">
+    ${["mayordomo", "grower"].map((k) => {
+      const v = [...new Set((receipt.harvests || []).map((h) => (h[k] || "").trim()).filter(Boolean))].join(", ");
+      return v ? `<div class="stat"><div class="label">${k === "grower" ? "Grower" : "Mayordomo"}</div><div class="value">${escapeHtml(v)}</div></div>` : "";
+    }).join("")}
     <div class="stat highlight">
       <div class="label">Total horas</div>
       <div class="value">${(receipt.total_hours || 0).toFixed(2)} h</div>
