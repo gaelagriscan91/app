@@ -73,6 +73,7 @@ export default function PayrollTab() {
         <div className="flex gap-2">
           <select value={grower} onChange={(e) => setGrower(e.target.value)} className="flex-1 h-11 rounded-xl border border-[#E2DDD0] bg-white px-3 font-bold text-sm" data-testid="payroll-grower-select">
             <option value="">Todos los growers</option>
+            {grower && !(data?.growers || []).includes(grower) && <option value={grower}>{grower}</option>}
             {(data?.growers || []).map((g) => <option key={g} value={g}>{g}</option>)}
           </select>
           <button onClick={share} disabled={sharing || loading} className="h-11 px-4 rounded-xl bg-[#1D4ED8] text-white font-bold text-sm flex items-center gap-2 disabled:opacity-60" data-testid="payroll-share-button">
@@ -91,20 +92,20 @@ export default function PayrollTab() {
             <div><b>Grower:</b> <span data-testid="payroll-grower">{data.grower || "Todos"}</span></div>
             <div><b>Mayordomo:</b> <span data-testid="payroll-mayordomo">{data.mayordomo || "—"}</span></div>
           </div>
-          <div className="overflow-x-auto -mx-3 px-3">
-            <table className="text-xs border-collapse min-w-[900px] w-full" data-testid="payroll-table">
+          <div className="overflow-x-auto">
+            <table className="text-xs border-separate border-spacing-0 min-w-[900px] w-full" data-testid="payroll-table">
               <thead className="bg-[#C9C9C9] text-[#111]">
                 <tr>
-                  <th className="border border-[#aaa] p-1.5" />
+                  <th className="border border-[#aaa] p-1.5 sticky left-0 bg-[#C9C9C9] z-10" />
                   {data.days.map((d) => <th key={d.date} colSpan={2} className="border border-[#aaa] p-1.5">{d.name}</th>)}
                   <th rowSpan={3} className="border border-[#aaa] p-1.5">$</th>
                 </tr>
                 <tr>
-                  <th className="border border-[#aaa] p-1.5 text-right">Fecha</th>
+                  <th className="border border-[#aaa] p-1.5 text-right sticky left-0 bg-[#C9C9C9] z-10">Fecha</th>
                   {data.days.map((d) => <th key={d.date} colSpan={2} className="border border-[#aaa] p-1.5">{short(d.date)}</th>)}
                 </tr>
                 <tr>
-                  <th className="border border-[#aaa] p-1.5 text-left sticky left-0 bg-[#C9C9C9]">Nombre Empleados</th>
+                  <th className="border border-[#aaa] p-1.5 text-left sticky left-0 bg-[#C9C9C9] z-10">Nombre Empleados</th>
                   {data.days.map((d) => [
                     <th key={d.date + "p"} className="border border-[#aaa] p-1.5 text-left">Pieza</th>,
                     <th key={d.date + "$"} className="border border-[#aaa] p-1.5 text-left">Precio {d.price ? formatCurrency(d.price) : ""}</th>,
@@ -114,7 +115,7 @@ export default function PayrollTab() {
               <tbody>
                 {data.rows.map((r) => (
                   <tr key={r.worker_name} className="bg-white" data-testid={`payroll-row-${r.worker_name}`}>
-                    <td className="border border-[#ccc] p-1.5 font-semibold sticky left-0 bg-white whitespace-nowrap">{r.worker_name}</td>
+                    <td className="border border-[#ccc] p-1.5 font-semibold sticky left-0 bg-white z-10 max-w-[120px] break-words">{r.worker_name}</td>
                     {r.days.map((c, i) => [
                       <td key={i + "u"} className="border border-[#ccc] p-1.5 text-right">{c.units ? qty(c.units) : ""}</td>,
                       <td key={i + "$"} className="border border-[#ccc] p-1.5 text-right">{c.units ? formatCurrency(c.payment) : ""}</td>,
