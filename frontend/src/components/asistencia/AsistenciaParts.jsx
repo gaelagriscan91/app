@@ -66,22 +66,24 @@ export const HubRow = memo(function HubRow({ r, shortId, checkoutCode, processin
   );
 });
 
-export const AttendanceRow = memo(function AttendanceRow({ r, place, onDelete }) {
+export const AttendanceRow = memo(function AttendanceRow({ r, place, onDelete, checkout = false }) {
   return (
     <div className="bg-white border border-[#E2DDD0] rounded-xl p-3 flex items-start gap-3" data-testid={`attendance-row-${r.id}`}>
       <div className="min-w-[70px]">
         <div className="text-xs text-[#889078] font-semibold uppercase tracking-wider">Hora</div>
-        <div className="font-bold text-[#1A2210] text-base">{formatHHMM(r.check_in) || "—"}</div>
-        {r.check_out && <div className="text-xs text-red-700 font-bold mt-0.5">↓ {formatHHMM(r.check_out)}</div>}
+        <div className="font-bold text-[#1A2210] text-base">{formatHHMM(checkout ? r.check_out : r.check_in) || "—"}</div>
+        {!checkout && r.check_out && <div className="text-xs text-red-700 font-bold mt-0.5">↓ {formatHHMM(r.check_out)}</div>}
       </div>
       <div className="min-w-0 flex-1 border-l border-[#E2DDD0] pl-3">
         <div className="text-xs text-[#889078] font-semibold uppercase tracking-wider">Empleado</div>
         <div className="font-bold text-[#1A2210]">{r.worker_name}</div>
         <div className="text-xs text-[#556047] font-semibold mt-0.5 truncate">{place}</div>
       </div>
-      <button onClick={() => onDelete(r.id)} className="w-8 h-8 rounded-lg hover:bg-red-50 text-red-600 flex items-center justify-center" data-testid={`attendance-delete-${r.id}`}>
-        <Trash2 className="w-4 h-4" />
-      </button>
+      {onDelete && (
+        <button onClick={() => onDelete(r.id)} className="w-8 h-8 rounded-lg hover:bg-red-50 text-red-600 flex items-center justify-center" data-testid={`attendance-delete-${r.id}`}>
+          <Trash2 className="w-4 h-4" />
+        </button>
+      )}
     </div>
   );
 });

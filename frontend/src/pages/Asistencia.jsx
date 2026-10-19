@@ -194,7 +194,7 @@ export default function Asistencia() {
       toast.info("Aún no hay empleados con entrada");
       return;
     }
-    setView("checkin");
+    setView("checkout");
   };
 
   // ============== End-of-day summary + reset ==============
@@ -256,9 +256,10 @@ export default function Asistencia() {
     />
   );
 
-  if (view === "checkin") return (
+  if (view === "checkin" || view === "checkout") return (
     <CheckInView
-      key={sessionVersion}
+      key={`${view}-${sessionVersion}`}
+      mode={view}
       navigate={navigate}
       data={data}
       loading={loading}
@@ -504,10 +505,25 @@ function CheckInView(props) {
     showCrewPicker, setShowCrewPicker2, moveCrew,
     manualSelected, setManualSelected, manualSearch, setManualSearch,
     manualSubmitting, setManualSubmitting,
-    showCheckoutMenu, setShowCheckoutMenu, openCount, setConfirmCheckout, setView,
+    showCheckoutMenu, setShowCheckoutMenu, openCount, setConfirmCheckout, setView, mode,
   } = props;
+  const isOut = mode === "checkout";
+  const listRows = useMemo(() => (isOut ? data.rows.filter((r) => r.check_out).sort((a, b) => String(b.check_out).localeCompare(String(a.check_out))) : data.rows), [isOut, data.rows]);
+  const openByCode = useMemo(() => {
+    const m = new Map();
+    data.rows.filter((r) => r.check_in && !r.check_out).forEach((r) => {
+      const w = (workers || []).find((x) => x.id === r.worker_id);
+      [r.worker_id, w?.qr_code, w?.id_document].filter(Boolean).forEach((c) => m.set(String(c), w?.qr_code || r.worker_id));
+    });
+    return m;
+  }, [data.rows, workers]);
+  const onScanCode = (code) => {
+    if (!isOut) return requireFields(handleScan)(code);
+    if (!openByCode.has(String(code))) { toast.error("Este empleado no tiene entrada abierta"); return; }
+    handleScan(openByCode.get(String(code)));
+  };
   const [unitMode, setUnitMode] = useState(session?.unitMode || "pieza"); // "pieza" | "libra" | "horas"
-  const attPage = usePaged(data.rows, [data.rows.length]);
+  const attPage = usePaged(listRows, [listRows.length]);
   const [manualLimit, setManualLimit] = useState(PAGE_SIZE);
   const place = `${selectedParcel?.name || "—"}, ${selectedProduct?.name || "—"}`;
 
@@ -600,7 +616,7 @@ function CheckInView(props) {
   };
   const missingLabels = { rancho: "Rancho", block: "Block", trabajo: "Trabajo", variedad: "Variedad", precio: unitMode === "horas" ? "Precio / hora" : "Precio" };
   const requireFields = (fn) => (...args) => {
-    const list = Object.keys(missing).filter((k) => missing[k]);
+    const list = isOut ? [] : Object.keys(missing).filter((k) => missing[k]);
     if (list.length) {
       setShowErrors(true);
       if (scannerOn) setScannerOn(false);
@@ -627,7 +643,7 @@ function CheckInView(props) {
           <button onClick={goBack} className="flex items-center gap-1 font-semibold" data-testid="checkin-back-button">
             <ArrowLeft className="w-5 h-5" /> Atrás
           </button>
-          <h1 className="text-xl font-extrabold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }}>Check in</h1>
+          <h1 className="text-xl font-extrabold text-[#1A2210]" style={{ fontFamily: "Outfit, sans-serif" }} data-testid="checkin-title">{isOut ? "Check out" : "Check in"}</h1>
           <button onClick={openSummary} data-testid="open-summary-button" className="text-base font-bold">
             Resumen
           </button>
@@ -637,12 +653,12 @@ function CheckInView(props) {
         <div className="flex items-start gap-3 mb-4">
           {/* Left: CHECKED IN counter */}
           <div className="shrink-0 min-w-[76px]">
-            <div className="text-[11px] font-extrabold uppercase tracking-wider text-[#1A2210]/70">Checked in</div>
-            <div className="font-mono-stat text-5xl text-[#1A2210] leading-none mt-1" data-testid="checkin-count">{data.rows.length}</div>
+            <div className="text-[11px] font-extrabold uppercase tracking-wider text-[#1A2210]/70">{isOut ? "Checked out" : "Checked in"}</div>
+            <div className="font-mono-stat text-5xl text-[#1A2210] leading-none mt-1" data-testid="checkin-count">{listRows.length}</div>
           </div>
 
           {/* Mayordomo pill + keyboard + camera */}
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0 justify-end">
+          <div className={`flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0 ${isOut ? "justify-start" : "justify-end"}`}>
             <button
               onClick={requireFields(() => setManualOpen(true))}
               className="w-11 h-11 bg-white rounded-full flex items-center justify-center shadow-sm text-[#1A2210] shrink-0"
@@ -662,7 +678,7 @@ function CheckInView(props) {
           </div>
 
           {/* Right: Pieza / libra / Horas unit toggle */}
-          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+          {!isOut && <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             {[
               { k: "pieza", l: "Pieza" },
               { k: "libra", l: "Libra" },
@@ -679,7 +695,7 @@ function CheckInView(props) {
                 {l}
               </button>
             ))}
-          </div>
+          </div>}
         </div>
 
         {/* Checkout menu + Move crew */}
@@ -877,7 +893,7 @@ function CheckInView(props) {
       {/* Scanner area */}
       {scannerOn && (
         <div className="px-4 mt-4">
-          <QrScanner active={scannerOn} onScan={requireFields(handleScan)} />
+          <QrScanner active={scannerOn} onScan={onScanCode} />
         </div>
       )}
 
@@ -885,13 +901,13 @@ function CheckInView(props) {
       <div className="px-4 mt-4 space-y-2 pb-6">
         {loading ? (
           <div className="flex justify-center py-6 text-[#1D4ED8]"><Loader2 className="w-6 h-6 animate-spin" /></div>
-        ) : data.rows.length === 0 ? (
+        ) : listRows.length === 0 ? (
           <p className="text-center text-[#556047] font-semibold py-6" data-testid="attendance-empty">
-            Aún no hay empleados registrados hoy
+            {isOut ? "Aún no hay salidas registradas hoy" : "Aún no hay empleados registrados hoy"}
           </p>
         ) : (
           <>
-            {attPage.visible.map((r) => <AttendanceRow key={r.id} r={r} place={place} onDelete={removeAttendance} />)}
+            {attPage.visible.map((r) => <AttendanceRow key={r.id} r={r} place={place} checkout={isOut} onDelete={isOut ? null : removeAttendance} />)}
             <ShowMore remaining={attPage.remaining} onClick={attPage.more} testid="attendance-show-more" />
           </>
         )}
@@ -900,8 +916,9 @@ function CheckInView(props) {
       {/* Manual entry modal */}
       {manualOpen && (() => {
         const checkedInIds = new Set((data?.rows || []).filter((r) => r.check_in).map((r) => String(r.worker_id)));
+        const openIds = new Set((data?.rows || []).filter((r) => r.check_in && !r.check_out).map((r) => String(r.worker_id)));
         const needle = (manualSearch || "").trim().toLowerCase();
-        const eligible = (workers || []).filter((w) => !checkedInIds.has(String(w.id)));
+        const eligible = (workers || []).filter((w) => (isOut ? openIds.has(String(w.id)) : !checkedInIds.has(String(w.id))));
         const list = needle ? eligible.filter((w) => (w.name || "").toLowerCase().includes(needle)) : eligible;
         const allSelected = list.length > 0 && list.every((w) => manualSelected.has(w.id));
         const toggleAll = () => {
@@ -934,7 +951,7 @@ function CheckInView(props) {
           <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={closeModal}>
             <div className="bg-white rounded-t-3xl sm:rounded-3xl p-5 w-full sm:max-w-md shadow-2xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-extrabold text-lg" style={{ fontFamily: "Outfit, sans-serif" }}>Entrada</h3>
+                <h3 className="font-extrabold text-lg" style={{ fontFamily: "Outfit, sans-serif" }}>{isOut ? "Salida" : "Entrada"}</h3>
                 <button onClick={closeModal} data-testid="manual-close"><X className="w-5 h-5" /></button>
               </div>
               <input
@@ -961,7 +978,7 @@ function CheckInView(props) {
               <ul className="flex-1 overflow-y-auto divide-y divide-[#E2DDD0] -mx-1 border border-[#E2DDD0] rounded-xl" data-testid="manual-worker-list">
                 {list.length === 0 ? (
                   <li className="px-4 py-6 text-center text-sm text-[#556047] font-semibold">
-                    {eligible.length === 0 ? "Todos los empleados ya tienen entrada hoy." : "Sin coincidencias."}
+                    {eligible.length === 0 ? (isOut ? "No hay empleados con jornada abierta." : "Todos los empleados ya tienen entrada hoy.") : "Sin coincidencias."}
                   </li>
                 ) : list.slice(0, manualLimit).map((w) => (
                   <ManualWorkerRow key={w.id} w={w} selected={manualSelected.has(w.id)} setSelected={setManualSelected} />
