@@ -8,7 +8,6 @@ import QrScanner from "@/components/QrScanner";
 import { thermalPrinter } from "@/lib/thermalPrinter";
 import { openHtmlWindow, escapeHtml } from "@/lib/printHtml";
 
-const FRACTIONS = [["1/4", 0.25], ["1/2", 0.5], ["3/4", 0.75]];
 const TIPO = { pieza: "Pieza", libra: "Libra", horas: "Horas" };
 const unitOf = (h) => (TIPO[h.unit_type] || (h.price_mode === "hour" ? "Horas" : "Pieza")).toLowerCase();
 
@@ -131,9 +130,6 @@ function EditRecord({ rec, onClose, onDone }) {
         </div>
         <label className="block text-sm text-[#4B5563]">Cantidad</label>
         <div className="flex gap-2">
-          {FRACTIONS.map(([l, v]) => (
-            <button key={l} onClick={() => setQty(String(v))} className={`px-3 py-1.5 rounded-md text-sm font-semibold ${Number(qty) === v ? "bg-[#9BC53D] text-white" : "bg-[#E5E7EB] text-[#6B7280]"}`} data-testid={`quick-edit-frac-${l.replace("/", "-")}`}>{l}</button>
-          ))}
           <input value={qty} onChange={(e) => setQty(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="flex-1 min-w-0 border border-[#D1D5DB] rounded-md px-3 text-right text-lg outline-none focus:border-[#9BC53D]" data-testid="quick-edit-qty" />
         </div>
         <div className="flex gap-3 pt-2">
@@ -312,6 +308,7 @@ export default function QuickHarvest() {
           date: today, photo_path: "", notes: team.length > 1 ? `Pieza compartida entre ${team.length}` : "Cosecha escaneada",
           block: session.block || "", variety: session.variedad || "", mayordomo: (session.mayordomo || "").trim(), grower: (session.grower || "").trim(),
         });
+        setTeam((t) => t.filter((x) => x.id !== w.id));
       }
       toast.success(team.length > 1 ? `Guardado: ${total} entre ${team.length} · ${units} c/u` : `Guardado: ${worker.name} · ${total}`);
       setTeam([]);
@@ -319,6 +316,7 @@ export default function QuickHarvest() {
       setResetKey((k) => k + 1);
       loadRows();
     } catch (e) {
+      loadRows();
       toast.error(formatApiErrorDetail(e.response?.data?.detail) || "No se pudo guardar");
     } finally {
       setSaving(false);
