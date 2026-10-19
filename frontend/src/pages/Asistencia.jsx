@@ -637,7 +637,7 @@ function CheckInView(props) {
   return (
     <div className="-mx-4 -my-5 sm:-mx-0 sm:-my-0" data-testid="asistencia-checkin">
       {/* Blue header */}
-      <div className="bg-[#2563EB] px-5 pt-4 pb-5 rounded-b-2xl text-white">
+      <div className={`${isOut ? "bg-[#5A4A98]" : "bg-[#2563EB]"} px-5 pt-4 pb-5 rounded-b-2xl text-white`}>
         {/* Top row: Atrás · Check in · Resumen */}
         <div className="flex items-center justify-between mb-4">
           <button onClick={goBack} className="flex items-center gap-1 font-semibold" data-testid="checkin-back-button">
@@ -698,15 +698,14 @@ function CheckInView(props) {
           </div>}
         </div>
 
-        {/* Checkout menu + Move crew */}
         <div className="flex items-center gap-2 mb-4">
-          <button
+          {!isOut && <button
             onClick={requireFields(() => crews.length > 0 ? setShowCrewPicker(true) : toast.info("Primero crea una cuadrilla en Módulos"))}
             className="h-10 bg-white text-[#1A2210] px-4 rounded-full text-sm font-bold flex items-center gap-1.5 shadow-sm"
             data-testid="move-crew-button"
           >
             <Users className="w-4 h-4" /> Move Crew
-          </button>
+          </button>}
           <div className="relative">
             <button
               onClick={() => setShowCheckoutMenu((v) => !v)}
