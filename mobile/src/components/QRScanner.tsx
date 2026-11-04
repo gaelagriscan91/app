@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Linking, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Linking, Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import { X, Camera as CameraIcon } from "lucide-react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/src/theme";
 
 type Props = {
@@ -17,7 +17,6 @@ export default function QRScanner({ onScan, onClose, title = "Escanea el QR del 
   const [asked, setAsked] = useState(false);
   const lockRef = useRef(false);
   const lastRef = useRef({ code: "", at: 0 });
-  const insets = useSafeAreaInsets();
   const { colors } = useTheme();
 
   // Auto-request once when undetermined (contextual: scanner opened on user intent)
@@ -39,25 +38,25 @@ export default function QRScanner({ onScan, onClose, title = "Escanea el QR del 
     setTimeout(() => { lockRef.current = false; }, 1200);
   };
 
-  const Header = (
-    <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-      <View style={styles.headerTitle}>
-        <CameraIcon size={16} color="#FFFFFF" />
-        <Text style={styles.headerText}>{title}</Text>
-      </View>
-      <TouchableOpacity testID="qr-close-button" onPress={onClose} style={styles.closeBtn}>
-        <X size={22} color="#FFFFFF" />
-      </TouchableOpacity>
-    </View>
+  const Header = <ScannerHeader title={title} onClose={onClose} />;
+
+  // The scanner opens in a full-screen Modal so it covers the app header and the tab bar.
+  // RN 0.88 removed StyleSheet.absoluteFillObject, so the old inline root collapsed to the header height.
+  const shell = (children: React.ReactNode, testID?: string) => (
+    <Modal visible animationType="slide" presentationStyle="fullScreen" statusBarTranslucent onRequestClose={onClose}>
+      <SafeAreaProvider>
+        <View style={styles.black} testID={testID}>{children}</View>
+      </SafeAreaProvider>
+    </Modal>
   );
 
   if (!permission) {
-    return <View style={styles.black}>{Header}</View>;
+    return shell(Header);
   }
 
   if (!permission.granted) {
-    return (
-      <View style={styles.black} testID="qr-permission-screen">
+    return shell(
+      <>
         {Header}
         <View style={styles.center}>
           <CameraIcon size={56} color={colors.brandSecondary} />
@@ -75,12 +74,13 @@ export default function QRScanner({ onScan, onClose, title = "Escanea el QR del 
             </TouchableOpacity>
           )}
         </View>
-      </View>
+      </>,
+      "qr-permission-screen"
     );
   }
 
-  return (
-    <View style={styles.black} testID="qr-scanner">
+  return shell(
+    <>
       <CameraView
         style={StyleSheet.absoluteFill}
         facing="back"
@@ -91,12 +91,29 @@ export default function QRScanner({ onScan, onClose, title = "Escanea el QR del 
       <View style={styles.frameWrap} pointerEvents="none">
         <View style={[styles.frame, { borderColor: colors.brandSecondary }]} />
       </View>
+    </>,
+    "qr-scanner"
+  );
+}
+
+// Reads insets inside the Modal's own SafeAreaProvider (the outer insets read 0 inside a Modal on Android).
+function ScannerHeader({ title, onClose }: { title: string; onClose: () => void }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+      <View style={styles.headerTitle}>
+        <CameraIcon size={16} color="#FFFFFF" />
+        <Text style={styles.headerText}>{title}</Text>
+      </View>
+      <TouchableOpacity testID="qr-close-button" onPress={onClose} style={styles.closeBtn}>
+        <X size={22} color="#FFFFFF" />
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  black: { ...StyleSheet.absoluteFillObject, backgroundColor: "#000000", zIndex: 100 },
+  black: { flex: 1, backgroundColor: "#000000" },
   header: {
     flexDirection: "row",
     alignItems: "center",
