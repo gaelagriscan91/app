@@ -3,6 +3,7 @@ import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "r
 import { LifeBuoy, Mail, LogOut } from "lucide-react-native";
 import { useAuth } from "@/src/auth/AuthContext";
 import { Card } from "@/src/components/ui";
+import ChangePasswordCard from "@/src/components/ChangePasswordCard";
 import { useTheme, ThemeColors } from "@/src/theme";
 
 export default function SupportModule() {
@@ -25,6 +26,8 @@ export default function SupportModule() {
         <Text style={s.acc}>{user?.name}</Text>
         <Text style={s.accSub}>{user?.email}</Text>
       </Card>
+
+      <ChangePasswordCard />
 
       <TouchableOpacity testID="support-logout" onPress={logout} style={s.logout}>
         <LogOut size={18} color={colors.error} /><Text style={s.logoutText}>Cerrar sesión</Text>

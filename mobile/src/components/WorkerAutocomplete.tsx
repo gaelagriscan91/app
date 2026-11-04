@@ -8,11 +8,12 @@ import { useTheme, ThemeColors } from "@/src/theme";
 export type Worker = { id: string; name: string; active?: boolean; qr_code?: string };
 
 export default function WorkerAutocomplete({
-  workers, onPick, onCreated, placeholder = "Empleado", testID,
+  workers, onPick, onCreated, createWorker, placeholder = "Empleado", testID,
 }: {
   workers: Worker[];
   onPick: (w: Worker) => void;
   onCreated?: (w: Worker) => void;
+  createWorker?: (name: string) => Promise<{ id: string; name: string }>;
   placeholder?: string;
   testID?: string;
 }) {
@@ -28,6 +29,11 @@ export default function WorkerAutocomplete({
   const pick = (w: Worker) => { onPick(w); setText(""); setOpen(false); };
   const createNew = async () => {
     try {
+      if (createWorker) {
+        const w = await createWorker(text.trim());
+        pick({ id: w.id, name: w.name });
+        return;
+      }
       const { data } = await api.post("/workers", { name: text.trim() });
       onCreated?.(data);
       pick({ id: data.id, name: data.name });

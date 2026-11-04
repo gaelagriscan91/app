@@ -10,6 +10,7 @@ import { ErrorBoundary } from "@/src/components/error-boundary";
 import { queryClient } from "@/src/query-client";
 import { AuthProvider } from "@/src/auth/AuthContext";
 import { ToastProvider } from "@/src/components/Toast";
+import { OfflineProvider } from "@/src/offline/OfflineContext";
 
 LogBox.ignoreAllLogs(true);
 
@@ -22,12 +23,14 @@ export default function RootLayout() {
             <KeyboardProvider>
               <AuthProvider>
                 <ToastProvider>
-                  <StatusBar style="light" />
-                  <Stack screenOptions={{ headerShown: false }}>
-                    <Stack.Screen name="index" />
-                    <Stack.Screen name="(auth)" />
-                    <Stack.Screen name="(tabs)" />
-                  </Stack>
+                  <OfflineProvider>
+                    <StatusBar style="light" />
+                    <Stack screenOptions={{ headerShown: false }}>
+                      <Stack.Screen name="index" />
+                      <Stack.Screen name="(auth)" />
+                      <Stack.Screen name="(tabs)" />
+                    </Stack>
+                  </OfflineProvider>
                 </ToastProvider>
               </AuthProvider>
             </KeyboardProvider>

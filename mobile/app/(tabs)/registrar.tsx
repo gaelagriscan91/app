@@ -8,6 +8,7 @@ import * as Haptics from "expo-haptics";
 import { QrCode, X, Printer, Trash2, ArrowLeft, UserPlus, Loader } from "lucide-react-native";
 import api, { apiErrorMessage } from "@/src/api/client";
 import { useSession } from "@/src/api/session";
+import { useOfflineActions } from "@/src/offline/useOfflineActions";
 import { toast } from "@/src/components/Toast";
 import QRScanner from "@/src/components/QRScanner";
 import { formatCurrency, fmtStamp, todayISO, unitOf, TIPO } from "@/src/utils/format";
@@ -25,6 +26,7 @@ export default function RegistrarScreen() {
   const qc = useQueryClient();
   const today = todayISO();
   const { session, save } = useSession();
+  const { saveHarvest, createWorker } = useOfflineActions();
 
   const [team, setTeam] = useState<Worker[]>([]);
   const [qty, setQty] = useState("1");
@@ -78,20 +80,23 @@ export default function RegistrarScreen() {
     const units = Math.round((total / team.length) * 10000) / 10000;
     setSaving(true);
     try {
+      let pendingAny = false;
       for (const w of team) {
-        await api.post("/harvests", {
+        const res = await saveHarvest({
           worker_id: w.id, parcel_id: session.parcelId, product_id: session.productId,
           kilos: 0, units, price_per_kg: 0, price_per_unit: price,
           price_mode: mode === "horas" ? "hour" : "piece", unit_type: mode,
           date: today, photo_path: "", notes: team.length > 1 ? `Pieza compartida entre ${team.length}` : "Cosecha escaneada",
           block: session.block || "", variety: session.variedad || "",
           mayordomo: (session.mayordomo || "").trim(), grower: (session.grower || "").trim(),
-        });
+        }, { workerName: w.name, today });
+        if (res.pending) pendingAny = true;
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      toast.success(team.length > 1 ? `Guardado: ${total} entre ${team.length}` : `Guardado: ${team[0].name} · ${total}`);
+      toast.success(pendingAny
+        ? `Guardado sin conexión: ${total}${team.length > 1 ? ` entre ${team.length}` : ""}`
+        : team.length > 1 ? `Guardado: ${total} entre ${team.length}` : `Guardado: ${team[0].name} · ${total}`);
       setTeam([]); setQty(mode === "pieza" ? "1" : "");
-      qc.invalidateQueries({ queryKey: ["harvests-today", today] });
     } catch (e) { toast.error(apiErrorMessage(e, "No se pudo guardar")); }
     finally { setSaving(false); }
   };
@@ -147,7 +152,7 @@ export default function RegistrarScreen() {
                     <EmployeeInput
                       workers={workers.filter((w) => !team.some((t) => t.id === w.id))}
                       onPick={addToTeam}
-                      onCreated={() => workersQ.refetch()}
+                      onCreateWorker={createWorker}
                       requireSetup={!setupReady ? requireSetup : undefined}
                     />
                   ) : <Text style={s.maxText}>Máximo {MAX_TEAM}</Text>}
@@ -167,25 +172,26 @@ export default function RegistrarScreen() {
                 </View>
               )}
 
-              {/* Cantidad */}
-              <View style={s.row} testID="quick-qty-row">
-                <Text style={s.rowLabel}>Cantidad</Text>
-                <View style={s.rowRightWrap}>
-                  {team.length > 1 && Number(qty) > 0 && (
-                    <Text style={s.splitInfo} testID="quick-split-info">÷ {team.length} = {Math.round((Number(qty) / team.length) * 100) / 100} c/u</Text>
-                  )}
-                  <TextInput
-                    testID="quick-qty-input"
-                    value={qty}
-                    onChangeText={(t) => setQty(t.replace(/[^0-9.]/g, ""))}
-                    keyboardType="decimal-pad"
-                    placeholder="Cantidad"
-                    placeholderTextColor="#C4C4C4"
-                    editable={team.length > 0}
-                    style={s.qtyInput}
-                  />
+              {/* Cantidad — solo aparece cuando hay empleado seleccionado */}
+              {team.length > 0 && (
+                <View style={s.row} testID="quick-qty-row">
+                  <Text style={s.rowLabel}>Cantidad</Text>
+                  <View style={s.rowRightWrap}>
+                    {team.length > 1 && Number(qty) > 0 && (
+                      <Text style={s.splitInfo} testID="quick-split-info">÷ {team.length} = {Math.round((Number(qty) / team.length) * 100) / 100} c/u</Text>
+                    )}
+                    <TextInput
+                      testID="quick-qty-input"
+                      value={qty}
+                      onChangeText={(t) => setQty(t.replace(/[^0-9.]/g, ""))}
+                      keyboardType="decimal-pad"
+                      placeholder="Cantidad"
+                      placeholderTextColor="#C4C4C4"
+                      style={s.qtyInput}
+                    />
+                  </View>
                 </View>
-              </View>
+              )}
 
               <View style={{ height: 20 }} />
               <ValueRow label="Precio" value={formatCurrency(price)} testID="quick-price" colors={colors} />
@@ -253,7 +259,7 @@ function FieldRow({ label, initial, onCommit, testID, colors }: { label: string;
   );
 }
 
-function EmployeeInput({ workers, onPick, onCreated, requireSetup }: { workers: Worker[]; onPick: (w: Worker) => void; onCreated: (w: Worker) => void; requireSetup?: () => void }) {
+function EmployeeInput({ workers, onPick, onCreateWorker, requireSetup }: { workers: Worker[]; onPick: (w: Worker) => void; onCreateWorker: (name: string) => Promise<{ id: string; name: string }>; requireSetup?: () => void }) {
   const { colors } = useTheme();
   const s = styles(colors);
   const [text, setText] = useState("");
@@ -265,8 +271,8 @@ function EmployeeInput({ workers, onPick, onCreated, requireSetup }: { workers: 
   const pick = (w: Worker) => { if (requireSetup) return requireSetup(); onPick(w); setText(""); setOpen(false); };
   const createNew = async () => {
     if (requireSetup) return requireSetup();
-    try { const { data } = await api.post("/workers", { name: text.trim() }); onCreated(data); onPick({ id: data.id, name: data.name }); setText(""); setOpen(false); toast.success(`Empleado agregado: ${data.name}`); }
-    catch (e) { toast.error(apiErrorMessage(e, "No se pudo agregar")); }
+    try { const w = await onCreateWorker(text.trim()); onPick({ id: w.id, name: w.name }); setText(""); setOpen(false); }
+    catch {}
   };
 
   return (

@@ -1,97 +1,66 @@
 # Cross-Platform Port Blueprint: AgriScan
 
 ## 1. Detection
-- **Source Platform**: Web (React, Tailwind, Shadcn UI) detected in `/app/frontend`.
-- **Target Platform**: Mobile (React Native, Expo, Expo Router) detected in `/app/mobile`.
-- **Evidence**: `/app/frontend/src` contains a complete React web application with routing (`App.js`), pages, and components. `/app/mobile/app` contains a fresh Expo Router boilerplate without application code.
+- **Source Platform**: Web (React, Tailwind, Shadcn UI) detected in `/app/frontend`. Evidence includes `package.json`, `tailwind.config.js`, and pages mapped to React Router.
+- **Target Platform**: Mobile (React Native, Expo) detected in `/app/mobile`. Evidence includes `app.json`, `metro.config.js`, and Expo Router file structure under `/app`.
+- **Assumption**: Based on the extensive web implementation and the mobile app containing React Native components, the intent is to map the original React web app to its Expo mobile counterpart, sharing the backend.
 
 ## 2. Existing App Map (Web)
 ### Screens / Routes
 - **Auth**: `/login`, `/register`, `/forgot-password`, `/reset-password`
-- **Main Shell (`AppLayout.jsx`)**: Wrapper protecting authenticated routes. Features a top header (User info, Admin badge, Logout), an optional Trial/Blocked banner, a main scrollable content area, and a fixed bottom tab navigation.
+- **Dashboard/Core**: Wrapper protecting authenticated routes via `AppLayout.jsx` (Header with User info, Admin badge, Blocked banner).
 - **Tabs**:
-  - `/registrar` (`RegistrarCosecha.jsx` -> `QuickHarvest.jsx`): Core flow for registering harvests. Supports QR scanning, employee search, weight/pieces inputs, pricing, and a quick view of today's records.
-  - `/asistencia` (`Asistencia.jsx`): Check-in and Check-out flow for workers. Requires setting Rancho, Block, Task, Variety.
-  - `/dia` (`ListaDia.jsx`): List of today's records (harvests and checked-in workers).
-  - `/reportes` (`Reportes.jsx`): Report generation, historical receipts, and payroll export capabilities.
-  - `/modulos` (`Modulos.jsx`): Settings hub (Workers, Crew, Mayordomos, Support, Plan/Paywall).
+  - `/registrar` (`RegistrarCosecha.jsx` -> `QuickHarvest.jsx`): Core harvest registration. QR scanning, piece/weight modes, pricing, and live records view.
+  - `/asistencia` (`Asistencia.jsx`): Check-in / out flow. Configures session (Rancho, Block, Variety) before operations.
+  - `/dia` (`ListaDia.jsx`): List of daily harvest records and attendance.
+  - `/reportes` (`Reportes.jsx`): Export capabilities (Excel), historical receipts, and payroll summaries.
+  - `/modulos` (`Modulos.jsx`): Admin hub for Employees (Workers), Crews, Recycle bin (Trash), and Settings/Paywall.
 
 ### Components & State
-- **Context**: `AuthContext` (managing user session, `blocked` status, and triggering the `PaywallDialog`).
-- **Key Reusable Components**: 
-  - `QrScanner`: Camera implementation using `<video>` and `jsQR` with continuous stream management.
-  - `ConfirmHost`: Custom dialog system overriding native `window.confirm`.
-  - `PaywallDialog`: PayPal subscription modal.
-  - `LogoHandCherry`: App branding.
+- **Contexts**: `AuthContext` (session management and paywall triggers).
+- **Key UI Patterns**: Custom `ConfirmHost` dialog replacing native alerts; `PaywallDialog` for PayPal sub handling; `QrScanner` using HTML5 video stream and jsQR.
 
 ### Primary User Flows
-1. **Authentication**: Login/Register. If trial expires or unpaid, user enters a restricted state triggering Paywall.
-2. **Setup**: Defining Rancho/Block (Check-in context) before operations.
-3. **Operations**: Scanning employee QRs or manually selecting them -> Inputting harvest quantity -> Saving.
-4. **End of Day**: Viewing daily list -> Exporting reports or printing ESC/POS tickets.
+1. **Auth & Access**: Standard JWT login. Blocked/Trial accounts hit a PayPal paywall overlay.
+2. **Operations Prep**: User defines Rancho/Block settings in `Asistencia`.
+3. **Registration**: Scan worker QR -> Input amounts -> Send to backend. Multi-worker shared pieces supported.
+4. **Closing**: Export day’s summary via Excel or print ESC/POS tickets directly.
 
 ## 3. Shared Backend API Surface
-The backend (`/app/backend/server.py`) is shared and will be consumed via standard HTTP requests by the new mobile app. The backend supports `Authorization: Bearer <token>` natively, providing a smooth path for mobile auth.
+The FastAPI backend (`/app/backend/server.py`) uses Bearer JWT. The new mobile app must route all requests to the existing endpoints:
 
-### Authentication & Users
-- `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`
-- `POST /auth/forgot-password`, `POST /auth/reset-password`, `POST /auth/change-password`
-- `GET /auth/me`
-
-### Core Entities (CRUD)
-- **Workers**: `GET|POST /workers`, `PUT|DELETE /workers/{wid}`, `POST /workers/{wid}/regenerate-qr`, `POST /workers/resolve`
-- **Crews**: `GET|POST /crews`, `PUT|DELETE /crews/{cid}`
-- **Parcels/Products**: `GET|POST /parcels`, `PUT|DELETE /parcels/{pid}`, `GET|POST /products`, `PUT|DELETE /products/{pid}`
-
-### Daily Operations
-- **Check-in/Attendance**: `GET|PUT /checkin-session`, `GET /attendance`, `POST /attendance/scan`, `DELETE /attendance/{aid}`
-- **Harvests**: `GET|POST /harvests`, `PUT|DELETE /harvests/{hid}`
-- **Dashboard**: `GET /dashboard`, `GET /harvests/daily`
-
-### Reports & Billing
-- **Exports**: `GET /harvests/export`, `GET /receipts/export`, `GET /payroll/export`
-- **History/Receipts**: `GET|POST /receipts/history`, `GET|DELETE /receipts/history/{hid}`, `GET /receipts/trash`, `POST /receipts/trash/{hid}/restore`, `DELETE /receipts/trash/{hid}`
-- **Payroll**: `GET /receipts`, `GET /payroll`
-- **Billing (PayPal)**: `GET /billing/status`, `POST /billing/subscribe`, `POST /billing/confirm`, `POST /billing/cancel`, `POST /billing/paypal-webhook`
-
-### Admin & System
-- **Mayordomos**: `GET|POST /admin/mayordomos`, `PATCH|DELETE /admin/mayordomos/{uid}`
-- **Files**: `POST /upload`, `GET /files/{path:path}`
-- **Cron/Health**: `POST /cron/daily-close`, `GET /health`, `GET /api/health`
+- **Auth**: 
+  - `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/logout`
+  - `GET /api/auth/me`
+- **Core Entities (Workers, Parcels, Products)**: 
+  - `GET|POST|PUT|DELETE /api/workers`, `POST /api/workers/resolve`, `POST /api/workers/{wid}/regenerate-qr`
+  - `GET|POST|PUT|DELETE /api/crews`, `/api/parcels`, `/api/products`
+- **Operations (Harvests & Check-in)**: 
+  - `GET|PUT /api/checkin-session`
+  - `GET|POST|PUT|DELETE /api/harvests`, `GET /api/harvests/daily`, `GET /api/harvests/reset-check`, `POST /api/harvests/reset`
+  - `GET|POST|DELETE /api/attendance`
+- **Reports & Billing**: 
+  - `GET /api/dashboard`, `GET /api/harvests/export`, `GET /api/payroll/export`, `GET /api/receipts/export`
+  - `GET|POST|DELETE /api/receipts/history`, `GET|DELETE /api/receipts/trash`, `POST /api/receipts/trash/{hid}/restore`
+  - `GET /api/billing/status`, `POST /api/billing/subscribe`, `POST /api/billing/cancel`
 
 ## 4. Data Models & Integrations
-- **MongoDB Collections**: `users`, `workers`, `crews`, `parcels`, `products`, `harvests`, `checkin_sessions`, `receipts_history`, `receipts_trash`, `attendance`, `billing_config`, `cron_runs`, `login_attempts`, `password_reset_tokens`, `password_reset_requests`, `files`.
-- **Target Platform Integration Variants Required**:
-  - **Camera**: The web `jsQR` solution must be replaced with `expo-camera` for native barcode scanning.
-  - **Printing**: The web Web-Bluetooth ESC/POS implementation must be evaluated. Target platform will need `expo-print` (for HTML tickets) or a native Bluetooth module (`react-native-ble-plx`) for direct thermal printing.
-  - **Billing (PayPal)**: Instead of a standard web redirect, mobile requires using `expo-web-browser` or `react-native-webview` to open the `approve_url` and intercept the deep link callback.
-  - **File Downloads (Excel)**: Web relies on Blob URLs and `<a>` downloads. Mobile must use `expo-file-system` to save the generated report and `expo-sharing` to share/export it.
-  - **Sound Effects**: Web uses WebAudio API (`lib/sounds.js`). Mobile will need `expo-av` or `expo-haptics` for scan feedback.
+- **MongoDB Models**: `users`, `workers`, `crews`, `parcels`, `products`, `harvests`, `checkin_sessions`, `attendance`, `receipts_history`, `receipts_trash`.
+- **Integrations Needing Target Variants**:
+  - **Camera**: Move from web `jsQR` to mobile `expo-camera`.
+  - **Printing**: Move from web Web-Bluetooth to `expo-print` (system print) or native thermal print integration.
+  - **Excel/Export**: Move from standard web downloads (Blob) to `expo-file-system` and `expo-sharing`.
+  - **Billing**: Mobile apps cannot easily use web popups for PayPal. Requires deep linking or WebView interception.
+  - **Sounds**: Move from `WebAudio` to `expo-haptics` and `expo-av`.
 
-## 5. Port Requirements (Target Platform: Mobile/Expo)
-
-### Navigation & Shell (expo-router)
-- Setup `app/(auth)` for `login.tsx`, `register.tsx`, `forgot-password.tsx`.
-- Setup `app/(tabs)` as the main layout (`_layout.tsx`) replacing `AppLayout.jsx`. Implement standard React Native Bottom Tabs.
-- Implement Custom Headers in the `(tabs)` layout to include User Name, Admin badge, Logout button, and the Blocked/Trial banner.
-
-### Screen Translations
-- **`app/(tabs)/registrar.tsx`**: Port `QuickHarvest.jsx`. Use React Native `TextInput` with `keyboardType="numeric"`. Wrap in `KeyboardAvoidingView`. Add a modal/overlay for `expo-camera` to scan QRs. Call `POST /harvests`.
-- **`app/(tabs)/asistencia.tsx`**: Port `Asistencia.jsx`. Use `ScrollView` and standard RN touchables. Call `POST /attendance/scan`.
-- **`app/(tabs)/dia.tsx`**: Port `ListaDia.jsx`. Use `FlatList` to render the today's records mapped from `GET /dashboard`.
-- **`app/(tabs)/reportes.tsx`**: Port `Reportes.jsx`. Call export endpoints (e.g., `GET /harvests/export`). Implement `expo-file-system` + `expo-sharing` to handle the Excel buffer download.
-- **`app/(tabs)/modulos.tsx`**: Port `Modulos.jsx`. List settings natively using `SectionList` or mapped views.
-
-### Auth & State
-- Create an `AuthContext` wrapper in `app/_layout.tsx`.
-- Store the authentication token securely using `expo-secure-store`.
-- Configure the Axios instance to append `Authorization: Bearer <token>` instead of relying on cookies (since the backend already supports Bearer auth natively, avoiding React Native cookie syncing issues).
-
-### Styling
-- Convert Tailwind utility classes to React Native `StyleSheet.create` definitions.
-- Implement responsive safe-areas (`react-native-safe-area-context`) for notches.
+## 5. Port Requirements (Target Platform: Expo Mobile)
+- **Routing**: Use Expo Router (`app/(auth)` and `app/(tabs)`). Tabs must implement the 5 main flows (`registrar`, `asistencia`, `dia`, `reportes`, `modulos`).
+- **Auth**: Replace HTTP Only cookie dependencies with `expo-secure-store` holding the Bearer token and manually attaching it via an Axios interceptor.
+- **Components**: Translate Shadcn UI and Tailwind classes to React Native `StyleSheet`, `View`, `Text`, `TouchableOpacity`. Replace fixed headers with Safe Area aware components (`react-native-safe-area-context`).
+- **QR Scanner**: Build a native QR Scanner view with `expo-camera`, ensuring proper unmounting when navigating away.
+- **Offline/Sync**: Considering recent mobile codebase updates, wrap the `saveHarvest` and `attendance` operations in an offline queue that replays when `NetInfo` indicates connectivity.
 
 ## 6. Open Questions / Risks
-- **Bluetooth ESC/POS Printing**: Does V1 of the mobile app require direct Bluetooth thermal printing? If yes, `react-native-ble-plx` is required (which may prevent using standard Expo Go and require custom Dev Clients). If not, we can fallback to `expo-print`.
-- **PayPal Return URL**: Deep-linking back to the app from the PayPal web flow requires defining an app scheme in `app.json` and updating the backend's return URL logic, or relying on Webhooks to update state and polling on the client side.
-- **Camera Permissions**: Native mobile will explicitly request camera permissions on first scan. The flow needs proper error handling if the user denies the permission.
+- **App Store Compliance**: Implementing a direct PayPal link in the mobile app may violate iOS App Store and Google Play billing guidelines. Does the app strictly target internal Enterprise distribution (APK/IPA sideloading) to bypass IAP rules?
+- **Offline Reliability**: For offline harvest captures, how should concurrent edits or deletes be synced if multiple supervisors edit the same worker's data?
+- **Direct Bluetooth Thermal Printing**: Expo Go doesn't support direct Bluetooth. Has a custom dev client been generated to test `react-native-ble-plx`, or is the fallback system share sheet sufficient for V1?

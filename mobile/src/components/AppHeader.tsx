@@ -1,8 +1,9 @@
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { LogOut, Lock, Gift } from "lucide-react-native";
+import { LogOut, Lock, Gift, CloudOff, RefreshCw, CheckCircle2 } from "lucide-react-native";
 import { useAuth } from "@/src/auth/AuthContext";
+import { useOffline } from "@/src/offline/OfflineContext";
 import { useTheme } from "@/src/theme";
 import Logo from "@/src/components/Logo";
 
@@ -18,6 +19,7 @@ export default function AppHeader() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { user, blocked, logout } = useAuth();
+  const { online, pending, syncing, sync } = useOffline();
 
   return (
     <View>
@@ -56,6 +58,23 @@ export default function AppHeader() {
           </Text>
         </View>
       ) : null}
+
+      {!online ? (
+        <View style={[styles.offlineBar, { backgroundColor: "#FEF3C7" }]} testID="offline-bar">
+          <CloudOff size={15} color="#92400E" />
+          <Text style={[styles.offlineText, { color: "#92400E" }]}>
+            Sin conexión{pending > 0 ? ` · ${pending} pendiente${pending !== 1 ? "s" : ""}` : " · trabajando sin señal"}
+          </Text>
+        </View>
+      ) : pending > 0 ? (
+        <TouchableOpacity testID="sync-button" onPress={() => sync()} disabled={syncing} style={[styles.offlineBar, { backgroundColor: "#DBEAFE" }]}>
+          <RefreshCw size={15} color="#1E40AF" />
+          <Text style={[styles.offlineText, { color: "#1E40AF", flex: 1 }]}>
+            {syncing ? "Sincronizando…" : `${pending} registro${pending !== 1 ? "s" : ""} por subir`}
+          </Text>
+          {!syncing && <Text style={styles.syncAction}>Sincronizar</Text>}
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
@@ -71,4 +90,7 @@ const styles = StyleSheet.create({
   logout: { width: 38, height: 38, borderRadius: 10, backgroundColor: "#1E3A8A", alignItems: "center", justifyContent: "center" },
   banner: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 9, borderBottomWidth: 2 },
   bannerText: { fontWeight: "700", fontSize: 13, flex: 1 },
+  offlineBar: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 9 },
+  offlineText: { fontWeight: "700", fontSize: 13 },
+  syncAction: { color: "#1E40AF", fontWeight: "900", fontSize: 13, textDecorationLine: "underline" },
 });

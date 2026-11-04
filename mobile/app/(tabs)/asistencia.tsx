@@ -7,6 +7,7 @@ import { useFocusEffect } from "expo-router";
 import { Sun, Moon, Search, ArrowLeft, Keyboard as KeyboardIcon, Camera as CameraIcon, LogOut, Users, Trash2, Flag, Loader } from "lucide-react-native";
 import api, { apiErrorMessage } from "@/src/api/client";
 import { useSession, Session } from "@/src/api/session";
+import { useOfflineActions } from "@/src/offline/useOfflineActions";
 import { toast } from "@/src/components/Toast";
 import QRScanner from "@/src/components/QRScanner";
 import WorkerAutocomplete, { Worker } from "@/src/components/WorkerAutocomplete";
@@ -34,6 +35,7 @@ export default function AsistenciaScreen() {
   const qc = useQueryClient();
   const today = todayISO();
   const { session, save } = useSession();
+  const { scanAttendance: scanOffline, createWorker } = useOfflineActions();
 
   const [view, setView] = useState<"hub" | "scan">("hub");
   const [scanMode, setScanMode] = useState<"checkin" | "checkout">("checkin");
@@ -64,13 +66,7 @@ export default function AsistenciaScreen() {
     return q ? rows.filter((r) => (r.worker_name || "").toLowerCase().includes(q)) : rows;
   }, [rows, search]);
 
-  const scanAttendance = async (code: string) => {
-    try {
-      const { data } = await api.post("/attendance/scan", { code, date: today });
-      toast.success(`${data.action === "check_out" ? "Salida" : "Entrada"}: ${data.worker_name}`);
-      qc.invalidateQueries({ queryKey: ["attendance", today] });
-    } catch (e) { toast.error(apiErrorMessage(e, "No se pudo registrar")); }
-  };
+  const scanAttendance = (code: string) => scanOffline(code, today);
 
   const resolveParcel = async (name: string) => {
     if (!name) { save({ parcelId: "", ranchoName: "" }); return; }
@@ -155,7 +151,7 @@ export default function AsistenciaScreen() {
 
               {manualOpen && (
                 <View style={s.manualBox}>
-                  <WorkerAutocomplete workers={(workersQ.data || []).filter((w) => w.active !== false)} onPick={(w) => scanAttendance(w.id)} onCreated={() => workersQ.refetch()} placeholder="Buscar empleado por nombre" testID="asis-manual-input" />
+                  <WorkerAutocomplete workers={(workersQ.data || []).filter((w) => w.active !== false)} onPick={(w) => scanAttendance(w.id)} createWorker={createWorker} placeholder="Buscar empleado por nombre" testID="asis-manual-input" />
                 </View>
               )}
 

@@ -25,21 +25,28 @@ export default function PayrollModule() {
   const { colors } = useTheme();
   const s = styles(colors);
   const [week, setWeek] = useState(mondayOf(todayISO()));
+  const [grower, setGrower] = useState("");
   const [sharing, setSharing] = useState(false);
 
   const q = useQuery({
-    queryKey: ["payroll", week],
-    queryFn: async () => (await api.get("/payroll", { params: { week, grower: "" } })).data,
+    queryKey: ["payroll", week, grower],
+    queryFn: async () => (await api.get("/payroll", { params: { week, grower } })).data,
   });
   const data = q.data;
 
   const share = async () => {
     if (!data?.rows?.length) { toast.error("No hay datos esta semana"); return; }
     setSharing(true);
-    try { await downloadAndShareExcel("/payroll/export", { week, grower: "" }, `payroll_${week}.xlsx`); toast.success("Payroll generado"); }
+    try { await downloadAndShareExcel("/payroll/export", { week, grower }, `payroll_${week}${grower ? "_" + grower.replace(/\s+/g, "_") : ""}.xlsx`); toast.success("Payroll generado"); }
     catch (e: any) { toast.error(e?.message || "No se pudo compartir"); }
     finally { setSharing(false); }
   };
+
+  const growers: string[] = data?.growers || [];
+
+  React.useEffect(() => {
+    if (!grower && growers.length > 0) setGrower(growers[0]);
+  }, [growers, grower]);
 
   return (
     <ScrollView contentContainerStyle={s.scroll}>
@@ -55,6 +62,13 @@ export default function PayrollModule() {
         <TouchableOpacity testID="payroll-share" onPress={share} disabled={sharing} style={s.shareBtn}>
           <Share2 size={16} color="#FFFFFF" /><Text style={s.shareText}>Compartir Excel</Text>
         </TouchableOpacity>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.growerRow}>
+          {growers.length === 0 ? <Text style={s.noGrowers}>Sin growers esta semana</Text> : growers.map((g) => (
+            <TouchableOpacity key={g} testID={`payroll-grower-${g}`} onPress={() => setGrower(g)} style={[s.growerChip, grower === g && s.growerChipActive]}>
+              <Text style={[s.growerChipText, grower === g && s.growerChipTextActive]}>{g}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </Card>
 
       {q.isLoading ? <Loading /> : !data?.rows?.length ? <EmptyState text="No hay recibos en esta semana" /> : (
@@ -84,6 +98,12 @@ const styles = (c: ThemeColors) =>
     weekValue: { fontSize: 16, fontWeight: "800", color: c.onSurface, marginTop: 2 },
     shareBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: c.brandPrimary, height: 46, borderRadius: 12 },
     shareText: { color: "#FFFFFF", fontWeight: "800" },
+    growerRow: { gap: 8, paddingTop: 12 },
+    noGrowers: { color: c.muted, fontWeight: "600", fontSize: 13, paddingTop: 4 },
+    growerChip: { paddingHorizontal: 14, height: 38, borderRadius: 19, backgroundColor: c.surfaceTertiary, borderWidth: 1, borderColor: c.border, alignItems: "center", justifyContent: "center" },
+    growerChipActive: { backgroundColor: c.brandPrimary, borderColor: c.brandPrimary },
+    growerChipText: { fontWeight: "700", color: c.onSurfaceTertiary, fontSize: 13 },
+    growerChipTextActive: { color: "#FFFFFF" },
     grower: { fontSize: 13, fontWeight: "700", color: c.onSurfaceTertiary, marginBottom: 10 },
     payRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 11, borderTopWidth: 1, borderTopColor: c.divider },
     payName: { fontWeight: "700", color: c.onSurface, fontSize: 15, flex: 1 },

@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from "react";
-import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Platform, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { Download, Share2, ChevronDown, Calendar, FileSpreadsheet, FileText } from "lucide-react-native";
+import { Download, Share2, ChevronDown, Calendar, FileSpreadsheet, FileText, SlidersHorizontal, Trash2 } from "lucide-react-native";
 import api from "@/src/api/client";
 import { toast } from "@/src/components/Toast";
 import { Card, EmptyState, Loading, ScreenTitle } from "@/src/components/ui";
@@ -22,6 +22,13 @@ export default function ReportesScreen() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [showReset, setShowReset] = useState(false);
+  const [resetCheck, setResetCheck] = useState<any>(null);
+  const [resetConfirm, setResetConfirm] = useState("");
+  const [includeAtt, setIncludeAtt] = useState(true);
+  const [resetting, setResetting] = useState(false);
+  const [savingReceipt, setSavingReceipt] = useState(false);
 
   const receiptsQ = useQuery({
     queryKey: ["receipts", dateFrom, dateTo],
@@ -67,6 +74,36 @@ export default function ReportesScreen() {
     finally { setSharing(false); }
   };
 
+  const openReset = async () => {
+    setResetConfirm(""); setResetCheck(null);
+    setShowReset(true);
+    try { const { data } = await api.get("/harvests/reset-check"); setResetCheck(data); }
+    catch { setResetCheck({ unsaved: false }); }
+  };
+
+  const saveReceiptFirst = async () => {
+    if (!resetCheck) return;
+    setSavingReceipt(true);
+    try {
+      await api.post("/receipts/history", { date_from: resetCheck.date_from, date_to: resetCheck.date_to, note: "Guardado antes de borrar historial" });
+      toast.success("Recibo guardado");
+      setResetCheck({ ...resetCheck, unsaved: false });
+    } catch { toast.error("No se pudo guardar el recibo"); }
+    finally { setSavingReceipt(false); }
+  };
+
+  const resetAll = async () => {
+    if (resetConfirm.trim().toUpperCase() !== "BORRAR") { toast.error('Escribe "BORRAR" para confirmar'); return; }
+    setResetting(true);
+    try {
+      const { data } = await api.post("/harvests/reset", null, { params: { include_attendance: includeAtt } });
+      toast.success(`Historial borrado: ${data.harvests_deleted} cosechas${includeAtt ? ` y ${data.attendance_deleted} asistencias` : ""}`);
+      setShowReset(false);
+      receiptsQ.refetch();
+    } catch { toast.error("No se pudo borrar"); }
+    finally { setResetting(false); }
+  };
+
   return (
     <View style={[s.flex, { backgroundColor: colors.surfaceSecondary }]}>
       <ScrollView contentContainerStyle={s.scroll}>
@@ -85,11 +122,31 @@ export default function ReportesScreen() {
 
         {tab === "cosechas" ? (
           <>
-            <View style={s.dateRow}>
-              <TouchableOpacity testID="rep-date-from" onPress={() => setPicker("from")} style={s.dateBtn}><Calendar size={14} color={colors.muted} /><Text style={s.dateText}>{dateFrom}</Text></TouchableOpacity>
-              <Text style={s.arrow}>→</Text>
-              <TouchableOpacity testID="rep-date-to" onPress={() => setPicker("to")} style={s.dateBtn}><Calendar size={14} color={colors.muted} /><Text style={s.dateText}>{dateTo}</Text></TouchableOpacity>
+            <View style={s.btnRow}>
+              <TouchableOpacity testID="rep-filters" onPress={() => setShowFilters((v) => !v)} style={s.filterBtn}>
+                <SlidersHorizontal size={16} color={colors.brandPrimary} /><Text style={s.filterText}>Aplicar filtros</Text>
+              </TouchableOpacity>
+              <TouchableOpacity testID="rep-export" onPress={exportExcel} disabled={exporting || !receipts.length} style={[s.redBtn, { opacity: exporting || !receipts.length ? 0.6 : 1 }]}>
+                <Download size={16} color="#FFFFFF" /><Text style={s.redText}>{exporting ? "..." : "Exportar a Excel"}</Text>
+              </TouchableOpacity>
             </View>
+
+            <View style={s.btnRow}>
+              <TouchableOpacity testID="rep-date-from" onPress={() => setPicker("from")} style={s.datePill}>
+                <Calendar size={14} color={colors.muted} /><Text style={s.dateText}>{dateFrom} → {dateTo}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity testID="rep-clear-all" onPress={openReset} style={s.redBtn}>
+                <Trash2 size={16} color="#FFFFFF" /><Text style={s.redText}>Borrar todo</Text>
+              </TouchableOpacity>
+            </View>
+
+            {showFilters && (
+              <View style={s.dateRow}>
+                <TouchableOpacity testID="rep-date-to" onPress={() => setPicker("to")} style={s.dateBtn}><Calendar size={14} color={colors.muted} /><Text style={s.dateText}>Hasta: {dateTo}</Text></TouchableOpacity>
+                <TouchableOpacity testID="rep-share" onPress={share} disabled={sharing || !receipts.length} style={s.dateBtn}><Share2 size={14} color={colors.brandPrimary} /><Text style={[s.dateText, { color: colors.brandPrimary }]}>{sharing ? "..." : "Compartir"}</Text></TouchableOpacity>
+              </View>
+            )}
+
             {picker && (
               <DateTimePicker
                 value={new Date(`${picker === "from" ? dateFrom : dateTo}T12:00:00`)}
@@ -101,20 +158,9 @@ export default function ReportesScreen() {
               />
             )}
 
-            <View style={s.actionRow}>
-              <TouchableOpacity testID="rep-export" onPress={exportExcel} disabled={exporting || !receipts.length} style={[s.actionBtn, { backgroundColor: colors.brandSecondary, opacity: exporting || !receipts.length ? 0.6 : 1 }]}>
-                <Download size={16} color="#FFFFFF" /><Text style={s.actionText}>{exporting ? "..." : "Excel"}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity testID="rep-share" onPress={share} disabled={sharing || !receipts.length} style={[s.actionBtn, { backgroundColor: colors.brandPrimary, opacity: sharing || !receipts.length ? 0.6 : 1 }]}>
-                <Share2 size={16} color="#FFFFFF" /><Text style={s.actionText}>{sharing ? "..." : "Compartir"}</Text>
-              </TouchableOpacity>
+            <View style={s.resumenHead}>
+              <FileText size={18} color={colors.brandPrimary} /><Text style={s.resumenTitle}>Resumen por empleado</Text>
             </View>
-
-            <Card style={s.totalsCard}>
-              <View style={s.totalCell}><Text style={s.totalLabel}>Unidades</Text><Text style={s.totalVal}>{formatNumber(totals.units, 0)}</Text></View>
-              <View style={s.totalCell}><Text style={s.totalLabel}>Horas</Text><Text style={s.totalVal}>{formatNumber(totals.hours, 1)}</Text></View>
-              <View style={s.totalCell}><Text style={s.totalLabel}>Total</Text><Text style={[s.totalVal, { color: colors.brandPrimary }]}>{formatCurrency(totals.payment)}</Text></View>
-            </Card>
 
             {receiptsQ.isLoading ? <Loading /> : receipts.length === 0 ? <EmptyState text="Sin resultados en este periodo" /> : receipts.map((r: any) => {
               const open = expanded === r.worker_id;
@@ -123,7 +169,7 @@ export default function ReportesScreen() {
                   <TouchableOpacity onPress={() => setExpanded(open ? null : r.worker_id)} style={s.sumRow}>
                     <View style={s.flex}>
                       <Text style={s.sumName}>{r.worker_name}</Text>
-                      <Text style={s.sumSub}>{formatNumber(r.total_units, 0)} u. · {formatNumber(r.total_hours, 2)} h · {(r.harvests?.length || 0)} reg.</Text>
+                      <Text style={s.sumSub}>{formatNumber(r.total_units, 0)} u. · {formatNumber(r.total_hours, 2)} h · {(r.harvests?.length || 0)} registros</Text>
                     </View>
                     <Text style={s.sumPay}>{formatCurrency(r.total_payment)}</Text>
                     <ChevronDown size={18} color={colors.muted} style={{ transform: [{ rotate: open ? "180deg" : "0deg" }] }} />
@@ -160,6 +206,33 @@ export default function ReportesScreen() {
         )}
         <View style={{ height: 24 }} />
       </ScrollView>
+
+      <Modal visible={showReset} transparent animationType="fade" onRequestClose={() => setShowReset(false)}>
+        <View style={s.modalWrap}>
+          <View style={s.confirmCard} testID="reset-modal">
+            <Text style={s.confirmTitle}>Borrar todo el historial</Text>
+            <Text style={s.confirmSub}>Se eliminarán TODAS las cosechas{includeAtt ? " y las asistencias" : ""} de tu cuenta. Esta acción no se puede deshacer.</Text>
+
+            {resetCheck?.unsaved ? (
+              <TouchableOpacity testID="reset-save-receipt" onPress={saveReceiptFirst} disabled={savingReceipt} style={s.saveFirstBtn}>
+                <Text style={s.saveFirstText}>{savingReceipt ? "Guardando…" : "Guardar recibo antes de borrar"}</Text>
+              </TouchableOpacity>
+            ) : null}
+
+            <TouchableOpacity testID="reset-include-attendance" onPress={() => setIncludeAtt((v) => !v)} style={s.checkRow}>
+              <View style={[s.checkbox, includeAtt && { backgroundColor: colors.brandPrimary, borderColor: colors.brandPrimary }]}>{includeAtt ? <Text style={s.checkMark}>✓</Text> : null}</View>
+              <Text style={s.checkLabel}>También borrar asistencias</Text>
+            </TouchableOpacity>
+
+            <TextInput testID="reset-confirm-input" value={resetConfirm} onChangeText={setResetConfirm} placeholder='Escribe "BORRAR"' placeholderTextColor={colors.muted} autoCapitalize="characters" style={s.input} />
+
+            <View style={s.confirmBtns}>
+              <TouchableOpacity testID="reset-cancel" onPress={() => setShowReset(false)} style={[s.confirmBtn, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]}><Text style={[s.confirmBtnText, { color: colors.onSurfaceTertiary }]}>Cancelar</Text></TouchableOpacity>
+              <TouchableOpacity testID="reset-confirm-btn" onPress={resetAll} disabled={resetting} style={[s.confirmBtn, { backgroundColor: colors.error }]}><Text style={s.confirmBtnText}>{resetting ? "Borrando…" : "Borrar todo"}</Text></TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -177,6 +250,28 @@ const styles = (c: ThemeColors) =>
     dateBtn: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, borderRadius: 12, height: 46, paddingHorizontal: 12 },
     dateText: { fontWeight: "700", color: c.onSurface, fontSize: 14 },
     arrow: { color: c.muted, fontWeight: "800" },
+    btnRow: { flexDirection: "row", gap: 10, marginBottom: 12 },
+    filterBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, height: 50, borderRadius: 14, backgroundColor: c.surface, borderWidth: 1.5, borderColor: c.brandPrimary },
+    filterText: { color: c.brandPrimary, fontWeight: "800", fontSize: 15 },
+    redBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, height: 50, borderRadius: 14, backgroundColor: c.error },
+    redText: { color: "#FFFFFF", fontWeight: "800", fontSize: 15 },
+    datePill: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, borderRadius: 14, height: 50, paddingHorizontal: 14 },
+    resumenHead: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6, marginBottom: 12 },
+    resumenTitle: { fontSize: 17, fontWeight: "800", color: c.onSurface },
+    modalWrap: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center", padding: 32 },
+    confirmCard: { backgroundColor: "#FFFFFF", borderRadius: 24, padding: 24, width: "100%" },
+    confirmTitle: { fontSize: 20, fontWeight: "800", color: c.onSurface, textAlign: "center" },
+    confirmSub: { fontSize: 13, color: c.onSurfaceTertiary, textAlign: "center", marginTop: 8, marginBottom: 18, lineHeight: 19 },
+    confirmBtns: { flexDirection: "row", gap: 12 },
+    confirmBtn: { flex: 1, height: 50, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+    confirmBtnText: { color: "#FFFFFF", fontWeight: "800", fontSize: 15 },
+    saveFirstBtn: { backgroundColor: "#FEF3C7", borderRadius: 12, paddingVertical: 12, alignItems: "center", marginBottom: 14 },
+    saveFirstText: { color: "#92400E", fontWeight: "800", fontSize: 14 },
+    checkRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 14 },
+    checkbox: { width: 24, height: 24, borderRadius: 7, borderWidth: 2, borderColor: c.borderStrong, alignItems: "center", justifyContent: "center" },
+    checkMark: { color: "#FFFFFF", fontWeight: "900", fontSize: 14 },
+    checkLabel: { fontSize: 14, fontWeight: "700", color: c.onSurface },
+    input: { backgroundColor: c.surfaceTertiary, borderWidth: 1, borderColor: c.border, borderRadius: 12, height: 50, paddingHorizontal: 14, fontSize: 16, color: c.onSurface, marginBottom: 16 },
     actionRow: { flexDirection: "row", gap: 10, marginBottom: 14 },
     actionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, height: 48, borderRadius: 12 },
     actionText: { color: "#FFFFFF", fontWeight: "800" },

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Users, Trash2, FileText, Wallet, Shield, LifeBuoy } from "lucide-react-native";
 import { useAuth } from "@/src/auth/AuthContext";
 import WorkersModule from "@/src/modules/WorkersModule";
@@ -26,18 +26,19 @@ export default function ModulosScreen() {
 
   return (
     <View style={[s.flex, { backgroundColor: colors.surfaceSecondary }]}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabBar}>
+      <Text style={s.title}>Módulos</Text>
+      <View style={s.gridCard}>
         {tabs.map(({ id, label, Icon }) => {
           const active = tab === id;
           return (
-            <TouchableOpacity key={id} testID={`modulo-tab-${id}`} onPress={() => setTab(id)} style={[s.tab, active && s.tabActive]}>
-              <Icon size={15} color={active ? "#FFFFFF" : colors.onSurfaceTertiary} />
-              <Text style={[s.tabText, active && s.tabTextActive]}>{label}</Text>
+            <TouchableOpacity key={id} testID={`modulo-tab-${id}`} onPress={() => setTab(id)} style={[s.gridItem, active && s.gridItemActive]} activeOpacity={0.85}>
+              <Icon size={18} color={active ? "#FFFFFF" : colors.onSurfaceTertiary} />
+              <Text style={[s.gridText, { color: active ? "#FFFFFF" : colors.onSurfaceTertiary }]}>{label}</Text>
             </TouchableOpacity>
           );
         })}
-      </ScrollView>
-      <View style={s.flex}>
+      </View>
+      <View style={s.content}>
         {tab === "workers" && <WorkersModule />}
         {tab === "trash" && <TrashModule />}
         {tab === "registro" && <RegistroModule />}
@@ -52,9 +53,10 @@ export default function ModulosScreen() {
 const styles = (c: ThemeColors) =>
   StyleSheet.create({
     flex: { flex: 1 },
-    tabBar: { paddingHorizontal: 12, paddingVertical: 12, gap: 8 },
-    tab: { flexDirection: "row", alignItems: "center", gap: 6, height: 42, paddingHorizontal: 14, borderRadius: 12, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border },
-    tabActive: { backgroundColor: c.brandPrimary, borderColor: c.brandPrimary },
-    tabText: { fontWeight: "700", color: c.onSurfaceTertiary, fontSize: 13 },
-    tabTextActive: { color: "#FFFFFF" },
+    title: { fontSize: 30, fontWeight: "800", color: c.onSurface, paddingHorizontal: 20, paddingTop: 16, marginBottom: 14, letterSpacing: -0.5 },
+    gridCard: { marginHorizontal: 16, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, borderRadius: 20, padding: 10, flexDirection: "row", flexWrap: "wrap" },
+    gridItem: { width: "50%", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, height: 54, borderRadius: 14 },
+    gridItemActive: { backgroundColor: c.brandPrimary },
+    gridText: { fontWeight: "800", fontSize: 16 },
+    content: { flex: 1, marginTop: 8 },
   });

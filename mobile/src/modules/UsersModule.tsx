@@ -6,6 +6,7 @@ import api, { apiErrorMessage } from "@/src/api/client";
 import { useAuth } from "@/src/auth/AuthContext";
 import { toast } from "@/src/components/Toast";
 import { Card, EmptyState, Loading } from "@/src/components/ui";
+import ChangePasswordCard from "@/src/components/ChangePasswordCard";
 import { useTheme, ThemeColors } from "@/src/theme";
 
 export default function UsersModule() {
@@ -40,6 +41,7 @@ export default function UsersModule() {
 
   return (
     <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
+      <ChangePasswordCard />
       <Card style={{ marginBottom: 14 }}>
         <Text style={s.title}>Nuevo mayordomo</Text>
         <TextInput testID="mayordomo-name" value={form.name} onChangeText={(t) => setForm({ ...form, name: t })} placeholder="Nombre" placeholderTextColor={colors.muted} style={[s.input, { marginBottom: 10 }]} />
