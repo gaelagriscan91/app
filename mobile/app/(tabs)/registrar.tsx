@@ -172,26 +172,27 @@ export default function RegistrarScreen() {
                 </View>
               )}
 
-              {/* Cantidad — solo aparece cuando hay empleado seleccionado */}
-              {team.length > 0 && (
-                <View style={s.row} testID="quick-qty-row">
-                  <Text style={s.rowLabel}>Cantidad</Text>
-                  <View style={s.rowRightWrap}>
-                    {team.length > 1 && Number(qty) > 0 && (
-                      <Text style={s.splitInfo} testID="quick-split-info">÷ {team.length} = {Math.round((Number(qty) / team.length) * 100) / 100} c/u</Text>
-                    )}
-                    <TextInput
-                      testID="quick-qty-input"
-                      value={qty}
-                      onChangeText={(t) => setQty(t.replace(/[^0-9.]/g, ""))}
-                      keyboardType="decimal-pad"
-                      placeholder="Cantidad"
-                      placeholderTextColor="#C4C4C4"
-                      style={s.qtyInput}
-                    />
-                  </View>
+              {/* Cantidad — la etiqueta siempre visible; el número solo con empleado */}
+              <View style={s.row} testID="quick-qty-row">
+                <Text style={s.rowLabel}>Cantidad</Text>
+                <View style={s.rowRightWrap}>
+                  {team.length > 0 && (
+                    <>
+                      {team.length > 1 && Number(qty) > 0 && (
+                        <Text style={s.splitInfo} testID="quick-split-info">÷ {team.length} = {Math.round((Number(qty) / team.length) * 100) / 100} c/u</Text>
+                      )}
+                      <TextInput
+                        testID="quick-qty-input"
+                        value={qty}
+                        onChangeText={(t) => setQty(t.replace(/[^0-9.]/g, ""))}
+                        keyboardType="decimal-pad"
+                        placeholder=""
+                        style={s.qtyInput}
+                      />
+                    </>
+                  )}
                 </View>
-              )}
+              </View>
 
               <View style={{ height: 20 }} />
               <ValueRow label="Precio" value={formatCurrency(price)} testID="quick-price" colors={colors} />
