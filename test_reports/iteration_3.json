@@ -1,0 +1,24 @@
+{
+  "summary": "Tested the new Picking price lock-in feature end-to-end. Backend lock-in logic (piece mode + hour mode) in POST /api/harvests works as specified; product.price_per_unit / price_per_hour are set only when previously 0, and are NEVER overwritten by subsequent harvests even with a different price. Frontend ScanHarvestMode pre-fills saved prices, shows the green lock chip ('Guardado para este producto') when a price is locked, and blocks zero-price saves with the required Spanish toast. All 4 pytest cases pass; full E2E browser scenario passes.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_price_lockin.py",
+    "/app/test_reports/pytest/pytest_results_iter3.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Harvest 'snapshot' pricing: a second harvest with price_per_unit=999 still saves 999 on the harvest row itself (payment uses 999). Product stays locked at 25 as required, but downstream reports / receipts will reflect the 999 price_per_unit of that individual harvest row. If the business rule is 'price is the SAME for everyone', consider ignoring the posted price_per_unit when a product-level lock exists and forcing snapshot = product.price_per_unit. Currently only the lock-write is prevented, not the snapshot override.",
+    "ScanHarvestMode.jsx is 851 lines — recommend splitting (piece vs hour sub-components) once stabilized.",
+    "Backend price_mode is only used to decide which field to lock; it is not persisted on the harvest doc. Including it would help reporting distinguish piece vs hour rows."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_price_lockin.py (new)"
+  ],
+  "success_rate": {"backend": "100% (4/4)", "frontend": "100% (all expected UI/flows verified)"},
+  "test_credentials": "Admin gaelmartin158@gmail.com / agriscan2026",
+  "seed_data_creation": "Each test creates a TEST_-prefixed product and deletes it on teardown; a few TEST_* harvests remain in the DB tied to the first worker/parcel but have no production impact.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Price lock-in works. If main agent decides to enforce snapshot override (point 1 in critical_code_review_comments), re-test harvest creation with a locked product to ensure the harvest's own price_per_unit falls back to product.price_per_unit when a lock exists."
+}

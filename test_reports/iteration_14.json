@@ -1,0 +1,30 @@
+{
+  "summary": "Tested the Weekly Payroll feature in the backend and frontend. Backend: 7 of 7 pytest tests pass (tests/test_payroll.py). Covered: any date is moved to its Monday; 7 days Lunes..Domingo with the most-used price per day; growers list; mayordomo; per-worker cells and totals; combining saved receipts with live harvests, with nothing counted twice when the same harvest is in 2 overlapping saved receipts; case-insensitive grower filter; a week with no data; invalid week returns 400; no login returns 401 on both endpoints; xlsx layout matches the spec (A1 Grower/B1 grower, F1 Mayordomo/H1, row 3 weekdays, row 4 dates mm-dd-yy, row 5 Pieza/Precio $X.XX, employee rows, $ total in column 16). Deleting a harvest that is in a saved receipt correctly drops it from the payroll (via _resync_receipts). Frontend desktop: Payroll tab sits next to Registro; week label, prev/next week, grower select options, table, mayordomo, total $52.00 and row values all match the API. Compartir downloads payroll_<week>_<grower>.xlsx and shows the 'Payroll descargado' toast. An empty week shows payroll-empty, and Compartir there shows the 'No hay datos esta semana' toast. Mobile 390px: the table scrolls inside its container (scrollWidth 946 vs 354), the page does not overflow, and the name column stays sticky (left=30px after scrollLeft=400).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "PayrollTab grower select", "issue": "After you pick a grower and move to a week where that grower has no data, the grower stays in state and is still sent to the API, but it is no longer in data.growers. The select then shows 'Todos los growers' while the results are still filtered by the old grower, so the user sees 'No hay recibos' for a week that has other growers' data. Fix: reset grower when it is not in data.growers, or always render the current grower as an option.", "selector": "[data-testid='payroll-grower-select']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Payroll mobile 390px", "issues": ["Only the 'Nombre Empleados' header cell and the body name cells are sticky. The first cells of header rows 1-2 (blank and 'Fecha') scroll away, so weekday headers slide over the sticky name column. Make those cells sticky too, with a background.", "The name column uses whitespace-nowrap, so long names take about 200 of the 354px width. Consider a max-width with truncate/wrap."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_payroll.py", "/app/backend/tests/payroll_seed.py", "/app/test_reports/pytest/pytest_payroll.xml"],
+  "action_items": [
+    "PayrollTab: keep the grower select in sync when the selected grower is missing from data.growers for the new week",
+    "Optional: make the first column sticky in all thead rows on mobile",
+    "Optional: rows use key={r.worker_name}, which gives duplicate React keys if 2 workers share a name; return worker_id from the backend and use it as the key"
+  ],
+  "critical_code_review_comments": [
+    "_payroll groups rows by worker_id but the frontend keys rows by worker_name (duplicate key risk)",
+    "_payroll calls receipts() for the whole week plus every overlapping snapshot, which is fine for weekly volume; the dedupe key is the harvest id",
+    "Day price is the most frequent price that day; when workers had different prices the header shows only one. This is acceptable but should be documented"
+  ],
+  "updated_files": ["/app/backend/tests/test_payroll.py", "/app/backend/tests/payroll_seed.py"],
+  "success_rate": {"backend": "100%", "frontend": "95%"},
+  "seed_data_creation": "TEST_PAY workers, harvests with grower TEST_Grower/TEST_OtherGrower and saved receipts were created and fully cleaned up (history + trash). No TEST data remains.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: set -a; . backend/.env; export REACT_APP_BACKEND_URL; pytest tests/test_payroll.py. Use tests/payroll_seed.py seed|clean to seed UI data for the current week (2 workers, total $52). navigator.share is unavailable in headless Chromium, so Compartir falls back to a download."
+}

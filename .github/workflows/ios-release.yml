@@ -1,0 +1,136 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch: {}
+
+env:
+  BUNDLE_ID: com.griscan.ionicreact
+  BACKEND_URL: https://harvest-track-94.emergent.host
+
+jobs:
+  build-ios:
+    name: Build iOS IPA
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+
+      # yarn + yarn.lock (npm install breaks ajv / ajv-keywords versions)
+      - name: Install dependencies
+        working-directory: frontend
+        run: |
+          corepack enable || npm install -g yarn
+          yarn install --frozen-lockfile --network-timeout 600000
+
+      - name: Build React
+        working-directory: frontend
+        env:
+          CI: 'false'
+          REACT_APP_BACKEND_URL: ${{ env.BACKEND_URL }}
+        run: yarn build
+
+      - name: Add iOS platform (if missing) and sync
+        working-directory: frontend
+        run: |
+          if [ ! -d ios ]; then npx cap add ios; fi
+          npx cap sync ios
+
+      - name: Configure bundle ID, version and permissions
+        working-directory: frontend/ios/App
+        run: |
+          # Bundle ID only on the App target (not on Pods)
+          sed -i '' -E "s/PRODUCT_BUNDLE_IDENTIFIER = [^;]+;/PRODUCT_BUNDLE_IDENTIFIER = ${BUNDLE_ID};/g" App.xcodeproj/project.pbxproj
+          PLIST=App/Info.plist
+          set_key() { /usr/libexec/PlistBuddy -c "Set :$1 $2" "$PLIST" 2>/dev/null || /usr/libexec/PlistBuddy -c "Add :$1 string $2" "$PLIST"; }
+          set_key NSCameraUsageDescription "AgriScan usa la camara para escanear los codigos QR de los trabajadores."
+          set_key NSPhotoLibraryUsageDescription "AgriScan usa tus fotos para adjuntarlas a los registros de cosecha."
+          set_key CFBundleVersion "${{ github.run_number }}"
+          /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" "$PLIST" 2>/dev/null || true
+
+      - name: Check signing secrets
+        id: signing
+        env:
+          KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+          PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+          TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+        run: |
+          if [ -n "$KEY_ID" ] && [ -n "$ISSUER_ID" ] && [ -n "$PRIVATE_KEY" ] && [ -n "$TEAM_ID" ]; then
+            mkdir -p ~/.appstoreconnect/private_keys
+            echo "$PRIVATE_KEY" > ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "Signing + TestFlight enabled"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "No App Store Connect secrets: building UNSIGNED ipa"
+          fi
+
+      # ---------- Unsigned build (no secrets) ----------
+      - name: Build unsigned IPA
+        if: steps.signing.outputs.enabled != 'true'
+        working-directory: frontend/ios/App
+        run: |
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/dd" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+          mkdir -p "$RUNNER_TEMP/out/Payload"
+          cp -R "$RUNNER_TEMP/dd/Build/Products/Release-iphoneos/App.app" "$RUNNER_TEMP/out/Payload/"
+          cd "$RUNNER_TEMP/out" && zip -qr AgriScan-unsigned.ipa Payload && rm -rf Payload
+
+      # ---------- Signed build (App Store Connect API key, automatic signing) ----------
+      - name: Archive and export signed IPA
+        if: steps.signing.outputs.enabled == 'true'
+        working-directory: frontend/ios/App
+        env:
+          KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+          TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+        run: |
+          KEY_PATH=~/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$KEY_PATH" -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER_ID" \
+            DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Automatic archive
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>${TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+          </dict></plist>
+          EOF
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/out" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$KEY_PATH" -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER_ID"
+          mv "$RUNNER_TEMP"/out/*.ipa "$RUNNER_TEMP/out/AgriScan.ipa"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: agriscan-ipa
+          path: ${{ runner.temp }}/out/*.ipa
+          retention-days: 30
+
+      - name: Upload to TestFlight
+        if: steps.signing.outputs.enabled == 'true'
+        env:
+          KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+        run: |
+          xcrun altool --upload-app --type ios --file "$RUNNER_TEMP/out/AgriScan.ipa" \
+            --apiKey "$KEY_ID" --apiIssuer "$ISSUER_ID"

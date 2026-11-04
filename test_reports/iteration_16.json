@@ -1,0 +1,31 @@
+{
+  "summary": "Frontend-only test of /registrar QuickHarvest multi-employee (up to 6) shared piece at 390px mobile, Libra mode, $25. Tested with mouse clicks and with real touch emulation (has_touch/is_mobile + tap()). Every check passed. Adding employees 2..6 from suggestions works every time: the chip shows up, the input clears, already-added workers are left out of the suggestions, the 7th is blocked with 'Máximo 6', quick-scan-more is hidden at 6, and removing a chip brings the input back. No 1/4, 1/2 or 3/4 buttons in the Cantidad row. quick-split-info shows '÷ 3 = 10 c/u' and '÷ 2 = 7.5 c/u'. SAVE with 2 employees and qty 15 created 2 harvests (7.5 units, $187.50 each, notes 'Pieza compartida entre 2'). Chips and qty cleared after save, toast 'Guardado: 15 entre 2 · 7.5 c/u', and Records shows both rows. Single employee qty 7 saved 7 units / $175 with no split info. quick-scan-more opens the full-screen QR scanner and the team is kept. The second-employee problem from E1's smoke test did NOT reproduce. The resetKey remount works as intended: pick() runs onPick on mousedown before the remount, and the new input starts empty and works.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "EditRecord dialog (QuickHarvest.jsx L134-136)", "issue": "1/4, 1/2, 3/4 buttons are still in the record-edit dialog (quick-edit-frac-*). They were removed from the Cantidad row only. The user asked to remove these buttons; confirm whether the edit dialog should drop them too.", "selector": "[data-testid^='quick-edit-frac-']", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Shared save (save loop)", "issue": "Harvests are POSTed one after another with no rollback. If request k of N fails, records 1..k-1 are already saved but the team is not cleared, so pressing SAVE again creates duplicates for the employees already saved. Remove saved workers from the team on partial failure, or use a backend batch endpoint.", "affected_selectors": ["[data-testid='quick-save-button']"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Handle a partial failure in the multi-employee save so a retry does not create duplicates (drop saved workers from the team, or add a batch endpoint)",
+    "Decide whether to remove FRACTIONS buttons from the EditRecord dialog too (FRACTIONS const is otherwise only used there)",
+    "Optional: units are rounded to 4 decimals (10/3 -> 3.3333 x3 = 9.9999). Consider letting the last employee take the remainder so the total adds up exactly"
+  ],
+  "critical_code_review_comments": [
+    "EmployeeInput still receives the now-unused props worker/onClear (always null/no-op), so the `if (worker)` branches and the useEffect are dead code",
+    "testid prefix 'quick-team-' collides with 'quick-team-remove-' and the container 'quick-team', which makes prefix selectors ambiguous. Consider 'quick-team-chip-{id}'",
+    "Suggestions are capped at 6 matches (slice(0,6)). With many workers sharing a prefix, the user has to type more letters",
+    "Root cause of the reported 2nd-add issue: not reproducible. The likely cause in E1's smoke test was a test artifact, e.g. the option id not being among the first 6 matches, or querying the old input handle after the key remount (the element is detached after each add, so locators must be re-queried)"
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "seed_data_creation": "Created 8 TEST_QA workers and 3 harvests; all deleted at the end (DELETE 200).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Check-in session for today is in Libra mode at $25. Login via UI, then page.request shares cookies for API seeding. Use touch emulation via browser.new_context(storage_state=..., has_touch=True, is_mobile=True). Re-query quick-employee-input after each add because it remounts (key=resetKey)."
+}

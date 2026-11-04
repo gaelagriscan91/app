@@ -1,0 +1,43 @@
+{
+  "summary": "Tested QuickHarvest (/registrar) manual employee input + Records edit/delete, on both backend and frontend (mobile 390x844 and a desktop check). Working: typing shows suggestions; 'Agregar \"name\"' creates the worker (POST /api/workers) and selects it; qty becomes 1 and the button changes to SAVE; SAVE creates the harvest, shows a toast and resets the form; fraction buttons work; with no check-in session, picking a worker redirects to /asistencia with a toast. Records lists today's harvests. The edit dialog opens with the current qty. Guardar PUTs and updates units/payment (3->7, $38,388); qty 0 shows 'Cantidad no válida'; Borrar with confirm deletes the record and the list refreshes; a DELETE on a record locked by a receipt shows the backend error toast. Problems found: (1) PUT /api/harvests/{id} has no receipt-lock check, so a locked record can still be edited. (2) A worker created from the input is not added to the local workers list. (3) Invalid ObjectId returns 500. (4) Backspacing on a selected name clears the whole field.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "PUT /api/harvests/{hid}", "issue": "No receipt-lock check (DELETE has one). A record already in a saved receipt (receipts_history) can still be edited. Reproduced: locked delete -> 400, but PUT units 1->4 -> 200 and the UI shows 'Registro corregido'. The saved receipt snapshot then no longer matches the harvests.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "PUT/DELETE /api/harvests/{hid}", "issue": "Invalid id (e.g. 'not-an-id') -> 500 because ObjectId(hid) is not wrapped in try/except. Should be 400 'ID inválido', as receipts/history already does. Same pattern applies to workers endpoints."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "QuickHarvest EmployeeInput createNew", "issue": "A worker created via 'Agregar' is not appended to the `workers` state. Typing that name again in the same session shows no suggestion and shows 'Agregar' again, so a duplicate worker gets created. It only appears after a page reload. Fix: pass an onCreated callback and run setWorkers(prev => [...prev, data]).", "selector": "[data-testid=quick-employee-create]", "priority": "MEDIUM"},
+      {"component": "QuickHarvest EmployeeInput", "issue": "With a worker selected, one Backspace clears the whole field. onChange calls onClear(), which sets worker to null, and the useEffect on [worker] then runs setText(''), wiping the text the user just typed. Fix: only sync text from worker when worker is non-null, or drop the effect and set text in pick().", "selector": "[data-testid=quick-employee-input]", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Records edit on a locked record", "issue": "Guardar succeeds on a record that is part of a saved receipt (caused by the backend PUT gap above).", "affected_selectors": ["[data-testid=quick-edit-save]"]}
+    ],
+    "design_issues": [
+      {"screen": "Edit dialog (mobile)", "issues": ["Sonner toasts pile up at the top and are partly hidden behind the dark overlay. Minor."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_quick_harvest_edit.py", "/app/test_reports/pytest/pytest_quick_harvest.xml"],
+  "action_items": [
+    "Add the same receipts_history lock check to PUT /api/harvests/{hid} and return 400 with a 'No se puede editar...' message",
+    "Wrap ObjectId(hid) in try/except in the harvest PUT/DELETE endpoints and return 400 instead of 500",
+    "In QuickHarvest, append the newly created worker to the `workers` state after POST /workers",
+    "Fix EmployeeInput so Backspace on a selected name does not clear the whole text"
+  ],
+  "critical_code_review_comments": [
+    "update_harvest/delete_harvest: ObjectId(hid) is not validated, so a bad id gives a 500",
+    "update_harvest is missing the lock check, while delete_harvest has it",
+    "EmployeeInput: the 150ms setTimeout on blur plus onMouseDown works, but it is fragile on touch devices. Consider onPointerDown with preventDefault.",
+    "The worker created from the quick input has only a name (no document_id/crew). That is expected, but the workers list in Módulos will show bare entries."
+  ],
+  "updated_files": ["/app/backend/tests/test_quick_harvest_edit.py"],
+  "success_rate": {"backend": "67% (4/6; failures: invalid id 500, PUT lock missing)", "frontend": "~85% (all requested flows work; 2 minor input bugs + locked edit allowed)"},
+  "seed_data_creation": "Created TEST_Manual Worker, TEST_UIWorker, their harvests and TEST_lock receipts. All deleted at the end. The admin checkin-session was temporarily cleared and then restored to its original values (Eheh/Jejej/5484). Worker count is back to 3.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run backend tests with TEST_ADMIN_EMAIL/PASSWORD exported from backend/.env and REACT_APP_BACKEND_URL set. test_quick_harvest_edit.py::test_locked_by_receipt and ::test_invalid_id_returns_4xx fail until the main agent fixes them. In the UI, select suggestions with dispatch_event('mousedown'), because the buttons use onMouseDown. The admin's checkin-session must contain parcelId/productId/pricePerUnit, otherwise /registrar redirects to /asistencia.",
+  "rca of the issue": "Locked-edit: only delete_harvest queries receipts_history; update_harvest skips that check. Duplicate-worker risk: createNew in EmployeeInput never updates the parent `workers` state."
+}

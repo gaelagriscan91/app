@@ -1,0 +1,19 @@
+{
+  "summary": "Tested self-registration + blocked account + 30-day sliding session flow. All 9 backend tests pass (register creates blocked user, duplicate email 400, short password 400, blocked login returns 403 but sets cookies, admin unblock grants access on same cookies, admin block kicks active user, /auth/refresh rotates BOTH cookies with 30-day max-age, admin login works, mayordomos list contains self-registered user). Frontend mobile (390x844): /login shows 'Crear cuenta', navigates to /register, registration creates account and immediately shows BlockedAccount screen with data-testid=blocked-account-screen, blocked-support-email (gaelagriscan@gmail.com), blocked-recheck-button, blocked-logout-button. Reload keeps blocked screen. After admin PATCH active:true, pressing 'Ya me desbloquearon' takes user into the dashboard with success toast. Cleanup done.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_auth_blocked.py", "/app/test_reports/pytest/pytest_results_iter8.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is now ~1800+ lines; consider splitting into modules (auth.py, workers.py, receipts.py, admin.py) for maintainability.",
+    "ensure_not_blocked writes to DB (sets active=false on expiry) inside every request path for expired access_days accounts — acceptable but a DB index on users._id already handles this; just note it's a side effect of a GET.",
+    "/auth/register: on duplicate email we check after inserting into register_attempts; harmless but the attempt counter rises on duplicates too — fine for abuse protection."
+  ],
+  "updated_files": ["/app/backend/tests/test_auth_blocked.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Admin: gaelmartin158@gmail.com / agriscan2026. Test users created with test_<rand>@agriscan-test.com and cleaned up.",
+  "seed_data_creation": "No persistent seed. All test users deleted via DELETE /api/admin/mayordomos/{id} and remaining ones purged from Mongo. register_attempts cleared.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend auth-blocked flow fully covered by /app/backend/tests/test_auth_blocked.py (9 tests, all pass). Frontend blocked screen uses data-testids: blocked-account-screen, blocked-support-email, blocked-recheck-button, blocked-logout-button. Register page inputs have data-testid register-name-input/register-email-input/register-password-input. Rate limit: register ≤5/hour per IP — clear db.register_attempts between runs if needed."
+}

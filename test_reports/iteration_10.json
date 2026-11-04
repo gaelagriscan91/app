@@ -1,0 +1,34 @@
+{
+  "summary": "Tested Records print/trash feature + unit_type + delete/edit propagation to saved receipts. Backend 12/12 pytest pass (new test_records_print_delete.py + updated test_quick_harvest_edit.py). Frontend (390px): Check-in Libra/Pieza toggle -> scans saved show '2 libra' / '3 pieza' in Records with date/time and Ganó; print button opens HTML ticket popup (Bluetooth fallback) with per-line unit labels and GANÓ total; trash -> confirm -> 'Escaneo borrado' toast and row removed; tapping row body opens edit dialog. One logic bug in the ticket total line when a worker has records in mixed units.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/harvests/{id}", "issue": "_resync_receipts(existing) runs only for the OLD date/worker. If an edit changes date or worker_id, saved receipts covering the new date/worker are not rebuilt. The UI never changes these fields today."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "QuickHarvest printWorkerTicket", "issue": "The Total line adds up units across mixed unit types and labels the sum with the clicked record's unit. Example: 2 libra + 3 pieza prints 'Total: 5 pieza'. Totals should be grouped per unit (e.g. '2 libra · 3 pieza').", "selector": "[data-testid^='quick-record-print-']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/asistencia Check in header (390px)", "issues": ["The unit toggle reads 'Pieza / libra / Horas'. 'libra' is lowercase, unlike the other two.", "The mayordomo input next to the toggles is squeezed into a tiny white box at 390px width."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_records_print_delete.py", "/app/backend/tests/test_quick_harvest_edit.py", "/app/test_reports/pytest/pytest_iter10.xml"],
+  "action_items": [
+    "printWorkerTicket: group totalQty by unitOf(r) and print each unit's total (in both the thermal and HTML branches)",
+    "Optional: in update_harvest, also resync receipts for the new date/worker when they change",
+    "Optional: capitalize 'Libra' in the Asistencia toggle; fix the squeezed mayordomo input at 390px"
+  ],
+  "critical_code_review_comments": [
+    "server.py is 2300+ lines; split it into routers (harvests, receipts, attendance)",
+    "_resync_receipts runs one receipts() aggregation per matching snapshot on every edit/delete. Fine at this scale, but watch it as history grows."
+  ],
+  "updated_files": ["/app/backend/tests/test_records_print_delete.py (new)", "/app/backend/tests/test_quick_harvest_edit.py (test_locked_by_receipt replaced with test_delete_covered_by_receipt_allowed, since the lock was intentionally removed)"],
+  "success_rate": {"backend": "100%", "frontend": "95%"},
+  "seed_data_creation": "None kept. All TEST_RPD workers/harvests and receipts_history records were deleted. Admin checkin-session restored to its original value (unitMode libra).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Export TEST_ADMIN_EMAIL/PASSWORD from backend/.env and REACT_APP_BACKEND_URL before running pytest. On /asistencia, click tile-check-in before the checkin-unit-{pieza|libra|horas} buttons are visible. Select employee suggestions with dispatch_event('mousedown'). Accept confirm() dialogs through page.on('dialog'). Print in headless Chromium falls back to a popup page (context.on('page'))."
+}

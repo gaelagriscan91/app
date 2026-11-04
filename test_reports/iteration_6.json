@@ -1,0 +1,39 @@
+{
+  "summary": "Verification of the UTC->local timezone HH:MM display fix for /asistencia. The fix was NOT actually applied in the UI. The helper `formatHHMM(iso)` was correctly added to /app/frontend/src/lib/api.js, but it is never imported or used in /app/frontend/src/pages/Asistencia.jsx. All 7 display sites (toast, CheckInView row, HubView row count/filter, Resumen view, elapsed-time 'en campo' countdown) still read `r.check_in_hhmm` / `r.check_out_hhmm`, which the backend emits as UTC-based HH:MM strings. Therefore the user's reported bug (phone shows 12:25 local but UI shows 07:25 UTC in UTC+5) will PERSIST. No functional change ships to the browser bundle beyond the unused helper — confirmed by curling the live /static/js/bundle.js: `formatHHMM`=2 occurrences (export only), `check_in_hhmm`=7 occurrences (still consumed). Skipped login/Playwright scan+display assertion because the static/bundle evidence conclusively proves the UI code was not updated.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Asistencia.jsx — toast on successful check-in", "issue": "Toast still uses res.check_in_hhmm (UTC string) instead of formatHHMM(res.check_in). Line ~113-114.", "selector": "toast '✅ Entrada: <name> • HH:MM'", "priority": "HIGH"},
+      {"component": "Asistencia.jsx — CheckInView attendance row 'HORA' column", "issue": "Still renders `{r.check_in_hhmm}{r.check_out_hhmm ? ' → ' + r.check_out_hhmm : ' →'}` (UTC). Line ~460.", "selector": "attendance row time cell", "priority": "HIGH"},
+      {"component": "Asistencia.jsx — HubView row primary time", "issue": "Lines ~936-938 still use `{r.check_in_hhmm}` and `↓ {r.check_out_hhmm}` (UTC).", "selector": "hub row", "priority": "HIGH"},
+      {"component": "Asistencia.jsx — Resumen view timeRange", "issue": "Line ~1086 builds `${r.check_in_hhmm || '—'}${r.check_out_hhmm ? '→'+r.check_out_hhmm : '→en campo'}` (UTC).", "selector": "resumen row", "priority": "HIGH"},
+      {"component": "Asistencia.jsx — Hub row 'en campo' line", "issue": "Line ~1187 still uses UTC `check_in_hhmm`/`check_out_hhmm`.", "selector": "en-campo row", "priority": "HIGH"},
+      {"component": "Asistencia.jsx — import list", "issue": "formatHHMM is not imported from '@/lib/api' (line 8). Must add it to the import.", "selector": "import statement", "priority": "HIGH"}
+    ],
+    "integration_issues": [
+      {"flow": "Check-in time display (en campo elapsed)", "issue": "Elapsed/'en campo' countdown also keyed off the HH:MM UTC string in some branches rather than `r.check_in` ISO; must switch to formatHHMM/new Date(r.check_in) consistently.", "affected_selectors": ["hub row elapsed", "Resumen timeRange"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "In /app/frontend/src/pages/Asistencia.jsx add `formatHHMM` to the existing import from '@/lib/api'.",
+    "Replace every occurrence of `r.check_in_hhmm` with `formatHHMM(r.check_in)` and `r.check_out_hhmm` with `formatHHMM(r.check_out)` at the display sites (lines ~113, 114, 460, 936, 938, 1086, 1187).",
+    "For the boolean guards used to detect open shifts (e.g., `!r.check_out_hhmm` on lines 93, 152, 246, 435, 937, 1086, 1187), keep logical checks on the ISO field: use `!r.check_out` instead of `!r.check_out_hhmm` so logic doesn't depend on legacy field (optional but cleaner).",
+    "In the toast: use formatHHMM(res.check_in) and formatHHMM(res.check_out) for the two toast.success calls.",
+    "After the swap, retest in a non-UTC TZ by overriding the browser timezone (e.g., Playwright context timezone_id='Asia/Karachi') and asserting the displayed HH:MM equals new Date(iso).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',hour12:false}) in that TZ."
+  ],
+  "critical_code_review_comments": [
+    "The helper formatHHMM was added but never wired — classic dead-code regression. CI should fail builds where exported helpers in api.js have zero in-repo consumers (eslint no-unused-exports).",
+    "Display logic mixes two sources of truth: backend-emitted UTC HH:MM strings (check_in_hhmm) and the ISO `check_in`. Once the migration lands, remove check_in_hhmm/check_out_hhmm from frontend reads entirely to avoid future drift. Backend may keep them for backwards compat as stated.",
+    "Boolean 'is open shift' predicates currently rely on `!r.check_out_hhmm`. Prefer `!r.check_out` (ISO) so that if backend ever drops the legacy field the open/closed status still works."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (not tested this iteration)", "frontend": "0% — fix not applied"},
+  "test_credentials": "Admin gaelmartin158@gmail.com / agriscan2026 (not exercised this run due to static evidence)",
+  "seed_data_creation": "None",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "After E1 applies the swap, run Playwright with browser context `timezone_id='Asia/Karachi'` (UTC+5), login as admin, go to /asistencia, select a session, open Check-in tile, use keyboard (K) button to enter a worker id, submit, and assert that (a) the toast HH:MM equals the value returned by page.evaluate(iso => new Date(iso).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',hour12:false}), res.check_in) and (b) the row cell in the attendance list shows the same local HH:MM, NOT the raw UTC substring of the ISO. Also verify HubView row and Resumen view show the same local time.",
+  "rca of the issue": "Root cause: The main agent authored the correct helper `formatHHMM` in /app/frontend/src/lib/api.js (converts ISO -> local HH:MM via toLocaleTimeString) but never updated the consumer file /app/frontend/src/pages/Asistencia.jsx. Static grep: `formatHHMM` has 0 occurrences in Asistencia.jsx; `check_in_hhmm` still has 7 and `check_out_hhmm` still has 10. The live production bundle confirms this (formatHHMM=2 export-only references, check_in_hhmm=7 consumer references). Reproduction: Any browser in a non-UTC timezone will still see the UTC HH:MM returned by backend. Mitigation: import `formatHHMM` and swap all 7 display sites + 2 toasts as detailed under action_items; also prefer the ISO field for open/closed shift predicates."
+}

@@ -1,0 +1,30 @@
+{
+  "summary": "Frontend-only test of the new Check out view on /asistencia, mobile 390px, admin account. All 5 requested items PASS: (1) Tapping Check out with no attendance shows the toast 'Aún no hay empleados con entrada' and you stay on the hub. (2) Check in view: title 'Check in', Pieza/Libra/Horas toggle shows, Entrada modal lists only employees not yet checked in (3 TEST_ workers checked in -> count 3, 3 trash buttons, they drop out of the Entrada list; after checkout their rows show '↓ HH:MM'). (3) Check out view: title 'Check out', label 'Checked out', count 0 at first with the empty message 'Aún no hay salidas registradas hoy', no unit toggle, Rancho/Trabajo/Precio cards still visible. (4) The Salida modal listed only the 3 open employees. Selecting 2 and pressing Marcar (2) checked them out: count became 2, the rows show the check_out time sorted newest first, there are 0 attendance-delete buttons, and the Salida list then showed only TEST_CO_Caro. (5) The camera button opens the QR scanner (button title changes to 'Detener', scanner panel renders).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "CheckInView (checkout mode) - Move Crew button", "issue": "Move Crew is still shown in Check out mode. requireFields skips validation when isOut, so tapping it in Check out runs moveCrew, which CHECKS IN the crew (POST /attendance/scan) without checking the required session fields. This is a check-in action in the check-out screen and bypasses the Rancho/Block/Trabajo/Variedad/Precio check. Suggest hiding Move Crew when isOut, or limiting requireFields' isOut bypass to the keyboard and camera only.", "selector": "[data-testid='move-crew-button']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Check out view", "issues": ["Header is still the same blue (#2563EB) as Check in; the hub Check out tile is purple (#5A4A98). A purple header in checkout mode would make the two modes easy to tell apart.", "The keyboard and camera buttons are left-aligned (justify-start) with empty space on the right, which looks unbalanced at 390px.", "The Salida modal's Marcar button and selected-row checkboxes use the check-in blue, not a checkout color.", "The rows show only the check-out time; also showing check-in → check-out would help."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/checkout_helper.py"],
+  "action_items": [
+    "Hide Move Crew (and possibly the LogOut checkout menu, which duplicates this screen) in Check out mode, or stop it bypassing requireFields there",
+    "Optional: give checkout mode a purple header and centred/right-aligned action buttons"
+  ],
+  "critical_code_review_comments": [
+    "Asistencia.jsx requireFields: `isOut ? []` bypass covers every wrapped action including move-crew-button (a check-in action)",
+    "Asistencia.jsx openByCode: workers.find inside rows.forEach is O(n*m); use the existing workerMap pattern",
+    "Asistencia.jsx is ~1050 lines; split CheckInView and the manual modal into their own modules",
+    "Code-reviewed but not exercised: the manual modal's markSelected calls submitCode, which uses the scan toggle endpoint. If a worker's state changes between the list loading and Marcar (e.g. someone else checks them out), the scan returns 400 'ya cerró su jornada', which is handled with a toast. OK."
+  ],
+  "updated_files": ["/app/backend/tests/checkout_helper.py"],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100% of requested scenarios (1 medium-priority bug found outside them)"},
+  "seed_data_creation": "Created TEST_CO_Ana/Beto/Caro and their attendance; all deleted at the end (verified 0 rows for today, 0 TEST_ workers).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Helper: set -a; . backend/.env; . frontend/.env; set +a; python3 backend/tests/checkout_helper.py state|seed|clean. The admin session already has Rancho/Block/Trabajo/Variedad/Precio=25 saved for today. In the manual modal use 'button[data-testid^=\"manual-worker-\"]' (the ul manual-worker-list also matches the prefix). Sonner toasts disappear before 5s waits."
+}

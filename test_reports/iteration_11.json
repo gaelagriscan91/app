@@ -1,0 +1,38 @@
+{
+  "summary": "Tested the Mayordomo/Grower feature end-to-end. Backend: 6/6 pytest passed. The check-in session keeps mayordomo and grower. Harvest create/update stores grower, and grower is kept on update when omitted. /api/receipts harvest_lines include grower. The harvests Excel has Mayordomo and Grower columns with values. The receipts Excel row 3 has Mayordomo and Grower with G3='Grower'. Frontend at 390px and 1920px: on /registrar, the Mayordomo and Grower rows sit under Tipo. Typing and blurring sends PUT /api/checkin-session with the merged session, and values stay after reload. Saving a scan (TEST_UI Juan, qty 2) stored mayordomo=TEST_Pedro and grower=TEST_GrowCo on the harvest. The /asistencia check-in view (opened with 'Check in') shows the same values inside the Rancho/Block card. Changing grower there synced back to /registrar. The Records print ticket fallback HTML contains 'Mayordomo: TEST_Pedro' and 'Grower: TEST_GrowCo'. Cleanup done: test worker and harvests deleted, original check-in session restored (it had no mayordomo/grower).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/harvests/{id}", "issue": "mayordomo/grower/block/variety use `data.x or existing.x`, so a user can never clear a field back to empty through an update."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Recibos tab print (HTML + Bluetooth)", "issue": "RecibosTab printReceipt/printBluetooth do not show Mayordomo or Grower. Only the Excel receipt export and the QuickHarvest worker ticket include them. If 'recibo' meant the printed receipt, this is missing.", "affected_selectors": ["components/RecibosTab.jsx printReceipt ~line 342"]},
+      {"flow": "Edit record (QuickHarvest EditRecord)", "issue": "The PUT payload sends mayordomo but not grower. The backend keeps the old value, so nothing breaks, but this is inconsistent.", "affected_selectors": ["quick-edit-dialog"]},
+      {"flow": "Export params", "issue": "lib/api.js sessionExportParams has no grower fallback param. The server reads the session first, so it works anyway.", "affected_selectors": []}
+    ],
+    "design_issues": [
+      {"screen": "/registrar initial load", "issues": ["For about 1s before the session loads, the screen shows Precio $0.00, Tipo Pieza and empty Mayordomo/Grower. If the user types during this time, the session load can overwrite the input."]},
+      {"screen": "/asistencia check-in at 390px", "issues": ["Mayordomo/Grower cells are narrow, so values get truncated (e.g. 'TEST_P...').", "The 'CHECKED IN' counter label/number is partly covered by the keyboard/camera buttons (may have existed before)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_mayordomo_grower.py", "/app/test_reports/pytest/pytest_mayordomo_grower.xml"],
+  "action_items": [
+    "Optional: add Mayordomo/Grower lines to RecibosTab printed receipts (HTML + Bluetooth) if the user expects them there",
+    "Add grower to the EditRecord PUT payload in QuickHarvest.jsx",
+    "Optional: give the Mayordomo/Grower cells more width in the 390px check-in card (or wrap text)"
+  ],
+  "critical_code_review_comments": [
+    "harvest update cannot clear text fields to empty (the `or existing` fallback)",
+    "sessionExportParams is missing grower",
+    "QuickHarvest commitField sends the whole session object; a stale session in another tab could overwrite newer fields (last write wins)"
+  ],
+  "updated_files": ["/app/backend/tests/test_mayordomo_grower.py"],
+  "success_rate": {"backend": "100%", "frontend": "100% of requested flows"},
+  "seed_data_creation": "Created TEST_MG Worker and TEST_UI Juan plus harvests during the run; all deleted. Check-in session restored to the original.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: export TEST_ADMIN_EMAIL/TEST_ADMIN_PASSWORD from backend/.env and REACT_APP_BACKEND_URL, then pytest tests/test_mayordomo_grower.py. The test saves and restores the check-in session. The ticket HTML can be captured by overriding URL.createObjectURL plus window.open in page.evaluate."
+}

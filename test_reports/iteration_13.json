@@ -1,0 +1,39 @@
+{
+  "summary": "Tested backend and frontend at 390px mobile. All 7 requested features work. (1) In-app confirm dialog: no window.confirm calls are left (grep), and no native dialogs fired during testing. Cancel kept the item and OK deleted it, checked in the UI and against the API, on all four trash buttons: Cosechar Records quick-record-delete, Módulos > Empleados worker-delete, Registro registro-delete, Asistencia attendance-delete. The Basurero purge button also asks for confirmation. (2) Backend trash: new pytest file, 6/6 pass. DELETE history moves the receipt to trash with deleted_at, GET trash lists it without rows or _id, restore puts it back in history with rows and without deleted_at, purge returns 404 on repeat, and a trash item with deleted_at 61 days old is purged on list while one 59 days old is kept. (3) Módulos tabs are Empleados, Basurero, Registro, Usuarios; there is no Cuadrilla tab. In the UI, Registro delete -> Basurero item ('quedan 60 días') -> Recuperar -> shows again in Registro -> delete -> purge with Cancel/OK all worked, and the API state matches. (4) The Asistencia hub has only tile-check-in and tile-check-out. (5) No 'trabajador' text on any app screen (registrar, asistencia, dia, reportes, all modulos tabs, add-employee form). (6) dia-share-button calls navigator.share (checked with a stub) and falls back to clipboard with the 'Lista copiada' toast and correct text. (7) The .field-bg class with the field image is on .app-shell on every route.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "regression suite", "issue": "12 old tests fail (test_auth_blocked x5, test_attendance_gate x3, test_price_lockin x3, backend_test TestHarvests::test_update_delete). They were written for older rules that have since changed: trial-based register is no longer blocked, the attendance gate was removed, price lock-in changed. These tests are out of date, not regressions from this change. Because they fail, their cleanup is skipped and orphan TEST harvests/attendance stay in the DB (I removed them by hand)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ListaDia share", "issue": "dia-share-button can be pressed while the list is still loading. attendance is [] at that point, so it shows a false 'No hay nada que compartir' toast. Disable the button while loading.", "selector": "[data-testid='dia-share-button']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Módulos tabs at 390px", "issues": ["Registro and Usuarios tabs are cut off and need a horizontal scroll that is not obvious (no scroll hint)"]},
+      {"screen": "field-bg", "issues": ["background-attachment: fixed is ignored or janky on iOS Safari/WebViews (the user is on iPhone). The image may scale to the full scroll height. Consider a fixed pseudo-element or background-attachment: scroll on mobile."]},
+      {"screen": "Records / Lista del día", "issues": ["Harvests whose worker was deleted show as '—' (deleting a worker does not cascade to its harvests). Seen with test residue."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_receipts_trash.py", "/app/test_reports/pytest/pytest_trash.xml", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Disable dia-share-button while loading (LOW)",
+    "Update or remove the out-of-date regression tests (test_auth_blocked, test_attendance_gate, test_price_lockin, backend_test TestHarvests::test_update_delete) so they match current business rules and clean up their data",
+    "Optional: the share fallback window.open(wa.me) runs after an await rejection, so in-app browsers may block it as a popup. Consider falling back to clipboard instead.",
+    "Optional: iOS-friendly fixed background"
+  ],
+  "critical_code_review_comments": [
+    "confirm.jsx: falls back to window.confirm if ConfirmHost is not mounted. It is mounted in App.js, so this is fine.",
+    "DELETE /receipts/history copies the entire doc, including _id, into receipts_trash, and restore reinserts the same _id. IDs stay stable, which is good. Restore could raise DuplicateKey if the same id already exists in history (unlikely).",
+    "_purge_trash compares ISO strings. This is correct only while all deleted_at values are UTC isoformat with the same offset format, which is currently the case."
+  ],
+  "updated_files": ["/app/backend/tests/test_receipts_trash.py (new)", "/app/backend/tests/test_records_print_delete.py (cleanup also purges trash)", "/app/backend/tests/test_quick_harvest_edit.py (cleanup also purges trash)"],
+  "success_rate": {"backend": "100% of new trash tests (6/6); full suite 47/59 because of out-of-date tests", "frontend": "100% of requested features"},
+  "test_credentials": "admin gaelmartin158@gmail.com / agriscan2026 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created TEST_UI/TEST_TRASH workers, harvests, receipts and attendance, and deleted them all. Also removed residue left by the failing old tests (4 orphan harvests, 1 TEST_lock trash receipt, 4 TEST_AttGate attendance rows). Pre-existing receipts were not touched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The browser's local date (UTC in Playwright) decides which day Records/Lista show, so create harvests with the browser-local date. Setup is done with fetch(credentials:'include') inside page.evaluate after a UI login. Modulos?tab=registro|trash deep-links work. The confirm dialog uses confirm-dialog/confirm-ok/confirm-cancel. Run pytest without the -n flag issue: pytest.ini adds xdist options."
+}

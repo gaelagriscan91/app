@@ -1,0 +1,26 @@
+{
+  "summary": "Verified new 'Compartir pieza' (share-piece) feature in Picking (/registrar?mode=qr) end-to-end on mobile viewport. share-mode-toggle visible only in piece mode; enabling it reveals share-buffer-card. Adding workers via scan-manual-add creates share-chips, buffer preview shows correct 'Cada uno recibirá: X piezas · $Y' (0.500 pieza/$12.50 for 2 workers, 0.333 for 3). share-confirm-button distributes 1/N to each worker in the tally (3-way → 0.33 each) and resets buffer. share-chip click removes individual worker; share-clear-button (Vaciar) empties buffer. Toggling share-mode OFF hides buffer card and restores normal 1-piece-per-scan behavior (verified w1 0.33 → 1.33). Backend accepted fractional units via POST /api/harvests and GET returned them intact (0.333... persisted with price_per_unit=25).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Picking totals bar", "issues": ["'Total piezas' card and quick-save-button use formatNumber(units, 0) so 1.99 fractional total is displayed as '2' / '2🧺'. Pago total ($50.00) is computed from the real 1.9999... × price so the money is correct, but the piece count rounds visually. Consider formatNumber(units, units % 1 === 0 ? 0 : 2) for consistency with the per-worker row display."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "ScanHarvestMode.jsx is now ~997 lines — still over the 700-line guideline. Recommend extracting ShareBufferCard, PiecePayPanel, HourPayPanel into subcomponents.",
+    "Total piezas / quick-save show the fractional sum rounded to integer (formatNumber(totals.units, 0)); per-worker rows show 2-decimal fractional count. Inconsistent display when share-piece is used — consider conditional precision.",
+    "confirmSharedPiece uses 1/N as a float (0.333333...). Backend stores the full float (verified). If payroll ever sums these across many shared pieces the floating-point drift could appear in receipts — consider rounding to 2 or 3 decimals or storing as a rational (num/den) if accounting precision matters."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (fractional POST/GET verified)", "frontend": "100% (all 10 expected flows verified)"},
+  "test_credentials": "Admin gaelmartin158@gmail.com / agriscan2026 (from problem statement)",
+  "seed_data_creation": "Created 1 parcel 'TEST_Parcel_Share' and 1 worker 'TEST_Worker_<ts>_0' via API because the environment had 0 active parcels and only 2 workers. Also saved 3 harvest rows (one with 1.333 units, two with 0.333 units) under this parcel/product combo during the save-flow verification. Safe to leave or clean up via admin modules.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Share-piece feature is fully functional on frontend and backend. If main agent decides to tweak the Total piezas display precision, re-run only the final assertion block (count displayed vs underlying value) — no backend changes are required.",
+  "rca of the issue": "N/A — no bugs reproduced."
+}
