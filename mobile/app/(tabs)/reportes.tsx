@@ -7,7 +7,7 @@ import { Download, Share2, ChevronDown, Calendar, FileSpreadsheet, FileText, Sli
 import api from "@/src/api/client";
 import { toast } from "@/src/components/Toast";
 import { Card, EmptyState, Loading, ScreenTitle } from "@/src/components/ui";
-import { formatCurrency, formatNumber, startOfMonthISO, todayISO } from "@/src/utils/format";
+import { formatCurrency, formatHHMM, formatNumber, startOfMonthISO, todayISO } from "@/src/utils/format";
 import { downloadAndShareExcel } from "@/src/utils/download";
 import { shareTextSummary } from "@/src/utils/print";
 import { useTheme, ThemeColors } from "@/src/theme";
@@ -178,7 +178,10 @@ export default function ReportesScreen() {
                     <View style={s.detail}>
                       {r.harvests.map((h: any, i: number) => (
                         <View key={h.id || i} style={s.detailRow}>
-                          <Text style={s.detailDate}>{h.date}</Text>
+                          <View style={s.detailDate}>
+                            <Text style={s.detailDateText}>{h.date}</Text>
+                            {formatHHMM(h.created_at) ? <Text style={s.detailTime}>{formatHHMM(h.created_at)}</Text> : null}
+                          </View>
                           <Text style={s.detailMid}>{formatNumber(h.units, h.units % 1 === 0 ? 0 : 2)} {h.unit_label || "u"}</Text>
                           <Text style={s.detailPay}>{formatCurrency(h.payment)}</Text>
                         </View>
@@ -285,7 +288,9 @@ const styles = (c: ThemeColors) =>
     sumPay: { fontWeight: "800", color: c.brandPrimary, fontSize: 16 },
     detail: { marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: c.divider, gap: 6 },
     detailRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-    detailDate: { fontSize: 12, fontWeight: "700", color: c.onSurface, width: 90 },
+    detailDate: { width: 90 },
+    detailDateText: { fontSize: 12, fontWeight: "700", color: c.onSurface },
+    detailTime: { fontSize: 11, color: c.muted, marginTop: 1 },
     detailMid: { fontSize: 12, color: c.onSurfaceTertiary, flex: 1 },
     detailPay: { fontSize: 13, fontWeight: "800", color: c.brandPrimary },
   });
