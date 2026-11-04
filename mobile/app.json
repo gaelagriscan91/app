@@ -38,7 +38,15 @@
       "expo-image",
       "expo-secure-store",
       "expo-web-browser",
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-sharing",
+      "@react-native-community/datetimepicker",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "AgriScan usa la cámara para escanear el código QR de los empleados."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

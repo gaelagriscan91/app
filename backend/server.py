@@ -468,8 +468,10 @@ async def register(data: RegisterIn, request: Request, response: Response):
     }
     res = await db.users.insert_one(doc)
     uid = str(res.inserted_id)
-    set_auth_cookies(response, create_access_token(uid, email, 0), create_refresh_token(uid, 0))
-    return {"id": uid, "email": email, "name": name, "role": "user", "blocked": False, "trial_ends_at": trial_end}
+    access, refresh = create_access_token(uid, email, 0), create_refresh_token(uid, 0)
+    set_auth_cookies(response, access, refresh)
+    return {"id": uid, "email": email, "name": name, "role": "user", "blocked": False, "trial_ends_at": trial_end,
+            "access_token": access, "refresh_token": refresh, "token_type": "bearer"}
 
 
 @api_router.post("/auth/login")
@@ -492,13 +494,20 @@ async def login(data: LoginIn, request: Request, response: Response):
     except HTTPException:
         is_blocked = True
     set_auth_cookies(response, access, refresh)
-    return {"id": uid, "email": email, "name": user.get("name", ""), "role": user.get("role", "user"), "blocked": is_blocked}
+    return {"id": uid, "email": email, "name": user.get("name", ""), "role": user.get("role", "user"), "blocked": is_blocked,
+            "access_token": access, "refresh_token": refresh, "token_type": "bearer"}
 
 
 @api_router.post("/auth/refresh")
 async def refresh_token(request: Request, response: Response):
-    """Issue a new access token from a valid refresh cookie. Never goes through get_current_user."""
+    """Issue a new access token from a valid refresh cookie (web) or JSON body token (mobile). Never goes through get_current_user."""
     token = request.cookies.get("refresh_token")
+    if not token:
+        try:
+            body = await request.json()
+            token = (body or {}).get("refresh_token")
+        except Exception:
+            token = None
     if not token:
         raise HTTPException(status_code=401, detail="Sin token de refresco")
     try:
@@ -513,8 +522,9 @@ async def refresh_token(request: Request, response: Response):
         uid = str(user["_id"])
         ver = user.get("token_version", 0)
         # Sliding 30-day session: rotate both tokens on every refresh
-        set_auth_cookies(response, create_access_token(uid, user["email"], ver), create_refresh_token(uid, ver))
-        return {"ok": True}
+        access, refresh = create_access_token(uid, user["email"], ver), create_refresh_token(uid, ver)
+        set_auth_cookies(response, access, refresh)
+        return {"ok": True, "access_token": access, "refresh_token": refresh, "token_type": "bearer"}
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expirado")
     except jwt.InvalidTokenError:

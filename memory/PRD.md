@@ -83,5 +83,13 @@ App de registro de cosecha estilo PickTrace para equipos agrícolas:
 - Refactor `server.py` (~1900 líneas) en routers
 - Refactor `Dashboard.jsx` modularizando componentes
 
+## App Móvil (Expo / React Native) — agregada 2026-06
+Nueva superficie móvil en `/app/mobile` que consume el MISMO backend FastAPI (`EXPO_PUBLIC_BACKEND_URL` + `/api`) con auth por JWT Bearer (tokens guardados con el helper `storage`: SecureStore en dispositivo, localStorage en web preview).
+- Cambio backend NO rompiente: `/api/auth/login` y `/api/auth/register` ahora también devuelven `access_token`+`refresh_token` en el body; `/api/auth/refresh` acepta `{refresh_token}` en el body. El flujo web por cookies sigue igual. Se agregó el origin del expo preview a `CORS_ORIGINS`.
+- 5 pestañas: **Registrar** (cosecha, escaneo QR con expo-camera, piezas compartidas hasta 6, records con imprimir/borrar, Cantidad=1 por defecto en Pieza), **Asistencia** (hub con tiles Sol/Luna sin marco, Finalizar día; vista Check in/out con panel azul/morado + tarjetas de config que persisten en `/api/checkin-session`), **Día** (lista + sin-entrada + compartir), **Reportes** (cosechas con totales + export Excel/compartir + recibos), **Módulos** (Empleados, Basurero, Registro, Payroll, Usuarios/Soporte).
+- Impresión: `expo-print` (compartir/imprimir por el sistema). Excel: `expo-file-system` + `expo-sharing`. Impresión Bluetooth directa PENDIENTE (requiere build nativo).
+- Diseño replica la web: logo mano-cerezas, fondo `field-bg.jpg`, marca azul + verde lima.
+- Probado con testing_agent (iteration_17): backend 7/7 y todas las pantallas móviles OK, sin regresiones web.
+
 ## Credenciales de prueba
 Ver `/app/memory/test_credentials.md`

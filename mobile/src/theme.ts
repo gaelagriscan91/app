@@ -36,53 +36,38 @@ import { Appearance, StyleSheet, useColorScheme } from "react-native";
 export type ColorScheme = "light" | "dark";
 
 const light = {
-  // ---------------------------------------------------------------------------
-  // Surfaces: backgrounds, from the screen down to small fills.
-  // Each `on` key is the text and icon color for that background.
-  // ---------------------------------------------------------------------------
-  surface: "#FFFFFF", // primary canvas, most of every screen
-  onSurface: "#111827", // text and icons on the canvas
-  surfaceSecondary: "#F9FAFB", // cards, sheets, list rows
-  onSurfaceSecondary: "#374151", // text and icons on cards, sheets, rows
-  surfaceTertiary: "#F3F4F6", // input backgrounds, chips, deepest nesting
-  onSurfaceTertiary: "#4B5563", // text on inputs and chips; also muted text
-  surfaceInverse: "#1F2937", // tooltips, snackbars, anything popping against the theme
-  onSurfaceInverse: "#FFFFFF", // text and icons on the inverse surface
-  muted: "#6B7280", // subdued text on surface: captions, timestamps, placeholders
+  // AgriScan brand: deep-blue identity + lime-green action accent, warm cream surfaces.
+  surface: "#FFFFFF", // primary canvas
+  onSurface: "#1A2210", // dark olive text on the canvas
+  surfaceSecondary: "#F7F5EE", // cream cards, sheets, list rows
+  onSurfaceSecondary: "#1A2210",
+  surfaceTertiary: "#F0EDE1", // input backgrounds, chips
+  onSurfaceTertiary: "#556047",
+  surfaceInverse: "#1F2E52", // dark navy (login hero, snackbars)
+  onSurfaceInverse: "#FFFFFF",
+  muted: "#889078", // captions, timestamps, placeholders
 
-  // ---------------------------------------------------------------------------
-  // Brand: the identity color and the fills built from it.
-  // Neutral by default; replace with the design guidelines values.
-  // ---------------------------------------------------------------------------
-  brand: "#111827", // base hue, anchor only; Primary, Secondary, Tertiary are weights of it
-  onBrand: "#FFFFFF", // text and icons placed directly on brand
-  brandPrimary: "#111827", // primary CTA, active tab indicator, selected states
-  onBrandPrimary: "#FFFFFF", // text and icons on brandPrimary
-  brandSecondary: "#E5E7EB", // secondary CTA, less prominent accents
-  onBrandSecondary: "#111827", // text and icons on brandSecondary
-  brandTertiary: "#F3F4F6", // chips, tags, badges, subtle brand moments
-  onBrandTertiary: "#111827", // text and icons on brandTertiary
+  brand: "#1D4ED8", // AgriScan blue
+  onBrand: "#FFFFFF",
+  brandPrimary: "#1D4ED8", // header, active tab, primary CTA
+  onBrandPrimary: "#FFFFFF",
+  brandSecondary: "#8DC63F", // lime SAVE / accent action
+  onBrandSecondary: "#FFFFFF",
+  brandTertiary: "#EEF6DD", // light-lime chips, team pills
+  onBrandTertiary: "#1A2210",
 
-  // ---------------------------------------------------------------------------
-  // Status: semantic only, never decorative. Fill for badges, banners and
-  // toasts; the `on` key is text on that fill. The plain key is also safe as
-  // text on `surface`.
-  // ---------------------------------------------------------------------------
   success: "#15803D",
   onSuccess: "#FFFFFF",
   warning: "#B45309",
   onWarning: "#FFFFFF",
-  error: "#B91C1C",
+  error: "#DC2626",
   onError: "#FFFFFF",
   info: "#1D4ED8",
   onInfo: "#FFFFFF",
 
-  // ---------------------------------------------------------------------------
-  // Lines
-  // ---------------------------------------------------------------------------
-  border: "#E5E7EB", // hairline outline, 0.5pt or 1pt max: inputs, cards
-  borderStrong: "#D1D5DB", // focus rings, selected outlines, 1.5pt max
-  divider: "#E5E7EB", // subtle list separators
+  border: "#E2DDD0",
+  borderStrong: "#D1D5DB",
+  divider: "#E2DDD0",
 };
 
 export type ThemeColors = typeof light;

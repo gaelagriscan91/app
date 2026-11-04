@@ -1,0 +1,36 @@
+{
+  "summary": "Tested the brand-new mobile Expo surface end-to-end at 390x844 against the shared FastAPI backend. Backend parity: 7/7 pytest cases pass in /app/backend/tests/test_mobile_auth_tokens.py — /api/auth/login and /api/auth/register return {access_token, refresh_token, token_type:'bearer'} plus a flat user object AND still set the HttpOnly access_token/refresh_token cookies (verified via curl → web flow remains non-breaking). /api/auth/refresh accepts {refresh_token} in JSON body and rotates both tokens; missing-token returns 401; Bearer access_token works on /api/auth/me. Mobile UI: login screen renders correctly, invalid credentials show the inline error 'Correo o contraseña incorrectos', valid admin login lands on /registrar, bottom tabs navigate between Cosechar / Asistencia / Día / Reportes / Módulos. Registrar quick-harvest shows all expected rows (Empleado, Cantidad, Precio $25, Tipo=Libra, Mayordomo, Grower) with the day pill 'Libra 2', QR scan button, Records toggle (today has 4 harvests). Asistencia hub renders tiles for check-in/check-out, Finalizar día opens the bottom sheet with cancelar/confirmar, hub-search toggles the input. Check-in scan view has scan-back, scan-resumen, ctrl-keyboard, ctrl-camera, mode-pieza/libra/horas pills, scan-trigger red circle, and persisted config fields (rancho/block/trabajo/variedad/mayordomo/grower/precio/precio-hora) plus 3 attendance rows with delete. Día shows 'Con entrada · 3' + 'Sin entrada · 3' with + Entrada buttons, date picker, and Compartir. Reportes cosechas-tab shows totals ($1,337.50 / 54 u.) from /api/receipts and per-worker breakdown; recibos-tab renders. Módulos: all 5 sub-tabs (Empleados, Basurero, Registro, Payroll, Usuarios) mount — Empleados lists workers with regenerate-QR + delete, Registro lists receipt history with delete, Payroll has week prev/next + Compartir Excel + per-worker rows, Usuarios has Nuevo mayordomo form, Basurero is correctly empty with explanatory copy. No JS red-screen, no pageerror. Only two non-blocking console warnings observed (useNativeDriver on web preview, and a single pre-login 401 from /api/auth/me which is expected).",
+  "platforms_tested": ["mobile"],
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "mobile": {
+      "ui_bugs": [],
+      "integration_issues": [],
+      "design_issues": [],
+      "react_native_issues": []
+    }
+  },
+  "parity_issues": [],
+  "test_report_links": [
+    "/app/backend/tests/test_mobile_auth_tokens.py",
+    "/app/test_reports/pytest/pytest_iter17_mobile_auth_v2.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "mobile/src/api/client.ts: the refresh interceptor correctly skips /auth/login|register|refresh|logout, clears tokens on refresh failure, and single-flights via refreshPromise — looks solid.",
+    "mobile/app/(tabs)/registrar.tsx qty-default effect: setQty((q) => mode === 'pieza' ? (q === '' ? '1' : q) : q === '1' ? '' : q) — switching away from Pieza with qty='1' clears qty, and switching to Pieza with qty='' sets '1'. Works as spec'd; worth a small unit test.",
+    "mobile/app/(tabs)/registrar.tsx L93 after save: setQty(mode === 'pieza' ? '1' : '') resets correctly.",
+    "The partial-failure note from iteration 16 still applies to the multi-employee POST loop in registrar.tsx (one /api/harvests call per worker, no rollback). Low risk on mobile too; main agent decides whether to add a batch endpoint.",
+    "Basurero sub-tab correctly shows the empty state; restore/purge buttons will need a smoke test the first time there is trashed data."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (7/7 mobile auth tests)", "frontend": "100% on all tested mobile flows"},
+  "test_credentials": "admin gaelmartin158@gmail.com / agriscan2026 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "test_register_returns_tokens_and_cleanup creates and then deletes one test_mob_*@agriscan-test.com mayordomo. No other seed data created by this agent.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend tests must be run with REACT_APP_BACKEND_URL, TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD exported — pytest.ini does not auto-load /app/backend/.env. The mobile expo web preview is served at https://agriscan-cam--309xxgzh.expo.preview.emergentagent.com (note the `.expo.` segment), different from EXPO_PUBLIC_BACKEND_URL which is the API host. Scan mode testIDs are mode-pieza / mode-libra / mode-horas (Spanish keys, not english). Camera (expo-camera) QR scanning does not work in the web preview — the manual/autocomplete path is the correct surface to test. The test_mobile_auth_tokens.py file already covers token + refresh + register cleanup; keep extending it instead of writing one-off curl scripts."
+}
