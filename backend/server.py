@@ -1449,14 +1449,14 @@ def _hhmm_local(iso_ts: Optional[str], tz_offset_minutes: int = 0) -> str:
 WEEKDAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 
 
-async def _payroll(user: dict, week: str, grower: str) -> dict:
+async def _payroll(user: dict, week: str, grower: str, include_sunday: bool = True) -> dict:
     from datetime import date as _date
     try:
         d0 = _date.fromisoformat(week)
     except ValueError:
         raise HTTPException(status_code=400, detail="Fecha inválida")
     monday = d0 - timedelta(days=d0.weekday())
-    days = [(monday + timedelta(days=i)).isoformat() for i in range(7)]
+    days = [(monday + timedelta(days=i)).isoformat() for i in range(7 if include_sunday else 6)]
     seen, lines = set(), []
 
     def add(wid, wname, h):
@@ -1507,14 +1507,15 @@ async def _payroll(user: dict, week: str, grower: str) -> dict:
 
 
 @api_router.get("/payroll")
-async def payroll(user: CurrentUser, week: str, grower: Optional[str] = ""):
-    return await _payroll(user, week, grower)
+async def payroll(user: CurrentUser, week: str, grower: Optional[str] = "", include_sunday: bool = True):
+    return await _payroll(user, week, grower, include_sunday)
 
 
 @api_router.get("/payroll/export")
-async def payroll_export(user: CurrentUser, week: str, grower: Optional[str] = ""):
+async def payroll_export(user: CurrentUser, week: str, grower: Optional[str] = "", include_sunday: bool = True):
     await ensure_not_blocked(user)
-    data = await _payroll(user, week, grower)
+    data = await _payroll(user, week, grower, include_sunday)
+    n_days = len(data["days"])
     wb = Workbook()
     ws = wb.active
     ws.title = "Payroll"
@@ -1526,7 +1527,7 @@ async def payroll_export(user: CurrentUser, week: str, grower: Optional[str] = "
     ws["B1"] = data["grower"] or "Todos"
     ws["F1"] = "Mayordomo"; ws["F1"].font = Font(bold=True, size=14)
     ws["H1"] = data["mayordomo"]
-    last = 2 + 7 * 2
+    last = 2 + n_days * 2
     for i, d in enumerate(data["days"]):
         c = 2 + i * 2
         ws.merge_cells(start_row=3, start_column=c, end_row=3, end_column=c + 1)

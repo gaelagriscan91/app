@@ -30,14 +30,14 @@ export default function PayrollModule() {
 
   const q = useQuery({
     queryKey: ["payroll", week, grower],
-    queryFn: async () => (await api.get("/payroll", { params: { week, grower } })).data,
+    queryFn: async () => (await api.get("/payroll", { params: { week, grower, include_sunday: false } })).data,
   });
   const data = q.data;
 
   const share = async () => {
     if (!data?.rows?.length) { toast.error("No hay datos esta semana"); return; }
     setSharing(true);
-    try { await downloadAndShareExcel("/payroll/export", { week, grower }, `payroll_${week}${grower ? "_" + grower.replace(/\s+/g, "_") : ""}.xlsx`); toast.success("Payroll generado"); }
+    try { await downloadAndShareExcel("/payroll/export", { week, grower, include_sunday: false }, `payroll_${week}${grower ? "_" + grower.replace(/\s+/g, "_") : ""}.xlsx`); toast.success("Payroll generado"); }
     catch (e: any) { toast.error(e?.message || "No se pudo compartir"); }
     finally { setSharing(false); }
   };
@@ -54,7 +54,7 @@ export default function PayrollModule() {
         <View style={s.weekRow}>
           <TouchableOpacity testID="payroll-prev" onPress={() => setWeek(shiftWeek(week, -1))} style={s.navBtn}><ChevronLeft size={20} color={colors.onSurface} /></TouchableOpacity>
           <View style={s.weekMid}>
-            <Text style={s.weekLabel}>Semana (lun → dom)</Text>
+            <Text style={s.weekLabel}>Semana (lun → sáb)</Text>
             <Text style={s.weekValue} testID="payroll-week">{data ? `${short(data.week_start)} → ${short(data.week_end)}` : "…"}</Text>
           </View>
           <TouchableOpacity testID="payroll-next" onPress={() => setWeek(shiftWeek(week, 1))} style={s.navBtn}><ChevronRight size={20} color={colors.onSurface} /></TouchableOpacity>
