@@ -7,7 +7,7 @@ import { Download, Share2, ChevronDown, Calendar, FileSpreadsheet, FileText, Sli
 import api from "@/src/api/client";
 import { toast } from "@/src/components/Toast";
 import { Card, EmptyState, Loading, ScreenTitle } from "@/src/components/ui";
-import { formatCurrency, formatHHMM, formatNumber, startOfMonthISO, todayISO } from "@/src/utils/format";
+import { formatCurrency, formatNumber, startOfMonthISO, todayISO } from "@/src/utils/format";
 import { downloadAndShareExcel } from "@/src/utils/download";
 import { shareTextSummary } from "@/src/utils/print";
 import { useTheme, ThemeColors } from "@/src/theme";
@@ -160,6 +160,11 @@ export default function ReportesScreen() {
 
             <View style={s.resumenHead}>
               <FileText size={18} color={colors.brandPrimary} /><Text style={s.resumenTitle}>Resumen por empleado</Text>
+              {receipts.length > 0 && (
+                <View style={s.unitsBadge} testID="rep-total-units">
+                  <Text style={s.unitsBadgeText}>{formatNumber(totals.units, totals.units % 1 === 0 ? 0 : 2)} u.</Text>
+                </View>
+              )}
             </View>
 
             {receiptsQ.isLoading ? <Loading /> : receipts.length === 0 ? <EmptyState text="Sin resultados en este periodo" /> : receipts.map((r: any) => {
@@ -178,10 +183,7 @@ export default function ReportesScreen() {
                     <View style={s.detail}>
                       {r.harvests.map((h: any, i: number) => (
                         <View key={h.id || i} style={s.detailRow}>
-                          <View style={s.detailDate}>
-                            <Text style={s.detailDateText}>{h.date}</Text>
-                            {formatHHMM(h.created_at) ? <Text style={s.detailTime}>{formatHHMM(h.created_at)}</Text> : null}
-                          </View>
+                          <Text style={s.detailDate}>{h.date}</Text>
                           <Text style={s.detailMid}>{formatNumber(h.units, h.units % 1 === 0 ? 0 : 2)} {h.unit_label || "u"}</Text>
                           <Text style={s.detailPay}>{formatCurrency(h.payment)}</Text>
                         </View>
@@ -261,6 +263,8 @@ const styles = (c: ThemeColors) =>
     datePill: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, borderRadius: 14, height: 50, paddingHorizontal: 14 },
     resumenHead: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6, marginBottom: 12 },
     resumenTitle: { fontSize: 17, fontWeight: "800", color: c.onSurface },
+    unitsBadge: { marginLeft: "auto", backgroundColor: c.brandPrimary, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 },
+    unitsBadgeText: { color: "#FFFFFF", fontWeight: "800", fontSize: 13 },
     modalWrap: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center", padding: 32 },
     confirmCard: { backgroundColor: "#FFFFFF", borderRadius: 24, padding: 24, width: "100%" },
     confirmTitle: { fontSize: 20, fontWeight: "800", color: c.onSurface, textAlign: "center" },
@@ -288,9 +292,7 @@ const styles = (c: ThemeColors) =>
     sumPay: { fontWeight: "800", color: c.brandPrimary, fontSize: 16 },
     detail: { marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: c.divider, gap: 6 },
     detailRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-    detailDate: { width: 90 },
-    detailDateText: { fontSize: 12, fontWeight: "700", color: c.onSurface },
-    detailTime: { fontSize: 11, color: c.muted, marginTop: 1 },
+    detailDate: { fontSize: 12, fontWeight: "700", color: c.onSurface, width: 90 },
     detailMid: { fontSize: 12, color: c.onSurfaceTertiary, flex: 1 },
     detailPay: { fontSize: 13, fontWeight: "800", color: c.brandPrimary },
   });
