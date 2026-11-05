@@ -7,7 +7,7 @@ import { Clock, AlertCircle, Share2, Calendar, Loader } from "lucide-react-nativ
 import api, { apiErrorMessage } from "@/src/api/client";
 import { toast } from "@/src/components/Toast";
 import { Card, EmptyState, Loading, ScreenTitle } from "@/src/components/ui";
-import { formatNumber, todayISO } from "@/src/utils/format";
+import { formatHHMM, formatNumber, todayISO } from "@/src/utils/format";
 import { shareTextSummary } from "@/src/utils/print";
 import { useTheme, ThemeColors } from "@/src/theme";
 
@@ -50,7 +50,7 @@ export default function DiaScreen() {
   const share = async () => {
     if (!attendance.length && !byWorker.length) { toast.error("No hay nada que compartir"); return; }
     setSharing(true);
-    const lines = attendance.map((a: any) => `• ${a.worker_name}: ${a.check_in_hhmm || "--:--"}${a.check_out_hhmm ? ` → ${a.check_out_hhmm}` : ""}${a.hours ? ` (${formatNumber(a.hours, 2)} h)` : ""}`);
+    const lines = attendance.map((a: any) => `• ${a.worker_name}: ${formatHHMM(a.check_in) || "--:--"}${formatHHMM(a.check_out) ? ` → ${formatHHMM(a.check_out)}` : ""}${a.hours ? ` (${formatNumber(a.hours, 2)} h)` : ""}`);
     const text = [`AgriScan — Lista del día ${date}`, `${attendance.length} empleado(s) con entrada`, ...lines,
       ...(missing.length ? ["", `Sin entrada: ${missing.map((w: any) => w.worker_name).join(", ")}`] : [])].join("\n");
     try { await shareTextSummary("Lista del día", text); } catch { toast.error("No se pudo compartir"); }
@@ -96,7 +96,7 @@ export default function DiaScreen() {
                   <Text style={s.rowName}>{a.worker_name}</Text>
                   <View style={s.rowRight}>
                     <Clock size={13} color={colors.muted} />
-                    <Text style={s.rowTime}>{a.check_in_hhmm || "--:--"}{a.check_out_hhmm ? ` → ${a.check_out_hhmm}` : ""}</Text>
+                    <Text style={s.rowTime}>{formatHHMM(a.check_in) || "--:--"}{formatHHMM(a.check_out) ? ` → ${formatHHMM(a.check_out)}` : ""}</Text>
                   </View>
                 </View>
               ))}

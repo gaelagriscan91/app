@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, Clock, AlertCircle, Share2 } from "lucide-react";
 import { toast } from "sonner";
-import api, { formatNumber, todayISO } from "@/lib/api";
+import api, { formatHHMM, formatNumber, todayISO } from "@/lib/api";
 
 export default function ListaDia() {
   const [date, setDate] = useState(todayISO());
@@ -53,7 +53,7 @@ export default function ListaDia() {
   const share = async () => {
     if (attendance.length === 0 && harvestsByWorker.length === 0) { toast.error("No hay nada que compartir"); return; }
     setSharing(true);
-    const lines = attendance.map((a) => `• ${a.worker_name}: ${a.check_in_hhmm || "--:--"}${a.check_out_hhmm ? ` → ${a.check_out_hhmm}` : ""}${a.hours ? ` (${formatNumber(a.hours, 2)} h)` : ""}`);
+    const lines = attendance.map((a) => `• ${a.worker_name}: ${formatHHMM(a.check_in) || "--:--"}${formatHHMM(a.check_out) ? ` → ${formatHHMM(a.check_out)}` : ""}${a.hours ? ` (${formatNumber(a.hours, 2)} h)` : ""}`);
     const text = [`📋 AgriScan — Lista del día ${date}`, `👥 ${attendance.length} empleado(s) con entrada`, ...lines,
       ...(missingCheckIn.length ? ["", `⚠️ Sin entrada: ${missingCheckIn.map((w) => w.worker_name).join(", ")}`] : [])].join("\n");
     try {
@@ -123,11 +123,11 @@ export default function ListaDia() {
                     <div className="text-right shrink-0">
                       <div className="flex items-center gap-1.5 text-sm font-extrabold text-[#1A2210]">
                         <Clock className="w-3.5 h-3.5 text-[#556047]" />
-                        <span className="font-mono-stat">{a.check_in_hhmm || "--:--"}</span>
-                        {a.check_out_hhmm ? (
+                        <span className="font-mono-stat">{formatHHMM(a.check_in) || "--:--"}</span>
+                        {formatHHMM(a.check_out) ? (
                           <>
                             <span className="text-[#889078]">→</span>
-                            <span className="font-mono-stat">{a.check_out_hhmm}</span>
+                            <span className="font-mono-stat">{formatHHMM(a.check_out)}</span>
                           </>
                         ) : null}
                       </div>
