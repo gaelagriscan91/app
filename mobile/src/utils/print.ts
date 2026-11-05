@@ -86,7 +86,7 @@ export async function shareReceiptSheet(receipt: any) {
     </tr>`;
   }).join("");
 
-  const fld = (label: string, value: string, w = 150) => `<span class="fl"><b>${label}</b><span class="uv" style="min-width:${w}px">${esc(value)}</span></span>`;
+  const fld = (label: string, value: string, _w = 150) => `<span class="fl"><b>${label}</b><span class="uv">${esc(value)}</span></span>`;
 
   // Fit the report on one page (612x792): shrink the row height by row count down to a readable minimum.
   // Beyond that, rows never split across a page break and the table header repeats on every page.
@@ -101,13 +101,14 @@ export async function shareReceiptSheet(receipt: any) {
     *{box-sizing:border-box}
     body{font-family:'Helvetica Neue',Arial,sans-serif;margin:0;padding:18px 20px;color:#111}
     h1{text-align:center;font-size:17px;font-weight:800;letter-spacing:.5px;margin:0 0 16px}
-    .hwrap{display:flex;gap:28px;margin-bottom:16px}
-    .hcol{display:flex;flex-direction:column;gap:7px}
+    .hwrap{display:grid;grid-template-columns:1fr 1fr 1.3fr;gap:18px;margin-bottom:16px}
+    .hcol{display:flex;flex-direction:column;gap:7px;min-width:0}
     .hcol.c3{flex:1}
-    .fl{display:inline-flex;align-items:baseline;font-size:12.5px;white-space:nowrap}
-    .fl b{font-weight:700;margin-right:4px}
-    .uv{display:inline-block;border-bottom:1px solid #000;padding:0 6px;min-height:15px}
+    .fl{display:flex;align-items:baseline;font-size:12.5px;white-space:nowrap;min-width:0}
+    .fl b{font-weight:700;margin-right:4px;flex-shrink:0}
+    .uv{display:block;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid #000;padding:0 6px;min-height:15px}
     .brk{display:flex;gap:10px}
+    .brk .fl{flex:1}
     table.data{border-collapse:collapse;width:100%;margin-top:4px}
     .data th{border:1px solid #000;padding:${pad}px 8px;font-size:${fs}px;text-align:left;font-weight:700}
     .data td{border:1px solid #000;padding:${pad}px 8px;font-size:${fs}px}
