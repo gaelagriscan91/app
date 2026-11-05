@@ -198,6 +198,8 @@ export default function RegistrarScreen() {
                 </View>
               </View>
 
+              <ValueRow label="Empleados" value={String(checkedIn)} testID="quick-checkin-count" colors={colors} />
+
               <View style={{ height: 20 }} />
               <ValueRow label="Precio" value={formatCurrency(price)} testID="quick-price" colors={colors} />
               <View style={{ height: 8 }} />
@@ -212,7 +214,6 @@ export default function RegistrarScreen() {
                   <Text style={s.dayPillLabel}>{TIPO[mode] || "Pieza"}</Text>
                   <Text style={s.dayPillVal} testID="quick-total-qty">{dayTotal}</Text>
                 </View>
-                <Text style={s.employeesText} testID="quick-checkin-count">Empleados <Text style={s.employeesNum} testID="quick-checkin-value">{checkedIn}</Text></Text>
               </View>
             </ScrollView>
 
