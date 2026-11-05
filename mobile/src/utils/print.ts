@@ -55,6 +55,17 @@ export async function shareReceiptSheet(receipt: any) {
     try { const D = new Date(d.length === 10 ? d + "T12:00:00" : d); return `${D.getMonth() + 1}/${D.getDate()}/${String(D.getFullYear()).slice(-2)}`; } catch { return d; }
   };
   const hoursHM = (x?: number) => { const v = Number(x || 0); if (v <= 0) return "0"; const h = Math.floor(v); const m = Math.round((v - h) * 60); return m > 0 ? `${h}h ${m}min` : `${h}h`; };
+  const adjHours = (x?: number) => Math.max(0, Number(x || 0) - 0.5);
+
+  const checkIns = rows.map((r) => r.min_check_in_iso).filter(Boolean).map((x: string) => new Date(x).getTime());
+  const baseTs = checkIns.length ? Math.min(...checkIns) : null;
+  const tsTime = (ts: number) => timeHM(new Date(ts).toISOString());
+  const brk = baseTs != null ? {
+    b1: tsTime(baseTs + 120 * 60000), b1e: tsTime(baseTs + 130 * 60000),
+    lunch: tsTime(baseTs + 240 * 60000), lunchE: tsTime(baseTs + 270 * 60000),
+    b2: tsTime(baseTs + 360 * 60000), b2e: tsTime(baseTs + 370 * 60000),
+  } : { b1: "", b1e: "", lunch: "", lunchE: "", b2: "", b2e: "" };
+  const totalAdjHours = rows.reduce((sum, r) => sum + adjHours(r.total_hours), 0);
 
   const tr = rows.map((r) => {
     const h0 = (r.harvests || [])[0] || {};
@@ -67,7 +78,7 @@ export async function shareReceiptSheet(receipt: any) {
       <td class="r">${esc(timeHM(r.min_check_in_iso))}</td>
       <td class="c">${esc(mdyShort(date))}</td>
       <td class="r">${esc(r.still_working ? "" : timeHM(r.max_check_out_iso))}</td>
-      <td class="r">${esc(hoursHM(r.total_hours))}</td>
+      <td class="r">${esc(hoursHM(adjHours(r.total_hours)))}</td>
       <td class="r">${esc(price)}</td>
       <td class="r b">${esc(formatCurrency(r.total_payment))}</td>
     </tr>`;
@@ -112,9 +123,9 @@ export async function shareReceiptSheet(receipt: any) {
         ${fld("Variety :", head.variety, 150)}
       </div>
       <div class="hcol c3">
-        <div class="brk">${fld("1Break:", "", 70)}${fld("termina:", "", 70)}</div>
-        <div class="brk">${fld("Lunch :", "", 70)}${fld("termina:", "", 70)}</div>
-        <div class="brk">${fld("2 Break:", "", 70)}${fld("termina:", "", 70)}</div>
+        <div class="brk">${fld("1Break:", brk.b1, 70)}${fld("termina:", brk.b1e, 70)}</div>
+        <div class="brk">${fld("Lunch :", brk.lunch, 70)}${fld("termina:", brk.lunchE, 70)}</div>
+        <div class="brk">${fld("2 Break:", brk.b2, 70)}${fld("termina:", brk.b2e, 70)}</div>
       </div>
     </div>
     <table class="data">
@@ -122,7 +133,7 @@ export async function shareReceiptSheet(receipt: any) {
         <th>SS#  ID#</th><th>Nombre Empleados</th><th>Hora Entrada</th><th>Fecha</th><th>Hora Salida</th><th>Total Horas</th><th>Precio</th><th>$</th>
       </tr></thead>
       <tbody>${tr}
-        <tr class="tot"><td colspan="5" class="r">TOTAL</td><td class="r">${esc(hoursHM(receipt.total_hours))}</td><td></td><td class="r">${esc(formatCurrency(receipt.total_payment))}</td></tr>
+        <tr class="tot"><td colspan="5" class="r">TOTAL</td><td class="r">${esc(hoursHM(totalAdjHours))}</td><td></td><td class="r">${esc(formatCurrency(receipt.total_payment))}</td></tr>
       </tbody>
     </table>
   </body></html>`;

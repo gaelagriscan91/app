@@ -1497,7 +1497,7 @@ async def _payroll(user: dict, week: str, grower: str, include_sunday: bool = Tr
     rows = []
     for w in sorted(workers.values(), key=lambda x: (x["worker_name"] or "").lower()):
         cells = [{"units": round(w["days"][d]["units"], 2), "payment": round(w["days"][d]["payment"], 2)} for d in days]
-        rows.append({"worker_name": w["worker_name"], "days": cells, "total": round(sum(c["payment"] for c in cells), 2)})
+        rows.append({"worker_name": w["worker_name"], "days": cells, "total": round(sum(c["payment"] for c in cells), 2), "total_units": round(sum(c["units"] for c in cells), 2)})
     return {
         "week_start": days[0], "week_end": days[-1],
         "days": [{"date": d, "name": WEEKDAYS[i], "price": max(prices[d], key=prices[d].get) if prices[d] else 0} for i, d in enumerate(days)],

@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, Share2 } from "lucide-react-native";
 import api from "@/src/api/client";
 import { toast } from "@/src/components/Toast";
 import { Card, EmptyState, Loading } from "@/src/components/ui";
-import { formatCurrency, todayISO } from "@/src/utils/format";
+import { formatCurrency, formatNumber, todayISO } from "@/src/utils/format";
 import { downloadAndShareExcel } from "@/src/utils/download";
 import { useTheme, ThemeColors } from "@/src/theme";
 
@@ -43,6 +43,7 @@ export default function PayrollModule() {
   };
 
   const growers: string[] = data?.growers || [];
+  const totalPieces: number = (data?.rows || []).reduce((sum: number, r: any) => sum + (r.total_units || 0), 0);
 
   React.useEffect(() => {
     if (!grower && growers.length > 0) setGrower(growers[0]);
@@ -76,11 +77,20 @@ export default function PayrollModule() {
           <Text style={s.grower}>Grower: {data.grower || "Todos"} · Mayordomo: {data.mayordomo || "—"}</Text>
           {data.rows.map((r: any) => (
             <View key={r.worker_name} style={s.payRow} testID={`payroll-row-${r.worker_name}`}>
-              <Text style={s.payName}>{r.worker_name}</Text>
+              <View style={s.flex}>
+                <Text style={s.payName}>{r.worker_name}</Text>
+                <Text style={s.payPieces} testID={`payroll-pieces-${r.worker_name}`}>{formatNumber(r.total_units || 0, r.total_units % 1 === 0 ? 0 : 2)} pz</Text>
+              </View>
               <Text style={s.payTotal}>{formatCurrency(r.total)}</Text>
             </View>
           ))}
-          <View style={s.totalRow}><Text style={s.totalLabel}>Total</Text><Text style={s.totalVal}>{formatCurrency(data.total)}</Text></View>
+          <View style={s.totalRow}>
+            <View style={s.flex}>
+              <Text style={s.totalLabel}>Total</Text>
+              <Text style={s.totalPieces} testID="payroll-total-pieces">{formatNumber(totalPieces, totalPieces % 1 === 0 ? 0 : 2)} pz</Text>
+            </View>
+            <Text style={s.totalVal}>{formatCurrency(data.total)}</Text>
+          </View>
         </Card>
       )}
       <View style={{ height: 24 }} />
@@ -105,10 +115,13 @@ const styles = (c: ThemeColors) =>
     growerChipText: { fontWeight: "700", color: c.onSurfaceTertiary, fontSize: 13 },
     growerChipTextActive: { color: "#FFFFFF" },
     grower: { fontSize: 13, fontWeight: "700", color: c.onSurfaceTertiary, marginBottom: 10 },
+    flex: { flex: 1 },
     payRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 11, borderTopWidth: 1, borderTopColor: c.divider },
-    payName: { fontWeight: "700", color: c.onSurface, fontSize: 15, flex: 1 },
+    payName: { fontWeight: "700", color: c.onSurface, fontSize: 15 },
+    payPieces: { fontWeight: "600", color: c.onSurfaceTertiary, fontSize: 12, marginTop: 2 },
     payTotal: { fontWeight: "800", color: c.brandPrimary, fontSize: 15 },
     totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 12, marginTop: 6, borderTopWidth: 2, borderTopColor: c.border },
     totalLabel: { fontWeight: "800", color: c.onSurface, fontSize: 15 },
+    totalPieces: { fontWeight: "700", color: c.onSurfaceTertiary, fontSize: 12, marginTop: 2 },
     totalVal: { fontWeight: "900", color: c.onSurface, fontSize: 18 },
   });
