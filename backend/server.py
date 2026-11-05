@@ -1452,6 +1452,20 @@ def _hhmm_local(iso_ts: Optional[str], tz_offset_minutes: int = 0) -> str:
 WEEKDAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 
 
+def _utc_from_hhmm(day: str, hhmm: Optional[str], after: Optional[str] = None) -> str:
+    """Saved receipt snapshots keep attendance only as UTC "HH:MM"; rebuild a full UTC timestamp so it sorts with live ISO values.
+    A time earlier than `after` means the shift crossed midnight."""
+    if not hhmm or not re.fullmatch(r"\d{2}:\d{2}", hhmm):
+        return ""
+    try:
+        dt = datetime.fromisoformat(f"{day}T{hhmm}:00+00:00")
+    except ValueError:
+        return ""
+    if after and re.fullmatch(r"\d{2}:\d{2}", after) and hhmm < after:
+        dt += timedelta(days=1)
+    return dt.isoformat()
+
+
 async def _payroll(user: dict, week: str, grower: str, include_sunday: bool = True) -> dict:
     from datetime import date as _date
     try:
@@ -1531,10 +1545,12 @@ async def _payroll(user: dict, week: str, grower: str, include_sunday: bool = Tr
                 continue
             w = _wrow(wid, wname)
             w["days"][ad]["hours"] += float(a.get("hours", 0) or 0)
-            if a.get("check_in_iso"):
-                day_hdr[ad]["entrada"].append(a["check_in_iso"])
-            if a.get("check_out_iso"):
-                day_hdr[ad]["salida"].append(a["check_out_iso"])
+            ci_ts = a.get("check_in_iso") or _utc_from_hhmm(ad, a.get("check_in"))
+            co_ts = a.get("check_out_iso") or _utc_from_hhmm(ad, a.get("check_out"), after=a.get("check_in"))
+            if ci_ts:
+                day_hdr[ad]["entrada"].append(ci_ts)
+            if co_ts:
+                day_hdr[ad]["salida"].append(co_ts)
 
     growers = sorted(growers_set)
     rows = []
