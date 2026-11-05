@@ -19,6 +19,25 @@ const fmtDateTime = (iso?: string) => {
   try { return new Date(iso).toLocaleString("es-MX", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }); }
   catch { return iso; }
 };
+const fmtTimeAmPm = (iso?: string) => {
+  if (!iso) return "—";
+  try {
+    const t = new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true });
+    return t.replace("AM", "a.m.").replace("PM", "p.m.");
+  } catch { return "—"; }
+};
+const fmtMDY = (d?: string) => {
+  if (!d) return "—";
+  try { return new Date(d.length === 10 ? d + "T12:00:00" : d).toLocaleDateString("en-US"); }
+  catch { return d; }
+};
+const fmtHoursHM = (x?: number) => {
+  const v = Number(x || 0);
+  if (v <= 0) return "0h";
+  const h = Math.floor(v);
+  const m = Math.round((v - h) * 60);
+  return m > 0 ? `${h}h ${m}min` : `${h}h`;
+};
 const uniq = (arr: any[]) => [...new Set(arr)];
 
 export default function RegistroModule() {
@@ -93,49 +112,77 @@ export default function RegistroModule() {
             </View>
             {detailLoading || selected?._loading || !selected ? (
               <View style={{ paddingVertical: 36 }}><Loading /></View>
-            ) : (
-              <ScrollView style={{ maxHeight: 560 }} contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={false} testID="registro-detail-modal">
-                <View style={s.infoBox}>
-                  <InfoLine label="Rancho" value={(selected.parcels && selected.parcels.length) ? selected.parcels.join(", ") : "—"} c={colors} />
-                  <InfoLine label="Trabajo" value={(selected.products && selected.products.length) ? selected.products.join(", ") : "—"} c={colors} />
-                  <InfoLine label="Fecha" value={`${fmtDate(selected.date_from)} → ${fmtDate(selected.date_to)}`} c={colors} />
-                </View>
-                <Text style={s.savedLine}>Guardado {fmtDateTime(selected.saved_at)}{selected.saved_by_name ? ` · por ${selected.saved_by_name}` : ""}</Text>
-                <View style={s.statsRow}>
-                  <View style={[s.stat, { backgroundColor: colors.brandPrimary }]}><Text style={s.statKW}>Horas</Text><Text style={s.statVW}>{formatNumber(selected.total_hours, 2)}</Text></View>
-                  <View style={s.statLight}><Text style={s.statK}>Emp.</Text><Text style={s.statV}>{selected.workers_count}</Text></View>
-                  <View style={s.statLight}><Text style={s.statK}>Piezas</Text><Text style={s.statV}>{Math.round(selected.total_units || 0)}</Text></View>
-                  <View style={[s.stat, { backgroundColor: colors.error }]}><Text style={s.statKW}>Nómina</Text><Text style={[s.statVW, { fontSize: 12 }]}>{formatCurrency(selected.total_payment)}</Text></View>
-                </View>
-                {(selected.rows || []).map((r: any) => {
-                  const harvests = r.harvests || [];
-                  const parcels = uniq(harvests.map((h: any) => h.parcel_name).filter((x: any) => x && x !== "—"));
-                  const products = uniq(harvests.map((h: any) => h.product_name).filter((x: any) => x && x !== "—"));
-                  const blocks = uniq(harvests.map((h: any) => h.block).filter(Boolean));
-                  const varieties = uniq(harvests.map((h: any) => h.variety).filter(Boolean));
-                  const prices = uniq(harvests.map((h: any) => h.price_per_unit).filter((x: any) => x > 0));
-                  const priceLabel = prices.length === 0 ? "—" : prices.length === 1 ? formatCurrency(prices[0]) : "Varios";
-                  const dates = harvests.map((h: any) => h.date).filter(Boolean).sort();
-                  const dateLabel = dates.length === 0 ? `${fmtDate(selected.date_from)} → ${fmtDate(selected.date_to)}`
-                    : dates[0] === dates[dates.length - 1] ? fmtDate(dates[0]) : `${fmtDate(dates[0])} → ${fmtDate(dates[dates.length - 1])}`;
-                  return (
-                    <Card key={r.worker_id} style={s.detailCard} testID={`registro-detail-row-${r.worker_id}`}>
-                      <View style={s.detailHead}><Text style={s.detailName} numberOfLines={1}>{r.worker_name}</Text><Text style={s.detailPay}>{formatCurrency(r.total_payment)}</Text></View>
-                      <View style={s.kvGrid}>
-                        <KV k="Rancho" v={parcels.join(", ") || "—"} c={colors} />
-                        <KV k="Trabajo" v={products.join(", ") || "—"} c={colors} />
-                        <KV k="Block" v={blocks.join(", ") || "—"} c={colors} />
-                        <KV k="Variedad" v={varieties.join(", ") || "—"} c={colors} />
-                        <KV k="Precio/pieza" v={priceLabel} c={colors} />
-                        <KV k="Piezas" v={String(Math.round(r.total_units || 0))} c={colors} />
-                        <KV k="Horas" v={`${formatNumber(r.total_hours || 0, 2)}h`} c={colors} />
-                        <KV k="Fecha" v={dateLabel} c={colors} />
+            ) : (() => {
+              const rows = (selected.rows || []);
+              const allH = rows.flatMap((r: any) => r.harvests || []);
+              const pick = (arr: any[]) => { const u = uniq(arr.filter((x) => x && x !== "—")); return u.length === 0 ? "—" : u.length === 1 ? String(u[0]) : "Varios"; };
+              const head = {
+                ranch: pick(allH.map((h: any) => h.parcel_name)),
+                block: pick(allH.map((h: any) => h.block)),
+                trabajo: pick(allH.map((h: any) => h.product_name)),
+                variedad: pick(allH.map((h: any) => h.variety)),
+                mayordomo: pick(allH.map((h: any) => h.mayordomo)) !== "—" ? pick(allH.map((h: any) => h.mayordomo)) : (selected.saved_by_name || "—"),
+                grower: pick(allH.map((h: any) => h.grower)),
+              };
+              const COLS = [
+                { k: "ss", label: "SS#", w: 92 },
+                { k: "name", label: "EMPLOYEE NAME", w: 150 },
+                { k: "in", label: "Hora entrada", w: 100 },
+                { k: "date", label: "Fecha", w: 86 },
+                { k: "out", label: "Hora Salida", w: 100 },
+                { k: "hours", label: "Total Horas", w: 86 },
+                { k: "pieces", label: "Total piezas", w: 78 },
+                { k: "price", label: "Precio", w: 66 },
+                { k: "amount", label: "$", w: 80 },
+              ];
+              return (
+                <ScrollView style={{ maxHeight: 580 }} showsVerticalScrollIndicator={false} testID="registro-detail-modal">
+                  <View style={s.sheetGrid}>
+                    <HeadCell label="RANCH" value={head.ranch} />
+                    <HeadCell label="BLOCK#" value={head.block} />
+                    <HeadCell label="Trabajo" value={head.trabajo} last />
+                    <HeadCell label="Variedad" value={head.variedad} />
+                    <HeadCell label="Mayordomo" value={head.mayordomo} />
+                    <HeadCell label="Grower" value={head.grower} last />
+                  </View>
+                  <Text style={s.savedLine}>Guardado {fmtDateTime(selected.saved_at)}</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={{ paddingBottom: 6 }}>
+                    <View>
+                      <View style={[s.tr, s.trHead]}>
+                        {COLS.map((c) => <Text key={c.k} style={[s.th, { width: c.w }]}>{c.label}</Text>)}
                       </View>
-                    </Card>
-                  );
-                })}
-              </ScrollView>
-            )}
+                      {rows.map((r: any, idx: number) => {
+                        const h0 = (r.harvests || [])[0] || {};
+                        const prices = uniq((r.harvests || []).map((h: any) => h.price_per_unit).filter((x: any) => x > 0));
+                        const price = prices.length === 0 ? "—" : prices.length === 1 ? formatCurrency(prices[0]) : "Varios";
+                        const date = (r.attendance || [])[0]?.date || h0.date || selected.date_from;
+                        return (
+                          <View key={r.worker_id || idx} style={[s.tr, idx % 2 === 1 && s.trAlt]} testID={`receipt-row-${r.worker_id}`}>
+                            <Text style={[s.td, { width: 92 }]}>{r.document_id || ""}</Text>
+                            <Text style={[s.td, s.tdName, { width: 150 }]} numberOfLines={1}>{r.worker_name}</Text>
+                            <Text style={[s.td, { width: 100 }]}>{fmtTimeAmPm(r.min_check_in_iso)}</Text>
+                            <Text style={[s.td, { width: 86 }]}>{fmtMDY(date)}</Text>
+                            <Text style={[s.td, { width: 100 }]}>{r.still_working ? "—" : fmtTimeAmPm(r.max_check_out_iso)}</Text>
+                            <Text style={[s.td, { width: 86 }]}>{fmtHoursHM(r.total_hours)}</Text>
+                            <Text style={[s.td, s.tdNum, { width: 78 }]}>{Math.round(r.total_units || 0)}</Text>
+                            <Text style={[s.td, s.tdNum, { width: 66 }]}>{price}</Text>
+                            <Text style={[s.td, s.tdNum, s.tdAmount, { width: 80 }]}>{formatCurrency(r.total_payment)}</Text>
+                          </View>
+                        );
+                      })}
+                      <View style={[s.tr, s.trTotal]}>
+                        <Text style={[s.td, s.tdTotalLabel, { width: 92 + 150 + 100 + 86 + 100 }]}>TOTAL</Text>
+                        <Text style={[s.td, s.tdNum, s.tdTotalVal, { width: 86 }]}>{fmtHoursHM(selected.total_hours)}</Text>
+                        <Text style={[s.td, s.tdNum, s.tdTotalVal, { width: 78 }]}>{Math.round(selected.total_units || 0)}</Text>
+                        <Text style={[s.td, { width: 66 }]}></Text>
+                        <Text style={[s.td, s.tdNum, s.tdTotalVal, { width: 80 }]}>{formatCurrency(selected.total_payment)}</Text>
+                      </View>
+                    </View>
+                  </ScrollView>
+                  <View style={{ height: 20 }} />
+                </ScrollView>
+              );
+            })()}
           </Pressable>
         </Pressable>
       </Modal>
@@ -143,19 +190,18 @@ export default function RegistroModule() {
   );
 }
 
-const InfoLine = ({ label, value, c }: { label: string; value: string; c: ThemeColors }) => (
-  <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-start" }}>
-    <Text style={{ width: 62, fontSize: 10, fontWeight: "800", textTransform: "uppercase", color: c.onSurfaceTertiary, paddingTop: 1 }}>{label}</Text>
-    <Text style={{ flex: 1, fontSize: 14, fontWeight: "700", color: c.onSurface }}>{value}</Text>
+const HeadCell = ({ label, value, last }: { label: string; value: string; last?: boolean }) => (
+  <View style={[hc.cell, last && { borderRightWidth: 0 }]}>
+    <Text style={hc.label}>{label}</Text>
+    <Text style={hc.value} numberOfLines={1}>{value}</Text>
   </View>
 );
 
-const KV = ({ k, v, c }: { k: string; v: string; c: ThemeColors }) => (
-  <View style={{ width: "48%" }}>
-    <Text style={{ fontSize: 10, fontWeight: "800", textTransform: "uppercase", color: c.onSurfaceTertiary }}>{k}</Text>
-    <Text style={{ fontSize: 12, fontWeight: "700", color: c.onSurface }}>{v}</Text>
-  </View>
-);
+const hc = StyleSheet.create({
+  cell: { width: "33.333%", borderRightWidth: 1, borderBottomWidth: 1, borderColor: "#111827", paddingVertical: 4, paddingHorizontal: 6 },
+  label: { fontSize: 9, fontWeight: "800", color: "#111827", textTransform: "uppercase" },
+  value: { fontSize: 11, fontWeight: "600", color: "#374151", marginTop: 1 },
+});
 
 const styles = (c: ThemeColors) =>
   StyleSheet.create({
@@ -172,18 +218,17 @@ const styles = (c: ThemeColors) =>
     sheetHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
     sheetTitle: { fontSize: 18, fontWeight: "900", color: c.onSurface },
     closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: c.surfaceTertiary, alignItems: "center", justifyContent: "center" },
-    infoBox: { backgroundColor: "#EFF6FF", borderWidth: 1, borderColor: "#DBEAFE", borderRadius: 14, padding: 12, gap: 7, marginBottom: 10 },
-    savedLine: { fontSize: 11, color: c.onSurfaceTertiary, fontWeight: "600", marginBottom: 12 },
-    statsRow: { flexDirection: "row", gap: 8, marginBottom: 14 },
-    stat: { flex: 1, borderRadius: 12, padding: 10 },
-    statLight: { flex: 1, borderRadius: 12, padding: 10, backgroundColor: c.surface, borderWidth: 1.5, borderColor: c.border },
-    statKW: { fontSize: 9, fontWeight: "800", textTransform: "uppercase", color: "#FFFFFF", opacity: 0.9 },
-    statVW: { fontSize: 16, fontWeight: "900", color: "#FFFFFF", marginTop: 2 },
-    statK: { fontSize: 9, fontWeight: "800", textTransform: "uppercase", color: c.onSurfaceTertiary },
-    statV: { fontSize: 16, fontWeight: "900", color: c.onSurface, marginTop: 2 },
-    detailCard: { marginBottom: 10, padding: 12 },
-    detailHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8 },
-    detailName: { fontWeight: "800", color: c.onSurface, fontSize: 15, flexShrink: 1 },
-    detailPay: { fontWeight: "900", color: c.brandPrimary, fontSize: 15 },
-    kvGrid: { flexDirection: "row", flexWrap: "wrap", rowGap: 6, columnGap: 8 },
+    savedLine: { fontSize: 11, color: c.onSurfaceTertiary, fontWeight: "600", marginTop: 8, marginBottom: 10 },
+    sheetGrid: { flexDirection: "row", flexWrap: "wrap", borderTopWidth: 1, borderLeftWidth: 1, borderColor: "#111827" },
+    tr: { flexDirection: "row" },
+    trHead: { backgroundColor: "#D1D5DB" },
+    trAlt: { backgroundColor: "#F9FAFB" },
+    trTotal: { backgroundColor: "#E5E7EB", borderTopWidth: 1.5, borderColor: "#111827" },
+    th: { fontSize: 10, fontWeight: "800", color: "#111827", paddingVertical: 6, paddingHorizontal: 6, borderRightWidth: 1, borderBottomWidth: 1, borderColor: "#111827" },
+    td: { fontSize: 11, color: "#1F2937", paddingVertical: 5, paddingHorizontal: 6, borderRightWidth: 1, borderBottomWidth: 1, borderColor: "#9CA3AF" },
+    tdName: { fontWeight: "700", color: "#111827" },
+    tdNum: { textAlign: "right" },
+    tdAmount: { fontWeight: "800", color: "#111827" },
+    tdTotalLabel: { fontWeight: "900", color: "#111827", textAlign: "right" },
+    tdTotalVal: { fontWeight: "900", color: "#111827" },
   });
