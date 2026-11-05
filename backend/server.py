@@ -1213,6 +1213,7 @@ async def dashboard(user: CurrentUser):
         "parcels_count": parcels_count,
         "present_now": present_now,
         "closed_today": closed_today,
+        "checked_in_today": present_now + closed_today,
         "weekly": list(weekly.values()),
         "month_records": month_records + pending_records,
         "month_records_count": len(month_rows),
@@ -1552,8 +1553,8 @@ async def _payroll(user: dict, week: str, grower: str, include_sunday: bool = Tr
             "price": max(prices[d], key=prices[d].get) if prices[d] else 0,
             "ranch": _hdr_pick(hdr["ranch"]),
             "grower": _hdr_pick(hdr["grower"]),
-            "entrada": _hhmm(min(hdr["entrada"])) if hdr["entrada"] else "",
-            "salida": _hhmm(max(hdr["salida"])) if hdr["salida"] else "",
+            "entrada": min(hdr["entrada"]) if hdr["entrada"] else "",
+            "salida": max(hdr["salida"]) if hdr["salida"] else "",
         })
     return {
         "week_start": days[0], "week_end": days[-1],

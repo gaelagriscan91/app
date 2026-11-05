@@ -5,7 +5,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFocusEffect, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { QrCode, X, Printer, Trash2, ArrowLeft, UserPlus, Loader } from "lucide-react-native";
+import { QrCode, X, Printer, Trash2, ArrowLeft, UserPlus, Loader, Users } from "lucide-react-native";
 import api, { apiErrorMessage } from "@/src/api/client";
 import { useSession } from "@/src/api/session";
 import { useOfflineActions } from "@/src/offline/useOfflineActions";
@@ -55,6 +55,10 @@ export default function RegistrarScreen() {
   });
   const rows = rowsQ.data || [];
   useFocusEffect(React.useCallback(() => { rowsQ.refetch(); }, []));
+
+  const dashQ = useQuery({ queryKey: ["dashboard-checkin"], queryFn: async () => (await api.get("/dashboard")).data });
+  const checkedIn = dashQ.data?.checked_in_today ?? 0;
+  useFocusEffect(React.useCallback(() => { dashQ.refetch(); }, []));
 
   const requireSetup = () => { toast.error("Completa primero el Check in (Rancho, Trabajo y Precio)"); router.push("/(tabs)/asistencia"); };
   const openScanner = () => { if (!setupReady) return requireSetup(); setScanning(true); };
@@ -207,6 +211,11 @@ export default function RegistrarScreen() {
                 <Text style={s.dayPillLabel}>{TIPO[mode] || "Pieza"}</Text>
                 <Text style={s.dayPillVal} testID="quick-total-qty">{dayTotal}</Text>
               </View>
+              <View style={s.checkinPill} testID="quick-checkin-count">
+                <Users size={14} color="#FFFFFF" />
+                <Text style={s.checkinLabel}>Check-in</Text>
+                <Text style={s.checkinVal} testID="quick-checkin-value">{checkedIn}</Text>
+              </View>
             </ScrollView>
 
             <TouchableOpacity
@@ -319,7 +328,10 @@ const styles = (c: ThemeColors) =>
     splitInfo: { fontSize: 12, color: c.muted },
     qtyInput: { minWidth: 90, textAlign: "right", fontSize: 19, color: "#111827", padding: 0 },
     fieldInput: { flex: 1, textAlign: "right", fontSize: 17, color: "#111827", padding: 0 },
-    dayPill: { alignSelf: "flex-start", margin: 16, backgroundColor: "#FFFFFF", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, flexDirection: "row", gap: 16, alignItems: "center", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+    dayPill: { alignSelf: "flex-start", marginHorizontal: 16, marginTop: 16, marginBottom: 6, backgroundColor: "#FFFFFF", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, flexDirection: "row", gap: 16, alignItems: "center", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+    checkinPill: { alignSelf: "flex-start", marginHorizontal: 16, marginBottom: 16, backgroundColor: "#7AB648", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10, flexDirection: "row", gap: 10, alignItems: "center", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+    checkinLabel: { color: "#FFFFFF", fontWeight: "700", fontSize: 14 },
+    checkinVal: { color: "#FFFFFF", fontWeight: "900", fontSize: 16 },
     dayPillLabel: { fontSize: 14, color: "#111827" },
     dayPillVal: { fontSize: 14, fontWeight: "800", color: "#111827" },
     fab: { position: "absolute", right: 20, bottom: 20, width: 84, height: 84, borderRadius: 42, backgroundColor: c.brandSecondary, alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 },

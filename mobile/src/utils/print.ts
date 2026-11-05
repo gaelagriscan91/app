@@ -37,11 +37,13 @@ export async function sharePayrollSheet(data: any) {
   const days: any[] = data.days || [];
   const rows: any[] = data.rows || [];
   const num = (n: any, dec = 0) => { const v = Number(n || 0); return v === 0 ? "" : (v % 1 === 0 ? v.toFixed(0) : v.toFixed(dec || 2)); };
+  const clock = (iso?: string) => { if (!iso) return ""; try { return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).replace(" AM", "am").replace(" PM", "pm"); } catch { return ""; } };
   const mdy = (d?: string) => { if (!d) return ""; try { const D = new Date(d + "T12:00:00"); return `${String(D.getMonth() + 1).padStart(2, "0")}-${String(D.getDate()).padStart(2, "0")}-${String(D.getFullYear()).slice(-2)}`; } catch { return d; } };
 
   const nDays = days.length;
   const hdrRow = (label: string, key: "ranch" | "grower" | "entrada" | "salida", tail = "") => {
-    const cells = days.map((d) => `<span class="uv">${esc(d[key] || "")}</span>`).join("");
+    const fmt = (d: any) => (key === "entrada" || key === "salida") ? clock(d[key]) : (d[key] || "");
+    const cells = days.map((d) => `<span class="uv">${esc(fmt(d))}</span>`).join("");
     const blanks = Array.from({ length: Math.max(0, 7 - nDays) }).map(() => `<span class="uv"></span>`).join("");
     return `<div class="hrow"><b>${label}</b>${cells}${blanks}${tail ? `<span class="cb">${esc(tail)}</span>` : ""}</div>`;
   };
