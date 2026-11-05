@@ -9,7 +9,7 @@ import { toast } from "@/src/components/Toast";
 import { Card, EmptyState, Loading, ScreenTitle } from "@/src/components/ui";
 import { formatCurrency, formatNumber, startOfMonthISO, todayISO } from "@/src/utils/format";
 import { downloadAndShareExcel } from "@/src/utils/download";
-import { shareTextSummary } from "@/src/utils/print";
+import { shareTextSummary, shareReceiptSheet } from "@/src/utils/print";
 import { useTheme, ThemeColors } from "@/src/theme";
 
 export default function ReportesScreen() {
@@ -76,20 +76,11 @@ export default function ReportesScreen() {
   };
 
   const shareSavedReceipt = async (h: any) => {
-    const rows = h.rows || [];
-    const lines = [
-      "AgriScan — Recibo guardado",
-      `Periodo: ${h.date_from} → ${h.date_to}`,
-      h.saved_by_name ? `Guardado por: ${h.saved_by_name}` : "",
-      "",
-      `Empleados: ${h.workers_count || h.worker_count || rows.length || 0}`,
-      `Horas: ${formatNumber(h.total_hours || 0, 2)}`,
-      `Piezas: ${Math.round(h.total_units || 0)}`,
-      `Total a pagar: ${formatCurrency(h.total_payment || 0)}`,
-      "",
-      ...rows.slice(0, 50).map((r: any) => `• ${r.worker_name}: ${formatCurrency(r.total_payment)}`),
-    ].filter(Boolean).join("\n");
-    try { await shareTextSummary("Recibo guardado", lines); } catch { toast.error("No se pudo compartir"); }
+    try {
+      let full = h;
+      if (!h.rows) { const { data } = await api.get(`/receipts/history/${h.id}`); full = data; }
+      await shareReceiptSheet(full);
+    } catch { toast.error("No se pudo compartir"); }
   };
 
   const openReset = async () => {

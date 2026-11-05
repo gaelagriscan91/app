@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Trash2, X, Users, Clock, FileText, ChevronRight, Calendar, Share2 } from "lucide-react-native";
 import api, { apiErrorMessage } from "@/src/api/client";
 import { toast } from "@/src/components/Toast";
-import { shareTextSummary } from "@/src/utils/print";
+import { shareReceiptSheet } from "@/src/utils/print";
 import { Card, EmptyState, Loading } from "@/src/components/ui";
 import { formatCurrency, formatNumber } from "@/src/utils/format";
 import { useTheme, ThemeColors } from "@/src/theme";
@@ -62,20 +62,7 @@ export default function RegistroModule() {
     try {
       let full = r;
       if (!r.rows) { const { data } = await api.get(`/receipts/history/${r.id}`); full = data; }
-      const rows = full.rows || [];
-      const lines = [
-        "AgriScan — Recibo guardado",
-        `Periodo: ${fmtDate(full.date_from)} → ${fmtDate(full.date_to)}`,
-        full.saved_by_name ? `Guardado por: ${full.saved_by_name}` : "",
-        "",
-        `Empleados: ${full.workers_count || rows.length || 0}`,
-        `Horas: ${formatNumber(full.total_hours || 0, 2)}`,
-        `Piezas: ${Math.round(full.total_units || 0)}`,
-        `Total a pagar: ${formatCurrency(full.total_payment || 0)}`,
-        "",
-        ...rows.slice(0, 60).map((x: any) => `• ${x.worker_name}: ${formatCurrency(x.total_payment)}`),
-      ].filter(Boolean).join("\n");
-      await shareTextSummary("Recibo guardado", lines);
+      await shareReceiptSheet(full);
     } catch (e) { toast.error(apiErrorMessage(e)); }
   };
 
