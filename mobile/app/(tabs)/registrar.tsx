@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import {
-  ImageBackground, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
+  ImageBackground, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from "react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -79,6 +79,7 @@ export default function RegistrarScreen() {
   };
 
   const save_ = async () => {
+    Keyboard.dismiss(); // close the keyboard on SAVE (the Empleado field kept focus and the keyboard stayed open)
     const total = Number(qty);
     if (!team.length || !(total > 0)) { toast.error("Agrega un empleado y la cantidad"); return; }
     const units = Math.round((total / team.length) * 10000) / 10000;
