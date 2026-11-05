@@ -41,11 +41,22 @@ export async function sharePayrollSheet(data: any) {
   const mdy = (d?: string) => { if (!d) return ""; try { const D = new Date(d + "T12:00:00"); return `${String(D.getMonth() + 1).padStart(2, "0")}-${String(D.getDate()).padStart(2, "0")}-${String(D.getFullYear()).slice(-2)}`; } catch { return d; } };
 
   const nDays = days.length;
+  // expo-print's printToFileAsync has no orientation option (only printAsync does), so the landscape page is set through width/height.
+  const PAGE_W = 792, PAGE_H = 612, PAD = 10;
+  const nameW = 104, totPieceW = 34, totAmtW = 54;
+  const dayW = Math.floor((PAGE_W - 2 * PAD - nameW - totPieceW - totAmtW) / Math.max(1, nDays));
+  const pcW = Math.round(dayW * 0.27), hrW = Math.round(dayW * 0.27), prW = dayW - pcW - hrW;
+  const fs = nDays > 6 ? 7.5 : 8.5;
+  const FIXED_H = 150; // page padding + header block + 3 table header rows, plus a safety margin for device differences
+  const rowH = Math.max(12, Math.min(20, Math.floor((PAGE_H - FIXED_H) / (rows.length + 1)))); // + total row
+  const pad = Math.max(0.5, Math.round(((rowH - 1 - fs * 1.2) / 2) * 10) / 10);
+  const tblW = nameW + nDays * dayW + totPieceW + totAmtW;
+  const colgroup = `<colgroup><col style="width:${nameW}px">${days.map(() => `<col style="width:${pcW}px"><col style="width:${hrW}px"><col style="width:${prW}px">`).join("")}<col style="width:${totPieceW}px"><col style="width:${totAmtW}px"></colgroup>`;
+
   const hdrRow = (label: string, key: "ranch" | "grower" | "entrada" | "salida", tail = "") => {
     const fmt = (d: any) => (key === "entrada" || key === "salida") ? clock(d[key]) : (d[key] || "");
-    const cells = days.map((d) => `<span class="uv">${esc(fmt(d))}</span>`).join("");
-    const blanks = Array.from({ length: Math.max(0, 7 - nDays) }).map(() => `<span class="uv"></span>`).join("");
-    return `<div class="hrow"><b>${label}</b>${cells}${blanks}${tail ? `<span class="cb">${esc(tail)}</span>` : ""}</div>`;
+    const cells = days.map((d) => `<td colspan="3"><div class="uv">${esc(fmt(d))}</div></td>`).join("");
+    return `<tr><td class="hl">${label}</td>${cells}<td colspan="2" class="cb">${esc(tail)}</td></tr>`;
   };
 
   const groupTh = days.map((d) => `<th colspan="3" class="ctr">${esc(d.name)}</th>`).join("");
@@ -60,32 +71,32 @@ export async function sharePayrollSheet(data: any) {
   const html = `<!doctype html><html lang="es"><head><meta charset="utf-8">
   <style>
     *{box-sizing:border-box}
-    body{font-family:'Helvetica Neue',Arial,sans-serif;margin:0;padding:16px;color:#111;font-size:11px}
-    .hdr{margin-bottom:12px}
-    .hrow{display:flex;align-items:baseline;gap:6px;margin-bottom:4px;white-space:nowrap}
-    .hrow b{width:66px;font-weight:700}
-    .uv{flex:1;border-bottom:1px solid #000;min-height:14px;padding:0 5px;text-align:center}
-    .cb{font-weight:700;padding-left:6px}
-    table{border-collapse:collapse;width:100%;table-layout:fixed}
-    th,td{border:1px solid #000;padding:4px 3px;font-size:10px;overflow:hidden}
-    th{background:#cfcfcf;font-weight:700;text-align:center}
-    .ctr{text-align:center}
-    .pr{font-size:9px}
-    td.nm{text-align:left;font-weight:600;font-size:10px}
+    body{font-family:'Helvetica Neue',Arial,sans-serif;margin:0;padding:${PAD}px;color:#111;font-size:${fs}px}
+    table{border-collapse:collapse;table-layout:fixed;width:${tblW}px}
+    .hdr{margin-bottom:6px}
+    .hdr td{padding:1px 0;font-size:${fs}px;white-space:nowrap}
+    .hl{font-weight:700}
+    .uv{margin:0 5px;border-bottom:1px solid #000;min-height:${Math.round(fs * 1.3)}px;text-align:center;overflow:hidden}
+    .cb{font-weight:700;padding-left:4px !important;overflow:visible}
+    .data th,.data td{border:1px solid #000;font-size:${fs}px;overflow:hidden;white-space:nowrap}
+    .data th{background:#cfcfcf;font-weight:700;text-align:center;padding:2px 1px}
+    .data td{padding:${pad}px 2px}
+    .pr{font-size:${Math.max(6.5, fs - 1)}px;white-space:normal !important;line-height:1.1}
+    td.nm{text-align:left;font-weight:600;text-overflow:ellipsis}
     td.r{text-align:right}
     td.b{font-weight:700;background:#f2f2f2}
-    .flabel{text-align:right;font-weight:700;background:#cfcfcf}
-    tr:nth-child(even) td{background:#fbfbfb}
-    tr:nth-child(even) td.b{background:#eee}
+    .flabel{text-align:right;font-weight:700}
+    .data tr{page-break-inside:avoid}
+    .data thead{display:table-header-group}
   </style></head>
   <body>
-    <div class="hdr">
+    <table class="hdr">${colgroup}
       ${hdrRow("Rancho", "ranch")}
       ${hdrRow("Grower", "grower")}
       ${hdrRow("Entrada", "entrada")}
       ${hdrRow("Salida", "salida", data.mayordomo ? "CB " + data.mayordomo : "")}
-    </div>
-    <table>
+    </table>
+    <table class="data">${colgroup}
       <thead>
         <tr><th></th>${groupTh}<th rowspan="3" class="ctr">Total<br>Pieza</th><th rowspan="3" class="ctr">$</th></tr>
         <tr><th class="flabel">Fecha</th>${dateTh}</tr>
@@ -101,7 +112,7 @@ export async function sharePayrollSheet(data: any) {
   const landscape = Print.Orientation ? Print.Orientation.landscape : undefined;
   const available = await Sharing.isAvailableAsync();
   if (!available) { await Print.printAsync({ html, orientation: landscape }); return; }
-  const { uri } = await Print.printToFileAsync({ html, orientation: landscape });
+  const { uri } = await Print.printToFileAsync({ html, width: PAGE_W, height: PAGE_H });
   await Sharing.shareAsync(uri, { dialogTitle: "Payroll", mimeType: "application/pdf", UTI: "com.adobe.pdf" });
 }
 
