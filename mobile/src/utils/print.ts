@@ -88,6 +88,14 @@ export async function shareReceiptSheet(receipt: any) {
 
   const fld = (label: string, value: string, w = 150) => `<span class="fl"><b>${label}</b><span class="uv" style="min-width:${w}px">${esc(value)}</span></span>`;
 
+  // Fit the report on one page (612x792): shrink the row height by row count down to a readable minimum.
+  // Beyond that, rows never split across a page break and the table header repeats on every page.
+  const PAGE_W = 612, PAGE_H = 792;
+  const FIXED_H = 230; // page padding + title + header fields + table margin, plus a safety margin for device differences
+  const rowH = Math.max(16, Math.min(33, Math.floor((PAGE_H - FIXED_H) / (rows.length + 2)))); // + table header + total row
+  const fs = Math.max(8, Math.min(11.5, Math.round(rowH * 0.42 * 10) / 10));
+  const pad = Math.max(1, Math.round(((rowH - 1 - fs * 1.25) / 2) * 10) / 10);
+
   const html = `<!doctype html><html lang="es"><head><meta charset="utf-8">
   <style>
     *{box-sizing:border-box}
@@ -101,8 +109,10 @@ export async function shareReceiptSheet(receipt: any) {
     .uv{display:inline-block;border-bottom:1px solid #000;padding:0 6px;min-height:15px}
     .brk{display:flex;gap:10px}
     table.data{border-collapse:collapse;width:100%;margin-top:4px}
-    .data th{border:1px solid #000;padding:8px 8px;font-size:11.5px;text-align:left;font-weight:700}
-    .data td{border:1px solid #000;padding:9px 8px;font-size:11.5px}
+    .data th{border:1px solid #000;padding:${pad}px 8px;font-size:${fs}px;text-align:left;font-weight:700}
+    .data td{border:1px solid #000;padding:${pad}px 8px;font-size:${fs}px}
+    .data tr{page-break-inside:avoid}
+    .data thead{display:table-header-group}
     .data .c{text-align:center}
     .data .r{text-align:right}
     .data .nm{font-weight:600}
@@ -142,7 +152,7 @@ export async function shareReceiptSheet(receipt: any) {
 
   const available = await Sharing.isAvailableAsync();
   if (!available) { await Print.printAsync({ html }); return; }
-  const { uri } = await Print.printToFileAsync({ html });
+  const { uri } = await Print.printToFileAsync({ html, width: PAGE_W, height: PAGE_H });
   await Sharing.shareAsync(uri, { dialogTitle: "Daily Labort Report", mimeType: "application/pdf", UTI: "com.adobe.pdf" });
 }
 
