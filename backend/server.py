@@ -1387,6 +1387,8 @@ async def receipts(
                 "date": a.get("date"),
                 "check_in": _hhmm(a.get("check_in")),
                 "check_out": _hhmm(a.get("check_out")),
+                "check_in_iso": a.get("check_in"),
+                "check_out_iso": a.get("check_out"),
                 "hours": _duration_hours(a.get("check_in"), a.get("check_out")),
             })
 
@@ -1457,52 +1459,108 @@ async def _payroll(user: dict, week: str, grower: str, include_sunday: bool = Tr
         raise HTTPException(status_code=400, detail="Fecha inválida")
     monday = d0 - timedelta(days=d0.weekday())
     days = [(monday + timedelta(days=i)).isoformat() for i in range(7 if include_sunday else 6)]
-    seen, lines = set(), []
 
-    def add(wid, wname, h):
-        hd = h.get("date", "")
-        if hd not in days:
-            return
-        key = h.get("id") or (wid, hd, h.get("created_at", ""), h.get("units"), h.get("payment"))
-        if key in seen:
-            return
-        seen.add(key)
-        lines.append((wid, wname, h))
-
+    # Gather worker rows from saved snapshots + live receipts
+    source_rows = []
     async for snap in db.receipts_history.find({**scope_filter(user), "date_from": {"$lte": days[-1]}, "date_to": {"$gte": days[0]}}):
         for r in snap.get("rows", []) or []:
-            for h in r.get("harvests", []) or []:
-                add(r.get("worker_id"), r.get("worker_name"), h)
+            source_rows.append(r)
     for r in await receipts(user=user, date_from=days[0], date_to=days[-1], worker_id=None, crew_id=None):
-        for h in r.get("harvests", []) or []:
-            add(r.get("worker_id"), r.get("worker_name"), h)
+        source_rows.append(r)
 
-    growers = sorted({(h.get("grower") or "").strip() for _, _, h in lines if (h.get("grower") or "").strip()})
     g = (grower or "").strip().lower()
-    if g:
-        lines = [x for x in lines if (x[2].get("grower") or "").strip().lower() == g]
+    seen_h, seen_a = set(), set()
+    workers = {}
+    prices = {d: {} for d in days}
+    worked_days = {}
+    day_hdr = {d: {"ranch": {}, "grower": {}, "entrada": [], "salida": []} for d in days}
+    growers_set, mayordomos = set(), []
 
-    workers, prices, mayordomos = {}, {d: {} for d in days}, []
-    for wid, wname, h in lines:
-        w = workers.setdefault(wid, {"worker_name": wname, "days": {d: {"units": 0.0, "payment": 0.0} for d in days}})
-        cell = w["days"][h["date"]]
-        cell["units"] += float(h.get("units", 0) or h.get("kilos", 0) or 0)
-        cell["payment"] += float(h.get("payment", 0))
-        p = float(h.get("price_per_unit", 0) or h.get("price_per_kg", 0) or 0)
-        prices[h["date"]][p] = prices[h["date"]].get(p, 0) + 1
-        m = (h.get("mayordomo") or "").strip()
-        if m and m not in mayordomos:
-            mayordomos.append(m)
+    def _wrow(wid, wname):
+        return workers.setdefault(wid, {"worker_name": wname, "days": {d: {"units": 0.0, "payment": 0.0, "hours": 0.0} for d in days}})
 
+    # Pass 1: harvests (pieces, payment, price, header ranch/grower)
+    for r in source_rows:
+        wid = r.get("worker_id"); wname = r.get("worker_name")
+        for h in r.get("harvests", []) or []:
+            hd = h.get("date", "")
+            if hd not in days:
+                continue
+            key = h.get("id") or (wid, hd, h.get("created_at", ""), h.get("units"), h.get("payment"))
+            if key in seen_h:
+                continue
+            seen_h.add(key)
+            hg = (h.get("grower") or "").strip()
+            if hg:
+                growers_set.add(hg)
+            if g and hg.lower() != g:
+                continue
+            w = _wrow(wid, wname)
+            cell = w["days"][hd]
+            cell["units"] += float(h.get("units", 0) or h.get("kilos", 0) or 0)
+            cell["payment"] += float(h.get("payment", 0))
+            worked_days.setdefault(wid, set()).add(hd)
+            p = float(h.get("price_per_unit", 0) or h.get("price_per_kg", 0) or 0)
+            if p:
+                prices[hd][p] = prices[hd].get(p, 0) + 1
+            rn = (h.get("parcel_name") or "").strip()
+            if rn and rn != "—":
+                day_hdr[hd]["ranch"][rn] = day_hdr[hd]["ranch"].get(rn, 0) + 1
+            if hg:
+                day_hdr[hd]["grower"][hg] = day_hdr[hd]["grower"].get(hg, 0) + 1
+            m = (h.get("mayordomo") or "").strip()
+            if m and m not in mayordomos:
+                mayordomos.append(m)
+
+    # Pass 2: attendance (hours + entrada/salida), aligned to grower filter via worked_days
+    for r in source_rows:
+        wid = r.get("worker_id"); wname = r.get("worker_name")
+        for a in r.get("attendance", []) or []:
+            ad = a.get("date", "")
+            if ad not in days:
+                continue
+            ci = a.get("check_in_iso") or a.get("check_in") or ""
+            akey = (wid, ad, ci)
+            if akey in seen_a:
+                continue
+            seen_a.add(akey)
+            if g and ad not in worked_days.get(wid, set()):
+                continue
+            if wid not in workers and g:
+                continue
+            w = _wrow(wid, wname)
+            w["days"][ad]["hours"] += float(a.get("hours", 0) or 0)
+            if a.get("check_in_iso"):
+                day_hdr[ad]["entrada"].append(a["check_in_iso"])
+            if a.get("check_out_iso"):
+                day_hdr[ad]["salida"].append(a["check_out_iso"])
+
+    growers = sorted(growers_set)
     rows = []
     for w in sorted(workers.values(), key=lambda x: (x["worker_name"] or "").lower()):
-        cells = [{"units": round(w["days"][d]["units"], 2), "payment": round(w["days"][d]["payment"], 2)} for d in days]
-        rows.append({"worker_name": w["worker_name"], "days": cells, "total": round(sum(c["payment"] for c in cells), 2), "total_units": round(sum(c["units"] for c in cells), 2)})
+        cells = [{"units": round(w["days"][d]["units"], 2), "payment": round(w["days"][d]["payment"], 2), "hours": round(w["days"][d]["hours"], 2)} for d in days]
+        rows.append({"worker_name": w["worker_name"], "days": cells, "total": round(sum(c["payment"] for c in cells), 2), "total_units": round(sum(c["units"] for c in cells), 2), "total_hours": round(sum(c["hours"] for c in cells), 2)})
+
+    def _hdr_pick(counter):
+        return max(counter, key=counter.get) if counter else ""
+
+    day_meta = []
+    for i, d in enumerate(days):
+        hdr = day_hdr[d]
+        day_meta.append({
+            "date": d, "name": WEEKDAYS[i],
+            "price": max(prices[d], key=prices[d].get) if prices[d] else 0,
+            "ranch": _hdr_pick(hdr["ranch"]),
+            "grower": _hdr_pick(hdr["grower"]),
+            "entrada": _hhmm(min(hdr["entrada"])) if hdr["entrada"] else "",
+            "salida": _hhmm(max(hdr["salida"])) if hdr["salida"] else "",
+        })
     return {
         "week_start": days[0], "week_end": days[-1],
-        "days": [{"date": d, "name": WEEKDAYS[i], "price": max(prices[d], key=prices[d].get) if prices[d] else 0} for i, d in enumerate(days)],
+        "days": day_meta,
         "growers": growers, "grower": grower or "", "mayordomo": ", ".join(mayordomos),
         "rows": rows, "total": round(sum(r["total"] for r in rows), 2),
+        "total_units": round(sum(r["total_units"] for r in rows), 2),
     }
 
 

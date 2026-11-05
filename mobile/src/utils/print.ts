@@ -33,6 +33,76 @@ export async function printWorkerTicket(rec: Harvest, rows: Harvest[]) {
   await Print.printAsync({ html });
 }
 
+export async function sharePayrollSheet(data: any) {
+  const days: any[] = data.days || [];
+  const rows: any[] = data.rows || [];
+  const num = (n: any, dec = 0) => { const v = Number(n || 0); return v === 0 ? "" : (v % 1 === 0 ? v.toFixed(0) : v.toFixed(dec || 2)); };
+  const mdy = (d?: string) => { if (!d) return ""; try { const D = new Date(d + "T12:00:00"); return `${String(D.getMonth() + 1).padStart(2, "0")}-${String(D.getDate()).padStart(2, "0")}-${String(D.getFullYear()).slice(-2)}`; } catch { return d; } };
+
+  const nDays = days.length;
+  const hdrRow = (label: string, key: "ranch" | "grower" | "entrada" | "salida", tail = "") => {
+    const cells = days.map((d) => `<span class="uv">${esc(d[key] || "")}</span>`).join("");
+    const blanks = Array.from({ length: Math.max(0, 7 - nDays) }).map(() => `<span class="uv"></span>`).join("");
+    return `<div class="hrow"><b>${label}</b>${cells}${blanks}${tail ? `<span class="cb">${esc(tail)}</span>` : ""}</div>`;
+  };
+
+  const groupTh = days.map((d) => `<th colspan="3" class="ctr">${esc(d.name)}</th>`).join("");
+  const dateTh = days.map((d) => `<th colspan="3" class="ctr">${esc(mdy(d.date))}</th>`).join("");
+  const subTh = days.map((d) => `<th>Pieza</th><th>Hrs</th><th class="pr">Precio${d.price ? `<br>${esc(formatCurrency(d.price))}` : ""}</th>`).join("");
+
+  const body = rows.map((r) => {
+    const cells = (r.days || []).map((c: any) => `<td class="r">${num(c.units)}</td><td class="r">${num(c.hours)}</td><td class="r">${c.payment ? esc(formatCurrency(c.payment)) : ""}</td>`).join("");
+    return `<tr><td class="nm">${esc(r.worker_name)}</td>${cells}<td class="r b">${num(r.total_units)}</td><td class="r b">${esc(formatCurrency(r.total))}</td></tr>`;
+  }).join("");
+
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8">
+  <style>
+    *{box-sizing:border-box}
+    body{font-family:'Helvetica Neue',Arial,sans-serif;margin:0;padding:16px;color:#111;font-size:11px}
+    .hdr{margin-bottom:12px}
+    .hrow{display:flex;align-items:baseline;gap:6px;margin-bottom:4px;white-space:nowrap}
+    .hrow b{width:66px;font-weight:700}
+    .uv{flex:1;border-bottom:1px solid #000;min-height:14px;padding:0 5px;text-align:center}
+    .cb{font-weight:700;padding-left:6px}
+    table{border-collapse:collapse;width:100%;table-layout:fixed}
+    th,td{border:1px solid #000;padding:4px 3px;font-size:10px;overflow:hidden}
+    th{background:#cfcfcf;font-weight:700;text-align:center}
+    .ctr{text-align:center}
+    .pr{font-size:9px}
+    td.nm{text-align:left;font-weight:600;font-size:10px}
+    td.r{text-align:right}
+    td.b{font-weight:700;background:#f2f2f2}
+    .flabel{text-align:right;font-weight:700;background:#cfcfcf}
+    tr:nth-child(even) td{background:#fbfbfb}
+    tr:nth-child(even) td.b{background:#eee}
+  </style></head>
+  <body>
+    <div class="hdr">
+      ${hdrRow("Rancho", "ranch")}
+      ${hdrRow("Grower", "grower")}
+      ${hdrRow("Entrada", "entrada")}
+      ${hdrRow("Salida", "salida", data.mayordomo ? "CB " + data.mayordomo : "")}
+    </div>
+    <table>
+      <thead>
+        <tr><th></th>${groupTh}<th rowspan="3" class="ctr">Total<br>Pieza</th><th rowspan="3" class="ctr">$</th></tr>
+        <tr><th class="flabel">Fecha</th>${dateTh}</tr>
+        <tr><th>Nombre Empleados</th>${subTh}</tr>
+      </thead>
+      <tbody>
+        ${body}
+        <tr><td class="nm b">TOTAL</td><td class="b" colspan="${nDays * 3}"></td><td class="r b">${num(data.total_units)}</td><td class="r b">${esc(formatCurrency(data.total))}</td></tr>
+      </tbody>
+    </table>
+  </body></html>`;
+
+  const landscape = Print.Orientation ? Print.Orientation.landscape : undefined;
+  const available = await Sharing.isAvailableAsync();
+  if (!available) { await Print.printAsync({ html, orientation: landscape }); return; }
+  const { uri } = await Print.printToFileAsync({ html, orientation: landscape });
+  await Sharing.shareAsync(uri, { dialogTitle: "Payroll", mimeType: "application/pdf", UTI: "com.adobe.pdf" });
+}
+
 export async function shareReceiptSheet(receipt: any) {
   const rows: any[] = receipt.rows || [];
   const allH = rows.flatMap((r) => r.harvests || []);
@@ -49,6 +119,10 @@ export async function shareReceiptSheet(receipt: any) {
   const timeHM = (iso?: string) => {
     if (!iso) return "";
     try { return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).replace(/\s?(AM|PM)/i, ""); } catch { return ""; }
+  };
+  const timeFull = (iso?: string) => {
+    if (!iso) return "";
+    try { return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true }).replace("AM", "a.m.").replace("PM", "p.m."); } catch { return ""; }
   };
   const mdyShort = (d?: string) => {
     if (!d) return "";
@@ -77,12 +151,12 @@ export async function shareReceiptSheet(receipt: any) {
     return `<tr>
       <td class="c">${esc(r.document_id || "")}</td>
       <td class="nm">${esc(r.worker_name || "")}</td>
-      <td class="r">${esc(timeHM(r.min_check_in_iso))}</td>
+      <td class="r">${esc(timeFull(r.min_check_in_iso))}</td>
       <td class="c">${esc(mdyShort(date))}</td>
-      <td class="r">${esc(r.still_working ? "" : timeHM(r.max_check_out_iso))}</td>
+      <td class="r">${esc(r.still_working ? "" : timeFull(r.max_check_out_iso))}</td>
       <td class="r">${esc(hoursHM(adjHours(r.total_hours)))}</td>
+      <td class="r b">${Math.round(r.total_units || 0) || ""}</td>
       <td class="r">${esc(price)}</td>
-      <td class="r b">${esc(formatCurrency(r.total_payment))}</td>
     </tr>`;
   }).join("");
 
@@ -143,10 +217,10 @@ export async function shareReceiptSheet(receipt: any) {
     </div>
     <table class="data">
       <thead><tr>
-        <th>SS#  ID#</th><th>Nombre Empleados</th><th>Hora Entrada</th><th>Fecha</th><th>Hora Salida</th><th>Total Horas</th><th>Precio</th><th>$</th>
+        <th>SS#  ID#</th><th>Nombre Empleados</th><th>Hora Entrada</th><th>Fecha</th><th>Hora Salida</th><th>Total Horas</th><th>Total pz</th><th>Precio</th>
       </tr></thead>
       <tbody>${tr}
-        <tr class="tot"><td colspan="5" class="r">TOTAL</td><td class="r">${esc(hoursHM(totalAdjHours))}</td><td></td><td class="r">${esc(formatCurrency(receipt.total_payment))}</td></tr>
+        <tr class="tot"><td colspan="5" class="r">TOTAL</td><td class="r">${esc(hoursHM(totalAdjHours))}</td><td class="r">${Math.round(receipt.total_units || 0)}</td><td></td></tr>
       </tbody>
     </table>
   </body></html>`;

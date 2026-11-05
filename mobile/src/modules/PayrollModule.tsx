@@ -6,7 +6,7 @@ import api from "@/src/api/client";
 import { toast } from "@/src/components/Toast";
 import { Card, EmptyState, Loading } from "@/src/components/ui";
 import { formatCurrency, formatNumber, todayISO } from "@/src/utils/format";
-import { downloadAndShareExcel } from "@/src/utils/download";
+import { sharePayrollSheet } from "@/src/utils/print";
 import { useTheme, ThemeColors } from "@/src/theme";
 
 const mondayOf = (iso: string) => {
@@ -37,7 +37,7 @@ export default function PayrollModule() {
   const share = async () => {
     if (!data?.rows?.length) { toast.error("No hay datos esta semana"); return; }
     setSharing(true);
-    try { await downloadAndShareExcel("/payroll/export", { week, grower, include_sunday: false }, `payroll_${week}${grower ? "_" + grower.replace(/\s+/g, "_") : ""}.xlsx`); toast.success("Payroll generado"); }
+    try { await sharePayrollSheet(data); }
     catch (e: any) { toast.error(e?.message || "No se pudo compartir"); }
     finally { setSharing(false); }
   };
@@ -61,7 +61,7 @@ export default function PayrollModule() {
           <TouchableOpacity testID="payroll-next" onPress={() => setWeek(shiftWeek(week, 1))} style={s.navBtn}><ChevronRight size={20} color={colors.onSurface} /></TouchableOpacity>
         </View>
         <TouchableOpacity testID="payroll-share" onPress={share} disabled={sharing} style={s.shareBtn}>
-          <Share2 size={16} color="#FFFFFF" /><Text style={s.shareText}>Compartir Excel</Text>
+          <Share2 size={16} color="#FFFFFF" /><Text style={s.shareText}>Compartir Payroll</Text>
         </TouchableOpacity>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.growerRow}>
           {growers.length === 0 ? <Text style={s.noGrowers}>Sin growers esta semana</Text> : growers.map((g) => (
