@@ -55,15 +55,17 @@ export async function shareReceiptSheet(receipt: any) {
     try { const D = new Date(d.length === 10 ? d + "T12:00:00" : d); return `${D.getMonth() + 1}/${D.getDate()}/${String(D.getFullYear()).slice(-2)}`; } catch { return d; }
   };
   const hoursHM = (x?: number) => { const v = Number(x || 0); if (v <= 0) return "0"; const h = Math.floor(v); const m = Math.round((v - h) * 60); return m > 0 ? `${h}h ${m}min` : `${h}h`; };
-  const adjHours = (x?: number) => Math.max(0, Number(x || 0) - 0.5);
+  const adjHours = (x?: number) => { const v = Number(x || 0); return v >= 4 ? Math.max(0, v - 0.5) : v; };
 
   const checkIns = rows.map((r) => r.min_check_in_iso).filter(Boolean).map((x: string) => new Date(x).getTime());
   const baseTs = checkIns.length ? Math.min(...checkIns) : null;
   const tsTime = (ts: number) => timeHM(new Date(ts).toISOString());
+  const basisHours = rows.reduce((mx, r) => Math.max(mx, Number(r.total_hours || 0)), 0);
+  const show1 = basisHours >= 2, showLunch = basisHours >= 4, show2 = basisHours >= 6;
   const brk = baseTs != null ? {
-    b1: tsTime(baseTs + 120 * 60000), b1e: tsTime(baseTs + 130 * 60000),
-    lunch: tsTime(baseTs + 240 * 60000), lunchE: tsTime(baseTs + 270 * 60000),
-    b2: tsTime(baseTs + 360 * 60000), b2e: tsTime(baseTs + 370 * 60000),
+    b1: show1 ? tsTime(baseTs + 120 * 60000) : "", b1e: show1 ? tsTime(baseTs + 130 * 60000) : "",
+    lunch: showLunch ? tsTime(baseTs + 240 * 60000) : "", lunchE: showLunch ? tsTime(baseTs + 270 * 60000) : "",
+    b2: show2 ? tsTime(baseTs + 360 * 60000) : "", b2e: show2 ? tsTime(baseTs + 370 * 60000) : "",
   } : { b1: "", b1e: "", lunch: "", lunchE: "", b2: "", b2e: "" };
   const totalAdjHours = rows.reduce((sum, r) => sum + adjHours(r.total_hours), 0);
 
