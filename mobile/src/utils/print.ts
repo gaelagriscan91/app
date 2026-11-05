@@ -37,21 +37,24 @@ export async function shareReceiptSheet(receipt: any) {
   const rows: any[] = receipt.rows || [];
   const allH = rows.flatMap((r) => r.harvests || []);
   const pick = (arr: any[]) => { const u = [...new Set(arr.filter((x) => x && x !== "—"))]; return u.length === 0 ? "" : u.length === 1 ? String(u[0]) : "Varios"; };
-  const mayordomo = pick(allH.map((h: any) => h.mayordomo)) || receipt.saved_by_name || "";
   const head = {
-    ranch: pick(allH.map((h: any) => h.parcel_name)),
-    block: pick(allH.map((h: any) => h.block)),
-    trabajo: pick(allH.map((h: any) => h.product_name)),
-    variedad: pick(allH.map((h: any) => h.variety)),
-    mayordomo,
     grower: pick(allH.map((h: any) => h.grower)),
+    block: pick(allH.map((h: any) => h.block)),
+    rancho: pick(allH.map((h: any) => h.parcel_name)),
+    descripcion: pick(allH.map((h: any) => h.product_name)),
+    variety: pick(allH.map((h: any) => h.variety)),
+    mayordomo: pick(allH.map((h: any) => h.mayordomo)) || receipt.saved_by_name || "",
+    locacion: pick(allH.map((h: any) => h.location || h.parcel_location)),
   };
-  const timeAmPm = (iso?: string) => {
+  const timeHM = (iso?: string) => {
     if (!iso) return "";
-    try { return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true }).replace("AM", "a.m.").replace("PM", "p.m."); } catch { return ""; }
+    try { return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).replace(/\s?(AM|PM)/i, ""); } catch { return ""; }
   };
-  const mdy = (d?: string) => { if (!d) return ""; try { return new Date(d.length === 10 ? d + "T12:00:00" : d).toLocaleDateString("en-US"); } catch { return d; } };
-  const hoursHM = (x?: number) => { const v = Number(x || 0); if (v <= 0) return "0h"; const h = Math.floor(v); const m = Math.round((v - h) * 60); return m > 0 ? `${h}h ${m}min` : `${h}h`; };
+  const mdyShort = (d?: string) => {
+    if (!d) return "";
+    try { const D = new Date(d.length === 10 ? d + "T12:00:00" : d); return `${D.getMonth() + 1}/${D.getDate()}/${String(D.getFullYear()).slice(-2)}`; } catch { return d; }
+  };
+  const hoursHM = (x?: number) => { const v = Number(x || 0); if (v <= 0) return "0"; const h = Math.floor(v); const m = Math.round((v - h) * 60); return m > 0 ? `${h}h ${m}min` : `${h}h`; };
 
   const tr = rows.map((r) => {
     const h0 = (r.harvests || [])[0] || {};
@@ -61,46 +64,65 @@ export async function shareReceiptSheet(receipt: any) {
     return `<tr>
       <td class="c">${esc(r.document_id || "")}</td>
       <td class="nm">${esc(r.worker_name || "")}</td>
-      <td>${esc(timeAmPm(r.min_check_in_iso))}</td>
-      <td>${esc(mdy(date))}</td>
-      <td>${esc(r.still_working ? "" : timeAmPm(r.max_check_out_iso))}</td>
+      <td class="r">${esc(timeHM(r.min_check_in_iso))}</td>
+      <td class="c">${esc(mdyShort(date))}</td>
+      <td class="r">${esc(r.still_working ? "" : timeHM(r.max_check_out_iso))}</td>
       <td class="r">${esc(hoursHM(r.total_hours))}</td>
-      <td class="r">${Math.round(r.total_units || 0)}</td>
       <td class="r">${esc(price)}</td>
       <td class="r b">${esc(formatCurrency(r.total_payment))}</td>
     </tr>`;
   }).join("");
 
+  const fld = (label: string, value: string, w = 150) => `<span class="fl"><b>${label}</b><span class="uv" style="min-width:${w}px">${esc(value)}</span></span>`;
+
   const html = `<!doctype html><html lang="es"><head><meta charset="utf-8">
   <style>
     *{box-sizing:border-box}
-    body{font-family:'Helvetica Neue',Arial,sans-serif;margin:0;padding:14px;color:#111}
-    table{border-collapse:collapse;width:100%}
-    .hdr td{border:1px solid #000;padding:5px 7px;font-size:12px}
-    .hdr .lbl{font-weight:bold;width:70px;text-align:center}
-    .hdr .val{text-align:center;color:#222}
-    .grid{margin-bottom:10px}
-    .data th{background:#c9c9c9;border:1px solid #000;padding:7px 6px;font-size:11px;text-align:left;font-weight:bold}
-    .data td{border:1px solid #9a9a9a;padding:5px 6px;font-size:11px}
+    body{font-family:'Helvetica Neue',Arial,sans-serif;margin:0;padding:18px 20px;color:#111}
+    h1{text-align:center;font-size:17px;font-weight:800;letter-spacing:.5px;margin:0 0 16px}
+    .hwrap{display:flex;gap:28px;margin-bottom:16px}
+    .hcol{display:flex;flex-direction:column;gap:7px}
+    .hcol.c3{flex:1}
+    .fl{display:inline-flex;align-items:baseline;font-size:12.5px;white-space:nowrap}
+    .fl b{font-weight:700;margin-right:4px}
+    .uv{display:inline-block;border-bottom:1px solid #000;padding:0 6px;min-height:15px}
+    .brk{display:flex;gap:10px}
+    table.data{border-collapse:collapse;width:100%;margin-top:4px}
+    .data th{border:1px solid #000;padding:8px 8px;font-size:11.5px;text-align:left;font-weight:700}
+    .data td{border:1px solid #000;padding:9px 8px;font-size:11.5px}
     .data .c{text-align:center}
     .data .r{text-align:right}
     .data .nm{font-weight:600}
-    .data .b{font-weight:bold}
-    .data tr:nth-child(even) td{background:#fafafa}
-    .tot td{background:#e3e3e3;border:1px solid #000;font-weight:bold;font-size:11px;padding:6px}
-    .tot .r{text-align:right}
+    .data .b{font-weight:700}
+    .data .tot td{font-weight:800;background:#f0f0f0}
   </style></head>
   <body>
-    <table class="grid">
-      <tr class="hdr"><td class="lbl">RANCH</td><td class="val">${esc(head.ranch)}</td><td class="lbl">BLOCK#</td><td class="val">${esc(head.block)}</td><td class="lbl">Trabajo</td><td class="val">${esc(head.trabajo)}</td></tr>
-      <tr class="hdr"><td class="lbl">Variedad</td><td class="val">${esc(head.variedad)}</td><td class="lbl">Mayordomo</td><td class="val">${esc(head.mayordomo)}</td><td class="lbl">Grower</td><td class="val">${esc(head.grower)}</td></tr>
-    </table>
+    <h1>DAILY LABORT REPORT</h1>
+    <div class="hwrap">
+      <div class="hcol">
+        ${fld("Fecha:", mdyShort(receipt.date_from), 110)}
+        ${fld("Block:", head.block, 120)}
+        ${fld("Rancho:", head.rancho, 120)}
+        ${fld("Locacion:", head.locacion, 110)}
+      </div>
+      <div class="hcol">
+        ${fld("Grower:", head.grower, 150)}
+        ${fld("Mayordomo", head.mayordomo, 150)}
+        ${fld("Descripción:", head.descripcion, 140)}
+        ${fld("Variety :", head.variety, 150)}
+      </div>
+      <div class="hcol c3">
+        <div class="brk">${fld("1Break:", "", 70)}${fld("termina:", "", 70)}</div>
+        <div class="brk">${fld("Lunch :", "", 70)}${fld("termina:", "", 70)}</div>
+        <div class="brk">${fld("2 Break:", "", 70)}${fld("termina:", "", 70)}</div>
+      </div>
+    </div>
     <table class="data">
       <thead><tr>
-        <th>SS#</th><th>EMPLOYEE NAME</th><th>Hora entrada</th><th>Fecha</th><th>Hora Salida</th><th>Total Horas</th><th>Total piezas</th><th>Precio</th><th>$</th>
+        <th>SS#  ID#</th><th>Nombre Empleados</th><th>Hora Entrada</th><th>Fecha</th><th>Hora Salida</th><th>Total Horas</th><th>Precio</th><th>$</th>
       </tr></thead>
       <tbody>${tr}
-        <tr class="tot"><td colspan="5" class="r">TOTAL</td><td class="r">${esc(hoursHM(receipt.total_hours))}</td><td class="r">${Math.round(receipt.total_units || 0)}</td><td></td><td class="r">${esc(formatCurrency(receipt.total_payment))}</td></tr>
+        <tr class="tot"><td colspan="5" class="r">TOTAL</td><td class="r">${esc(hoursHM(receipt.total_hours))}</td><td></td><td class="r">${esc(formatCurrency(receipt.total_payment))}</td></tr>
       </tbody>
     </table>
   </body></html>`;
@@ -108,7 +130,7 @@ export async function shareReceiptSheet(receipt: any) {
   const available = await Sharing.isAvailableAsync();
   if (!available) { await Print.printAsync({ html }); return; }
   const { uri } = await Print.printToFileAsync({ html });
-  await Sharing.shareAsync(uri, { dialogTitle: "Recibo guardado", mimeType: "application/pdf", UTI: "com.adobe.pdf" });
+  await Sharing.shareAsync(uri, { dialogTitle: "Daily Labort Report", mimeType: "application/pdf", UTI: "com.adobe.pdf" });
 }
 
 export async function shareTextSummary(title: string, text: string) {
