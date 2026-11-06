@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Mail, Shield, Ban, CheckCircle2, Pencil, Eye, EyeOff, Loader } from "lucide-react-native";
 import api, { apiErrorMessage } from "@/src/api/client";
 import { toast } from "@/src/components/Toast";
-import { Card, EmptyState, Loading } from "@/src/components/ui";
+import { Card, EmptyState, FlatGroup, FlatRow, Loading } from "@/src/components/ui";
 import ChangePasswordCard from "@/src/components/ChangePasswordCard";
 import { useTheme, ThemeColors } from "@/src/theme";
 
@@ -114,16 +114,18 @@ export default function UsersModule() {
       <Text style={s.sectionTitle}>Usuarios ({rows.length})</Text>
 
       {q.isLoading ? <Loading /> : rows.length === 0 ? (
-        <View style={s.emptyCard}>
-          <Shield size={38} color={colors.muted} />
-          <Text style={s.emptyText}>Aún no hay usuarios registrados</Text>
-        </View>
-      ) : rows.map((u) => {
+        <FlatGroup style={s.flatList}>
+          <FlatRow style={s.emptyRow}>
+            <Shield size={38} color={colors.muted} />
+            <Text style={s.emptyText}>Aún no hay usuarios registrados</Text>
+          </FlatRow>
+        </FlatGroup>
+      ) : <FlatGroup style={s.flatList}>{rows.map((u) => {
         const st = statusOf(u);
         const blocked = u.active === false || isExpired(u);
         const left = daysLeft(u);
         return (
-          <Card key={u.id} style={{ marginBottom: 12 }} testID={`mayordomo-row-${u.id}`}>
+          <FlatRow key={u.id} testID={`mayordomo-row-${u.id}`}>
             <View style={s.headRow}>
               <Text style={s.name} numberOfLines={1}>{u.name}</Text>
               <View style={[s.badge, { backgroundColor: st.bg }]} testID={`mayordomo-status-${u.id}`}><Text style={[s.badgeText, { color: st.fg }]}>{st.label}</Text></View>
@@ -167,9 +169,9 @@ export default function UsersModule() {
                 </View>
               </View>
             )}
-          </Card>
+          </FlatRow>
         );
-      })}
+      })}</FlatGroup>}
       <View style={{ height: 24 }} />
     </ScrollView>
   );
@@ -185,6 +187,8 @@ const styles = (c: ThemeColors) =>
     sectionTitle: { fontSize: 17, fontWeight: "800", color: c.onSurface, marginBottom: 12 },
     emptyCard: { alignItems: "center", gap: 8, paddingVertical: 32, backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.border },
     emptyText: { color: c.onSurfaceTertiary, fontWeight: "700" },
+    flatList: { marginHorizontal: -16 },
+    emptyRow: { alignItems: "center", gap: 8, paddingVertical: 32 },
     headRow: { flexDirection: "row", alignItems: "center", gap: 8 },
     name: { fontWeight: "800", color: c.onSurface, fontSize: 16, flexShrink: 1 },
     badge: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999 },

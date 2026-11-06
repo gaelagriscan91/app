@@ -211,7 +211,7 @@ export default function AsistenciaScreen() {
 
   // ===================== HUB VIEW =====================
   return (
-    <View style={[s.flex, { backgroundColor: "#F7F5EE" }]}>
+    <View style={[s.flex, { backgroundColor: colors.surfaceSecondary }]}>
       <ScrollView style={s.flex} contentContainerStyle={{ paddingBottom: 24 }}>
         <View style={s.navy} testID="asistencia-hub">
           <Text style={s.date}>{prettyDate(today)}</Text>
@@ -228,7 +228,7 @@ export default function AsistenciaScreen() {
             </TouchableOpacity>
           </View>
           <TouchableOpacity testID="end-day-button" onPress={() => setEndDayOpen(true)} style={s.endDay}>
-            <Flag size={16} color="#FFFFFF" /><Text style={s.endDayText}>Finalizar día · ver resumen y reiniciar</Text>
+            <Flag size={16} color="#111827" /><Text style={s.endDayText}>Finalizar día · ver resumen y reiniciar</Text>
           </TouchableOpacity>
         </View>
 
@@ -319,7 +319,7 @@ function EndDaySheet({ present, open, salida, closing, onConfirm, onClose, color
             <View style={s.summaryCell}><Text style={s.summaryLabel}>Salida</Text><Text style={s.summaryVal}>{salida}</Text></View>
           </View>
           <View style={s.sheetBtns}>
-            <TouchableOpacity testID="end-day-cancel" onPress={onClose} style={[s.sheetBtn, { backgroundColor: colors.surfaceTertiary }]}><Text style={[s.sheetBtnText, { color: colors.onSurfaceTertiary }]}>Cancelar</Text></TouchableOpacity>
+            <TouchableOpacity testID="end-day-cancel" onPress={onClose} style={[s.sheetBtn, { backgroundColor: colors.surfaceSecondary }]}><Text style={[s.sheetBtnText, { color: colors.onSurfaceTertiary }]}>Cancelar</Text></TouchableOpacity>
             <TouchableOpacity testID="end-day-confirm" onPress={onConfirm} disabled={closing} style={[s.sheetBtn, { backgroundColor: colors.brandSecondary }]}><Text style={s.sheetBtnText}>{closing ? "..." : "Confirmar"}</Text></TouchableOpacity>
           </View>
         </View>
@@ -333,27 +333,27 @@ const styles = (c: ThemeColors) =>
     flex: { flex: 1 },
     center: { paddingVertical: 28, alignItems: "center" },
     // hub
-    navy: { backgroundColor: "#1E2746", paddingHorizontal: 20, paddingTop: 18, paddingBottom: 40, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
-    date: { color: "rgba(255,255,255,0.75)", fontWeight: "700", fontSize: 14, textTransform: "capitalize" },
+    navy: { backgroundColor: "#FFFFFF", paddingHorizontal: 20, paddingTop: 18, paddingBottom: 18, borderBottomWidth: 2, borderBottomColor: "#9CA3AF" },
+    date: { color: "#4B5563", fontWeight: "700", fontSize: 14, textTransform: "capitalize" },
     iconTiles: { flexDirection: "row", marginTop: 16 },
     iconTile: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 18 },
-    iconTileLabel: { color: "#FFFFFF", fontWeight: "800", fontSize: 16, marginTop: 14 },
-    iconBadge: { position: "absolute", top: 6, right: "28%", minWidth: 28, height: 28, borderRadius: 14, backgroundColor: "#FFFFFF", paddingHorizontal: 6, alignItems: "center", justifyContent: "center" },
-    iconBadgeText: { color: "#1A2210", fontWeight: "800", fontSize: 13 },
-    endDay: { marginTop: 10, height: 50, borderRadius: 16, backgroundColor: "rgba(255,255,255,0.1)", borderWidth: 1, borderColor: "rgba(255,255,255,0.2)", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
-    endDayText: { color: "#FFFFFF", fontWeight: "700", fontSize: 13 },
-    lower: { backgroundColor: "#F7F5EE", marginTop: -24, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 16, paddingTop: 22, paddingBottom: 10, minHeight: 340 },
-    searchBtn: { position: "absolute", right: 20, top: -24, width: 48, height: 48, borderRadius: 24, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
-    searchInput: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E2DDD0", borderRadius: 12, height: 46, paddingHorizontal: 14, fontSize: 15, color: c.onSurface, marginBottom: 14 },
-    stats: { flexDirection: "row", gap: 8, marginBottom: 14 },
-    miniStat: { flex: 1, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E2DDD0", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
+    iconTileLabel: { color: "#111827", fontWeight: "800", fontSize: 16, marginTop: 14 },
+    iconBadge: { position: "absolute", top: 6, right: "28%", minWidth: 28, height: 28, borderRadius: 14, backgroundColor: "#1D4ED8", paddingHorizontal: 6, alignItems: "center", justifyContent: "center" },
+    iconBadgeText: { color: "#FFFFFF", fontWeight: "800", fontSize: 13 },
+    endDay: { marginTop: 10, height: 50, borderRadius: 16, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D1D5DB", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+    endDayText: { color: "#111827", fontWeight: "700", fontSize: 13 },
+    lower: { backgroundColor: "#E5E7EB", paddingTop: 0, paddingBottom: 10, minHeight: 340 },
+    searchBtn: { alignSelf: "flex-end", marginRight: 16, marginVertical: 10, width: 44, height: 44, borderRadius: 22, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D1D5DB", alignItems: "center", justifyContent: "center" },
+    searchInput: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D1D5DB", borderRadius: 12, height: 46, paddingHorizontal: 14, fontSize: 15, color: c.onSurface, marginHorizontal: 16, marginBottom: 10 },
+    stats: { flexDirection: "row", backgroundColor: "#FFFFFF", borderTopWidth: 1, borderBottomWidth: 1, borderColor: "#D1D5DB", marginBottom: 0 },
+    miniStat: { flex: 1, backgroundColor: "#FFFFFF", borderLeftWidth: 1, borderLeftColor: "#D1D5DB", paddingHorizontal: 16, paddingVertical: 10 },
     miniLabel: { fontSize: 10, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5, color: "#889078" },
     miniVal: { fontSize: 22, fontWeight: "800", marginTop: 2 },
-    empty: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E2DDD0", borderRadius: 18, paddingVertical: 36, alignItems: "center" },
+    empty: { backgroundColor: "#FFFFFF", borderBottomWidth: 1, borderColor: "#D1D5DB", paddingVertical: 36, alignItems: "center" },
     emptyTitle: { color: "#889078", fontWeight: "800", fontSize: 15 },
     emptySub: { color: "#889078", fontSize: 12, marginTop: 4 },
-    hubRow: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E2DDD0", borderRadius: 18, padding: 12, flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 10 },
-    avatar: { width: 42, height: 42, borderRadius: 12, backgroundColor: "#F0EDE1", alignItems: "center", justifyContent: "center" },
+    hubRow: { backgroundColor: "#FFFFFF", borderBottomWidth: 1, borderBottomColor: "#D1D5DB", paddingHorizontal: 20, paddingVertical: 14, minHeight: 64, flexDirection: "row", alignItems: "center", gap: 12 },
+    avatar: { width: 42, height: 42, borderRadius: 12, backgroundColor: "#E5E7EB", alignItems: "center", justifyContent: "center" },
     avatarText: { color: "#1E2746", fontWeight: "800", fontSize: 13, fontVariant: ["tabular-nums"] },
     hubName: { fontWeight: "800", color: "#1A2210", fontSize: 15 },
     hubTime: { fontSize: 11, color: "#889078", fontWeight: "700", marginTop: 2, fontVariant: ["tabular-nums"] },
@@ -400,7 +400,7 @@ const styles = (c: ThemeColors) =>
     attHoraLabel: { fontSize: 10, fontWeight: "800", color: "#889078", textTransform: "uppercase", letterSpacing: 0.5 },
     attHoraVal: { fontSize: 20, fontWeight: "800", color: "#1A2210", marginTop: 2 },
     attOut: { fontSize: 12, fontWeight: "800", color: "#DC2626", marginTop: 2 },
-    attEmp: { flex: 1, borderLeftWidth: 1, borderLeftColor: "#E2DDD0", paddingLeft: 12 },
+    attEmp: { flex: 1, borderLeftWidth: 1, borderLeftColor: "#D1D5DB", paddingLeft: 12 },
     attEmpLabel: { fontSize: 10, fontWeight: "800", color: "#889078", textTransform: "uppercase", letterSpacing: 0.5 },
     attEmpName: { fontSize: 17, fontWeight: "800", color: "#1A2210", marginTop: 2 },
     attPlace: { fontSize: 13, fontWeight: "600", color: "#556047", marginTop: 2 },
@@ -411,7 +411,7 @@ const styles = (c: ThemeColors) =>
     sheetTitle: { fontSize: 20, fontWeight: "800", color: c.onSurface, textAlign: "center" },
     sheetSub: { fontSize: 13, color: c.onSurfaceTertiary, textAlign: "center", marginTop: 8, marginBottom: 16, lineHeight: 19 },
     summaryRow: { flexDirection: "row", gap: 10, marginBottom: 20 },
-    summaryCell: { flex: 1, backgroundColor: "#F7F5EE", borderWidth: 1, borderColor: "#E2DDD0", borderRadius: 12, paddingVertical: 10, alignItems: "center" },
+    summaryCell: { flex: 1, backgroundColor: "#E5E7EB", borderWidth: 1, borderColor: "#D1D5DB", borderRadius: 12, paddingVertical: 10, alignItems: "center" },
     summaryLabel: { fontSize: 10, fontWeight: "800", textTransform: "uppercase", color: "#889078" },
     summaryVal: { fontSize: 20, fontWeight: "800", color: c.onSurface, marginTop: 2 },
     sheetBtns: { flexDirection: "row", gap: 12 },

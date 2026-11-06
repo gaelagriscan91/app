@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Share2 } from "lucide-react-native";
 import api from "@/src/api/client";
 import { toast } from "@/src/components/Toast";
-import { Card, EmptyState, Loading } from "@/src/components/ui";
+import { Card, EmptyState, FlatGroup, Loading } from "@/src/components/ui";
 import { formatCurrency, formatNumber, todayISO } from "@/src/utils/format";
 import { sharePayrollSheet } from "@/src/utils/print";
 import { useTheme, ThemeColors } from "@/src/theme";
@@ -73,7 +73,7 @@ export default function PayrollModule() {
       </Card>
 
       {q.isLoading ? <Loading /> : !data?.rows?.length ? <EmptyState text="No hay recibos en esta semana" /> : (
-        <Card>
+        <FlatGroup style={s.flatList}>
           <Text style={s.grower}>Grower: {data.grower || "Todos"} · Mayordomo: {data.mayordomo || "—"}</Text>
           {data.rows.map((r: any) => (
             <View key={r.worker_name} style={s.payRow} testID={`payroll-row-${r.worker_name}`}>
@@ -91,7 +91,7 @@ export default function PayrollModule() {
             </View>
             <Text style={s.totalVal}>{formatCurrency(data.total)}</Text>
           </View>
-        </Card>
+        </FlatGroup>
       )}
       <View style={{ height: 24 }} />
     </ScrollView>
@@ -102,7 +102,7 @@ const styles = (c: ThemeColors) =>
   StyleSheet.create({
     scroll: { padding: 16 },
     weekRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
-    navBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: c.surfaceTertiary, alignItems: "center", justifyContent: "center" },
+    navBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: c.surfaceSecondary, alignItems: "center", justifyContent: "center" },
     weekMid: { alignItems: "center" },
     weekLabel: { fontSize: 10, color: c.muted, fontWeight: "700", textTransform: "uppercase" },
     weekValue: { fontSize: 16, fontWeight: "800", color: c.onSurface, marginTop: 2 },
@@ -114,13 +114,14 @@ const styles = (c: ThemeColors) =>
     growerChipActive: { backgroundColor: c.brandPrimary, borderColor: c.brandPrimary },
     growerChipText: { fontWeight: "700", color: c.onSurfaceTertiary, fontSize: 13 },
     growerChipTextActive: { color: "#FFFFFF" },
-    grower: { fontSize: 13, fontWeight: "700", color: c.onSurfaceTertiary, marginBottom: 10 },
+    grower: { fontSize: 13, fontWeight: "700", color: c.onSurfaceTertiary, marginBottom: 10, paddingHorizontal: 20 },
     flex: { flex: 1 },
-    payRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 11, borderTopWidth: 1, borderTopColor: c.divider },
+    flatList: { marginHorizontal: -16, paddingTop: 12, paddingBottom: 14 },
+    payRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 11, paddingHorizontal: 20, borderTopWidth: 1, borderTopColor: c.hairline },
     payName: { fontWeight: "700", color: c.onSurface, fontSize: 15 },
     payPieces: { fontWeight: "600", color: c.onSurfaceTertiary, fontSize: 12, marginTop: 2 },
     payTotal: { fontWeight: "800", color: c.brandPrimary, fontSize: 15 },
-    totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 12, marginTop: 6, borderTopWidth: 2, borderTopColor: c.border },
+    totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 12, paddingHorizontal: 20, marginTop: 6, borderTopWidth: 2, borderTopColor: c.hairlineStrong },
     totalLabel: { fontWeight: "800", color: c.onSurface, fontSize: 15 },
     totalPieces: { fontWeight: "700", color: c.onSurfaceTertiary, fontSize: 12, marginTop: 2 },
     totalVal: { fontWeight: "900", color: c.onSurface, fontSize: 18 },

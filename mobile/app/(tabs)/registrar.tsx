@@ -323,7 +323,7 @@ const styles = (c: ThemeColors) =>
     maxText: { fontSize: 14, color: c.muted },
     scanMore: { width: 36, height: 36, borderRadius: 18, backgroundColor: c.brandSecondary, alignItems: "center", justifyContent: "center" },
     teamRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, justifyContent: "flex-end", backgroundColor: "#FFFFFF", paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "#ECECEC" },
-    pill: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#EEF6DD", borderRadius: 999, paddingLeft: 12, paddingRight: 8, paddingVertical: 6 },
+    pill: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D1D5DB", borderRadius: 999, paddingLeft: 12, paddingRight: 8, paddingVertical: 6 },
     pillText: { color: "#111827", fontSize: 15 },
     splitInfo: { fontSize: 12, color: c.muted },
     qtyInput: { minWidth: 90, textAlign: "right", fontSize: 19, color: "#111827", padding: 0 },

@@ -46,7 +46,7 @@ export default function ChangePasswordCard() {
           <TextInput testID="change-password-new" value={next} onChangeText={setNext} secureTextEntry={!show} placeholder="Nueva contraseña (mín. 6)" placeholderTextColor={colors.muted} style={s.input} />
           <TextInput testID="change-password-confirm" value={confirm} onChangeText={setConfirm} secureTextEntry={!show} placeholder="Repite la nueva contraseña" placeholderTextColor={colors.muted} style={s.input} />
           <View style={s.row}>
-            <TouchableOpacity onPress={() => setOpen(false)} style={[s.btn, { backgroundColor: colors.surfaceTertiary }]}><Text style={[s.btnText, { color: colors.onSurfaceTertiary }]}>Cancelar</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => setOpen(false)} style={[s.btn, { backgroundColor: colors.surfaceSecondary }]}><Text style={[s.btnText, { color: colors.onSurfaceTertiary }]}>Cancelar</Text></TouchableOpacity>
             <TouchableOpacity testID="change-password-save" onPress={submit} disabled={saving} style={[s.btn, { backgroundColor: colors.brandPrimary }]}><Text style={s.btnText}>{saving ? "..." : "Guardar"}</Text></TouchableOpacity>
           </View>
         </View>

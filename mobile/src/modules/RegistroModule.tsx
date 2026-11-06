@@ -5,7 +5,7 @@ import { Trash2, X, Users, Clock, FileText, ChevronRight, Calendar, Share2 } fro
 import api, { apiErrorMessage } from "@/src/api/client";
 import { toast } from "@/src/components/Toast";
 import { shareReceiptSheet } from "@/src/utils/print";
-import { Card, EmptyState, Loading } from "@/src/components/ui";
+import { EmptyState, FlatGroup, FlatRow, Loading } from "@/src/components/ui";
 import { formatCurrency, formatNumber } from "@/src/utils/format";
 import { useTheme, ThemeColors } from "@/src/theme";
 
@@ -74,9 +74,9 @@ export default function RegistroModule() {
   return (
     <ScrollView contentContainerStyle={s.scroll}>
       <Text style={s.hint}>Recibos guardados antes de borrar historial. Toca uno para abrirlo.</Text>
-      {q.isLoading ? <Loading /> : rows.length === 0 ? <EmptyState text="Aún no guardas recibos" /> : rows.map((r) => (
+      {q.isLoading ? <Loading /> : rows.length === 0 ? <EmptyState text="Aún no guardas recibos" /> : <FlatGroup style={s.flatList}>{rows.map((r) => (
         <TouchableOpacity key={r.id} activeOpacity={0.7} onPress={() => openDetail(r.id)} testID={`registro-${r.id}`}>
-          <Card style={s.row}>
+          <FlatRow style={s.flatRow}>
             <View style={s.flex}>
               <Text style={s.name}>{fmtDate(r.date_from)} → {fmtDate(r.date_to)}</Text>
               <Text style={s.sub}>{r.note || "Recibo guardado"} · {r.saved_by_name || ""}</Text>
@@ -85,9 +85,9 @@ export default function RegistroModule() {
             <TouchableOpacity testID={`registro-share-${r.id}`} onPress={() => share(r)} style={s.iconBtn}><Share2 size={18} color={colors.brandPrimary} /></TouchableOpacity>
             <TouchableOpacity testID={`registro-delete-${r.id}`} onPress={() => del(r.id)} style={s.iconBtn}><Trash2 size={18} color={colors.error} /></TouchableOpacity>
             <ChevronRight size={18} color={colors.muted} />
-          </Card>
+          </FlatRow>
         </TouchableOpacity>
-      ))}
+      ))}</FlatGroup>}
       <View style={{ height: 24 }} />
 
       <Modal visible={!!selected} transparent animationType="slide" onRequestClose={() => setSelected(null)}>
@@ -196,15 +196,18 @@ const styles = (c: ThemeColors) =>
     scroll: { padding: 16 },
     hint: { color: c.onSurfaceTertiary, fontWeight: "600", fontSize: 13, marginBottom: 12 },
     row: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10, paddingVertical: 12 },
+    flatList: { marginHorizontal: -16 },
+    flatRow: { flexDirection: "row", alignItems: "center", gap: 8 },
     name: { fontWeight: "800", color: c.onSurface, fontSize: 15 },
     sub: { fontSize: 12, color: c.muted, marginTop: 2 },
     pay: { fontWeight: "800", color: c.brandPrimary, fontSize: 15 },
-    iconBtn: { padding: 8 },
+    // 44px tap targets; cancel the row gap so they don't squeeze the date column.
+    iconBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center", marginLeft: -8 },
     backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
     sheet: { backgroundColor: c.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 18, paddingBottom: 28 },
     sheetHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
     sheetTitle: { fontSize: 18, fontWeight: "900", color: c.onSurface },
-    closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: c.surfaceTertiary, alignItems: "center", justifyContent: "center" },
+    closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: c.surfaceSecondary, alignItems: "center", justifyContent: "center" },
     savedLine: { fontSize: 11, color: c.onSurfaceTertiary, fontWeight: "600", marginTop: 8, marginBottom: 10 },
     sheetGrid: { flexDirection: "row", flexWrap: "wrap", borderTopWidth: 1, borderLeftWidth: 1, borderColor: "#111827" },
     tr: { flexDirection: "row" },

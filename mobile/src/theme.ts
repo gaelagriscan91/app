@@ -39,9 +39,9 @@ const light = {
   // AgriScan brand: deep-blue identity + lime-green action accent, warm cream surfaces.
   surface: "#FFFFFF", // primary canvas
   onSurface: "#1A2210", // dark olive text on the canvas
-  surfaceSecondary: "#F7F5EE", // cream cards, sheets, list rows
+  surfaceSecondary: "#E5E7EB", // silver screen background
   onSurfaceSecondary: "#1A2210",
-  surfaceTertiary: "#F0EDE1", // input backgrounds, chips
+  surfaceTertiary: "#FFFFFF", // input backgrounds, chips
   onSurfaceTertiary: "#556047",
   surfaceInverse: "#1F2E52", // dark navy (login hero, snackbars)
   onSurfaceInverse: "#FFFFFF",
@@ -53,7 +53,7 @@ const light = {
   onBrandPrimary: "#FFFFFF",
   brandSecondary: "#8DC63F", // lime SAVE / accent action
   onBrandSecondary: "#FFFFFF",
-  brandTertiary: "#EEF6DD", // light-lime chips, team pills
+  brandTertiary: "#FFFFFF", // light-lime chips, team pills
   onBrandTertiary: "#1A2210",
 
   success: "#15803D",
@@ -65,9 +65,11 @@ const light = {
   info: "#1D4ED8",
   onInfo: "#FFFFFF",
 
-  border: "#E2DDD0",
+  border: "#D1D5DB",
   borderStrong: "#D1D5DB",
-  divider: "#E2DDD0",
+  divider: "#D1D5DB",
+  hairline: "#D1D5DB", // 1px line between list rows
+  hairlineStrong: "#9CA3AF", // 2px line under a screen header
 };
 
 export type ThemeColors = typeof light;

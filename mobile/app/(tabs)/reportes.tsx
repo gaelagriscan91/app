@@ -6,7 +6,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { Download, Share2, ChevronDown, Calendar, FileSpreadsheet, FileText, SlidersHorizontal, Trash2, Settings } from "lucide-react-native";
 import api from "@/src/api/client";
 import { toast } from "@/src/components/Toast";
-import { Card, EmptyState, Loading, ScreenTitle } from "@/src/components/ui";
+import { EmptyState, FlatRow, HeaderRow, Loading } from "@/src/components/ui";
 import { formatCurrency, formatNumber, startOfMonthISO, todayISO } from "@/src/utils/format";
 import { downloadAndShareExcel } from "@/src/utils/download";
 import { shareTextSummary, shareReceiptSheet } from "@/src/utils/print";
@@ -113,37 +113,22 @@ export default function ReportesScreen() {
     finally { setResetting(false); }
   };
 
+  const gear = (
+    <TouchableOpacity testID="rep-gear" onPress={() => setShowMenu(true)} style={s.gearBtn}>
+      <Settings size={24} color={colors.onSurfaceTertiary} />
+    </TouchableOpacity>
+  );
+
   return (
     <View style={[s.flex, { backgroundColor: colors.surfaceSecondary }]}>
-      <ScrollView contentContainerStyle={s.scroll}>
-        <ScreenTitle title="Reportes" subtitle="Cosechas, recibos y exportación" />
-
-        <View style={s.tabs}>
-          <TouchableOpacity testID="rep-tab-cosechas" onPress={() => setTab("cosechas")} style={[s.tabBtn, tab === "cosechas" && s.tabActive]}>
-            <FileSpreadsheet size={16} color={tab === "cosechas" ? "#FFFFFF" : colors.onSurfaceTertiary} />
-            <Text style={[s.tabText, tab === "cosechas" && s.tabTextActive]}>Cosechas</Text>
-          </TouchableOpacity>
-          <TouchableOpacity testID="rep-tab-recibos" onPress={() => setTab("recibos")} style={[s.tabBtn, tab === "recibos" && s.tabActive]}>
-            <FileText size={16} color={tab === "recibos" ? "#FFFFFF" : colors.onSurfaceTertiary} />
-            <Text style={[s.tabText, tab === "recibos" && s.tabTextActive]}>Recibos</Text>
-          </TouchableOpacity>
-        </View>
-
+      <ScrollView>
         {tab === "cosechas" ? (
           <>
-            <View style={s.fechaRow}>
-              <View style={s.flex}>
-                <Text style={s.fechaLabel}>Fecha</Text>
-                <Text style={s.fechaRange}>{dateFrom} → {dateTo}</Text>
-              </View>
-              <TouchableOpacity testID="rep-gear" onPress={() => setShowMenu(true)} style={s.gearBtn}>
-                <Settings size={24} color={colors.onSurfaceTertiary} />
-              </TouchableOpacity>
-            </View>
+            <HeaderRow title="Fecha" subtitle={`${dateFrom} → ${dateTo}`} right={gear} />
 
             {showFilters && (
               <View style={s.dateRow}>
-                <TouchableOpacity testID="rep-date-from" onPress={() => setPicker("from")} style={s.dateBtn}><Calendar size={14} color={colors.muted} /><Text style={s.dateText}>Desde: {dateFrom}</Text></TouchableOpacity>
+                <TouchableOpacity testID="rep-date-from" onPress={() => setPicker("from")} style={[s.dateBtn, s.dateBtnFirst]}><Calendar size={14} color={colors.muted} /><Text style={s.dateText}>Desde: {dateFrom}</Text></TouchableOpacity>
                 <TouchableOpacity testID="rep-date-to" onPress={() => setPicker("to")} style={s.dateBtn}><Calendar size={14} color={colors.muted} /><Text style={s.dateText}>Hasta: {dateTo}</Text></TouchableOpacity>
               </View>
             )}
@@ -159,8 +144,8 @@ export default function ReportesScreen() {
               />
             )}
 
-            <View style={s.resumenHead}>
-              <FileText size={18} color={colors.brandPrimary} /><Text style={s.resumenTitle}>Resumen por empleado</Text>
+            <View style={s.resumenRow}>
+              <Text style={s.resumenTitle}>Resumen por empleado</Text>
             </View>
 
             {receipts.length > 0 && (
@@ -170,14 +155,14 @@ export default function ReportesScreen() {
             {receiptsQ.isLoading ? <Loading /> : receipts.length === 0 ? <EmptyState text="Sin resultados en este periodo" /> : receipts.map((r: any) => {
               const open = expanded === r.worker_id;
               return (
-                <Card key={r.worker_id} style={{ marginBottom: 10 }} testID={`worker-summary-${r.worker_id}`}>
+                <FlatRow key={r.worker_id} testID={`worker-summary-${r.worker_id}`}>
                   <TouchableOpacity onPress={() => setExpanded(open ? null : r.worker_id)} style={s.sumRow}>
                     <View style={s.flex}>
                       <Text style={s.sumName}>{r.worker_name}</Text>
                       <Text style={s.sumSub}>{formatNumber(r.total_units, 0)} u. · {formatNumber(r.total_hours, 2)} h · {(r.harvests?.length || 0)} registros</Text>
                     </View>
                     <Text style={s.sumPay}>{formatCurrency(r.total_payment)}</Text>
-                    <ChevronDown size={18} color={colors.muted} style={{ transform: [{ rotate: open ? "180deg" : "0deg" }] }} />
+                    <ChevronDown size={CHEVRON} color={colors.muted} style={{ transform: [{ rotate: open ? "180deg" : "0deg" }] }} />
                   </TouchableOpacity>
                   {open && (r.harvests || []).length > 0 && (
                     <View style={s.detail}>
@@ -190,14 +175,15 @@ export default function ReportesScreen() {
                       ))}
                     </View>
                   )}
-                </Card>
+                </FlatRow>
               );
             })}
           </>
         ) : (
-          <View style={{ marginTop: 14 }}>
+          <>
+            <HeaderRow title="Recibos guardados" right={gear} />
             {historyQ.isLoading ? <Loading /> : (historyQ.data || []).length === 0 ? <EmptyState text="Aún no guardas recibos" /> : (historyQ.data || []).map((h: any) => (
-              <Card key={h.id} style={{ marginBottom: 10 }} testID={`history-${h.id}`}>
+              <FlatRow key={h.id} testID={`history-${h.id}`}>
                 <View style={s.sumRow}>
                   <View style={s.flex}>
                     <Text style={s.sumName}>{h.date_from} → {h.date_to}</Text>
@@ -208,9 +194,9 @@ export default function ReportesScreen() {
                 <TouchableOpacity testID={`history-share-${h.id}`} onPress={() => shareSavedReceipt(h)} style={s.shareSavedBtn}>
                   <Share2 size={16} color={colors.brandPrimary} /><Text style={s.shareSavedText}>Compartir recibo guardado</Text>
                 </TouchableOpacity>
-              </Card>
+              </FlatRow>
             ))}
-          </View>
+          </>
         )}
         <View style={{ height: 24 }} />
       </ScrollView>
@@ -222,21 +208,29 @@ export default function ReportesScreen() {
               <Text style={s.menuHeadText}>Recibos</Text>
               <FileText size={18} color={colors.onSurface} />
             </View>
-            <TouchableOpacity testID="menu-recibos" onPress={() => { setShowMenu(false); setTab("recibos"); }} style={s.menuItem}>
-              <Text style={s.menuItemText}>Ver recibos guardados</Text>
-            </TouchableOpacity>
-            <TouchableOpacity testID="menu-filters" onPress={() => { setShowMenu(false); setShowFilters(true); }} style={s.menuItem}>
-              <SlidersHorizontal size={16} color={colors.onSurfaceTertiary} /><Text style={s.menuItemText}>Aplicar filtros</Text>
-            </TouchableOpacity>
-            <TouchableOpacity testID="menu-export" onPress={() => { setShowMenu(false); exportExcel(); }} disabled={!receipts.length} style={[s.menuItem, { opacity: receipts.length ? 1 : 0.5 }]}>
-              <Download size={16} color={colors.onSurfaceTertiary} /><Text style={s.menuItemText}>Exportar a Excel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity testID="menu-share" onPress={() => { setShowMenu(false); share(); }} disabled={!receipts.length} style={[s.menuItem, { opacity: receipts.length ? 1 : 0.5 }]}>
-              <Share2 size={16} color={colors.onSurfaceTertiary} /><Text style={s.menuItemText}>Compartir</Text>
-            </TouchableOpacity>
-            <TouchableOpacity testID="menu-fecha" onPress={() => { setShowMenu(false); setShowFilters(true); setPicker("from"); }} style={s.menuItem}>
-              <Calendar size={16} color={colors.onSurfaceTertiary} /><Text style={s.menuItemText}>Fecha</Text>
-            </TouchableOpacity>
+            {tab === "cosechas" ? (
+              <>
+                <TouchableOpacity testID="menu-recibos" onPress={() => { setShowMenu(false); setTab("recibos"); }} style={s.menuItem}>
+                  <Share2 size={16} color={colors.onSurfaceTertiary} /><Text style={s.menuItemText}>Compartir recibo guardado</Text>
+                </TouchableOpacity>
+                <TouchableOpacity testID="menu-filters" onPress={() => { setShowMenu(false); setShowFilters(true); }} style={s.menuItem}>
+                  <SlidersHorizontal size={16} color={colors.onSurfaceTertiary} /><Text style={s.menuItemText}>Aplicar filtros</Text>
+                </TouchableOpacity>
+                <TouchableOpacity testID="menu-export" onPress={() => { setShowMenu(false); exportExcel(); }} disabled={!receipts.length} style={[s.menuItem, { opacity: receipts.length ? 1 : 0.5 }]}>
+                  <Download size={16} color={colors.onSurfaceTertiary} /><Text style={s.menuItemText}>Exportar a Excel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity testID="menu-share" onPress={() => { setShowMenu(false); share(); }} disabled={!receipts.length} style={[s.menuItem, { opacity: receipts.length ? 1 : 0.5 }]}>
+                  <Share2 size={16} color={colors.onSurfaceTertiary} /><Text style={s.menuItemText}>Compartir</Text>
+                </TouchableOpacity>
+                <TouchableOpacity testID="menu-fecha" onPress={() => { setShowMenu(false); setShowFilters(true); setPicker("from"); }} style={s.menuItem}>
+                  <Calendar size={16} color={colors.onSurfaceTertiary} /><Text style={s.menuItemText}>Fecha</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity testID="menu-cosechas" onPress={() => { setShowMenu(false); setTab("cosechas"); }} style={s.menuItem}>
+                <FileSpreadsheet size={16} color={colors.onSurfaceTertiary} /><Text style={s.menuItemText}>Resumen de cosechas</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity testID="menu-borrar" onPress={() => { setShowMenu(false); openReset(); }} style={[s.menuItem, s.menuItemLast]}>
               <Trash2 size={16} color={colors.error} /><Text style={[s.menuItemText, { color: colors.error }]}>Borrar</Text>
             </TouchableOpacity>
@@ -274,32 +268,23 @@ export default function ReportesScreen() {
   );
 }
 
+// Row geometry shared by the employee rows and the "pz" band so the band's
+// right edge lines up with the pay amounts (row padding + chevron + gap).
+const ROW_PAD = 20;
+const CHEVRON = 18;
+const ROW_GAP = 10;
+
 const styles = (c: ThemeColors) =>
   StyleSheet.create({
     flex: { flex: 1 },
-    scroll: { padding: 16 },
-    tabs: { flexDirection: "row", gap: 8, marginTop: 14, marginBottom: 14 },
-    tabBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, height: 44, borderRadius: 12, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border },
-    tabActive: { backgroundColor: c.brandPrimary, borderColor: c.brandPrimary },
-    tabText: { fontWeight: "700", color: c.onSurfaceTertiary, fontSize: 14 },
-    tabTextActive: { color: "#FFFFFF" },
-    dateRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 },
-    dateBtn: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, borderRadius: 12, height: 46, paddingHorizontal: 12 },
-    dateText: { fontWeight: "700", color: c.onSurface, fontSize: 14 },
-    arrow: { color: c.muted, fontWeight: "800" },
-    btnRow: { flexDirection: "row", gap: 10, marginBottom: 12 },
-    filterBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, height: 50, borderRadius: 14, backgroundColor: c.surface, borderWidth: 1.5, borderColor: c.brandPrimary },
-    filterText: { color: c.brandPrimary, fontWeight: "800", fontSize: 15 },
-    redBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, height: 50, borderRadius: 14, backgroundColor: c.error },
-    redText: { color: "#FFFFFF", fontWeight: "800", fontSize: 15 },
-    datePill: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, borderRadius: 14, height: 50, paddingHorizontal: 14 },
-    resumenHead: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6, marginBottom: 10 },
-    resumenTitle: { fontSize: 17, fontWeight: "800", color: c.onSurface },
-    fechaRow: { flexDirection: "row", alignItems: "center", paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: c.divider, marginBottom: 14 },
-    fechaLabel: { fontSize: 22, fontWeight: "500", color: c.onSurface },
-    fechaRange: { fontSize: 12, color: c.onSurfaceTertiary, fontWeight: "600", marginTop: 2 },
     gearBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
-    pzBar: { backgroundColor: c.surfaceTertiary, borderRadius: 8, paddingVertical: 7, alignItems: "center", marginBottom: 10 },
+    dateRow: { flexDirection: "row", backgroundColor: c.surface, borderBottomWidth: 1, borderBottomColor: c.hairline },
+    dateBtn: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6, minHeight: 48, paddingHorizontal: ROW_PAD },
+    dateBtnFirst: { borderRightWidth: 1, borderRightColor: c.hairline },
+    dateText: { fontWeight: "700", color: c.onSurface, fontSize: 14 },
+    resumenRow: { backgroundColor: c.surface, paddingHorizontal: ROW_PAD, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: c.hairline },
+    resumenTitle: { fontSize: 20, fontWeight: "500", color: c.onSurface },
+    pzBar: { backgroundColor: c.surfaceSecondary, paddingVertical: 7, paddingLeft: ROW_PAD, paddingRight: ROW_PAD + CHEVRON + ROW_GAP, alignItems: "flex-end" },
     pzText: { fontSize: 15, fontWeight: "700", color: c.onSurface },
     menuBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)", paddingTop: 90, alignItems: "flex-end", paddingRight: 16 },
     menuCard: { width: 260, backgroundColor: c.surface, borderRadius: 14, paddingVertical: 4, shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
@@ -308,10 +293,8 @@ const styles = (c: ThemeColors) =>
     menuItem: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: c.divider },
     menuItemLast: { borderBottomWidth: 0 },
     menuItemText: { fontSize: 15, fontWeight: "600", color: c.onSurface },
-    shareSavedBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 10, paddingVertical: 11, borderRadius: 12, borderWidth: 1.5, borderColor: c.brandPrimary },
-    shareSavedText: { color: c.brandPrimary, fontWeight: "800", fontSize: 14 },
-    unitsBadge: { marginLeft: "auto", backgroundColor: c.brandPrimary, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 },
-    unitsBadgeText: { color: "#FFFFFF", fontWeight: "800", fontSize: 13 },
+    shareSavedBtn: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", gap: 8, minHeight: 44, marginTop: 4 },
+    shareSavedText: { color: c.brandPrimary, fontWeight: "700", fontSize: 14 },
     modalWrap: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center", padding: 32 },
     confirmCard: { backgroundColor: "#FFFFFF", borderRadius: 24, padding: 24, width: "100%" },
     confirmTitle: { fontSize: 20, fontWeight: "800", color: c.onSurface, textAlign: "center" },
@@ -326,18 +309,12 @@ const styles = (c: ThemeColors) =>
     checkMark: { color: "#FFFFFF", fontWeight: "900", fontSize: 14 },
     checkLabel: { fontSize: 14, fontWeight: "700", color: c.onSurface },
     input: { backgroundColor: c.surfaceTertiary, borderWidth: 1, borderColor: c.border, borderRadius: 12, height: 50, paddingHorizontal: 14, fontSize: 16, color: c.onSurface, marginBottom: 16 },
-    actionRow: { flexDirection: "row", gap: 10, marginBottom: 14 },
-    actionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, height: 48, borderRadius: 12 },
-    actionText: { color: "#FFFFFF", fontWeight: "800" },
-    totalsCard: { flexDirection: "row", marginBottom: 14 },
-    totalCell: { flex: 1, alignItems: "center" },
-    totalLabel: { fontSize: 11, color: c.muted, fontWeight: "700", textTransform: "uppercase" },
-    totalVal: { fontSize: 17, fontWeight: "800", color: c.onSurface, marginTop: 3 },
-    sumRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+    sumRow: { flexDirection: "row", alignItems: "center", gap: ROW_GAP },
     sumName: { fontWeight: "800", color: c.onSurface, fontSize: 15 },
     sumSub: { fontSize: 12, color: c.onSurfaceTertiary, marginTop: 2 },
     sumPay: { fontWeight: "800", color: c.brandPrimary, fontSize: 16 },
-    detail: { marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: c.divider, gap: 6 },
+    // Detail sits inside the FlatRow; right padding keeps its amounts in the pay column.
+    detail: { marginTop: 12, paddingTop: 10, paddingRight: CHEVRON + ROW_GAP, borderTopWidth: 1, borderTopColor: c.hairline, gap: 6 },
     detailRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
     detailDate: { fontSize: 12, fontWeight: "700", color: c.onSurface, width: 90 },
     detailMid: { fontSize: 12, color: c.onSurfaceTertiary, flex: 1 },

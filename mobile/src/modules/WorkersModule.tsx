@@ -5,7 +5,7 @@ import { SvgXml } from "react-native-svg";
 import { UserPlus, Printer, QrCode, Pencil, Trash2, X } from "lucide-react-native";
 import api, { apiErrorMessage } from "@/src/api/client";
 import { toast } from "@/src/components/Toast";
-import { Card, EmptyState, Loading } from "@/src/components/ui";
+import { Card, EmptyState, FlatGroup, FlatRow, Loading } from "@/src/components/ui";
 import { useOfflineActions } from "@/src/offline/useOfflineActions";
 import { qrSvg, printAllQR } from "@/src/utils/qr";
 import { useTheme, ThemeColors } from "@/src/theme";
@@ -81,9 +81,9 @@ export default function WorkersModule() {
         </Card>
       )}
 
-      {q.isLoading ? <Loading /> : workers.length === 0 ? <EmptyState text="Aún no tienes empleados" /> : workers.map((w) => (
-        <View key={w.id} style={s.row} testID={`worker-${w.id}`}>
-          <View style={s.flex}>
+      {q.isLoading ? <Loading /> : workers.length === 0 ? <EmptyState text="Aún no tienes empleados" /> : <FlatGroup style={s.flatList}>{workers.map((w) => (
+        <FlatRow key={w.id} style={s.flatRow} testID={`worker-${w.id}`}>
+          <View style={[s.flex, { paddingRight: 10 }]}>
             <Text style={s.name}>{w.name}</Text>
             <Text style={s.sub}>{w.role || "Cosechador"} · {w.document_id ? `SS# ${w.document_id}` : "sin SS#"}</Text>
             {w.qr_code ? <Text style={s.code}>{w.qr_code}</Text> : <Text style={s.pendingCode}>Pendiente de sincronizar</Text>}
@@ -93,9 +93,9 @@ export default function WorkersModule() {
           </View>
           <TouchableOpacity testID={`worker-qr-${w.id}`} onPress={() => printOne(w)} style={s.iconBtn}><Printer size={20} color={colors.onSurface} /></TouchableOpacity>
           <TouchableOpacity testID={`worker-edit-${w.id}`} onPress={() => setEditing({ ...w })} style={s.iconBtn}><Pencil size={19} color={colors.brandPrimary} /></TouchableOpacity>
-          <TouchableOpacity testID={`worker-delete-${w.id}`} onPress={() => remove(w)} style={s.iconBtn}><Trash2 size={19} color={colors.error} /></TouchableOpacity>
-        </View>
-      ))}
+          <TouchableOpacity testID={`worker-delete-${w.id}`} onPress={() => remove(w)} style={[s.iconBtn, s.iconBtnLast]}><Trash2 size={19} color={colors.error} /></TouchableOpacity>
+        </FlatRow>
+      ))}</FlatGroup>}
       <View style={{ height: 24 }} />
 
       {/* QR view modal */}
@@ -140,13 +140,18 @@ const styles = (c: ThemeColors) =>
     formLabel: { fontSize: 11, fontWeight: "700", color: c.muted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 5 },
     input: { backgroundColor: c.surfaceTertiary, borderWidth: 1, borderColor: c.border, borderRadius: 12, height: 50, paddingHorizontal: 14, fontSize: 16, color: c.onSurface },
     row: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 14, marginBottom: 10 },
+    flatList: { marginHorizontal: -16 },
+    flatRow: { flexDirection: "row", alignItems: "center", gap: 6 },
     name: { fontWeight: "800", color: c.onSurface, fontSize: 16 },
     sub: { fontSize: 12, color: c.onSurfaceTertiary, marginTop: 1 },
     code: { fontSize: 11, color: c.muted, marginTop: 2, fontVariant: ["tabular-nums"] },
     pendingCode: { fontSize: 11, color: c.warning, marginTop: 2, fontWeight: "700" },
     pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
     pillText: { fontSize: 11, fontWeight: "800" },
-    iconBtn: { padding: 6 },
+    // 44px tap targets sit edge to edge (cancel the row gap); the last one's inner padding
+    // hangs into the row padding so its glyph still ends 20px from the screen edge.
+    iconBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center", marginLeft: -6 },
+    iconBtnLast: { marginRight: -12 },
     modalWrap: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center", padding: 32 },
     qrCard: { backgroundColor: "#FFFFFF", borderRadius: 24, padding: 28, alignItems: "center", gap: 14 },
     qrName: { fontSize: 18, fontWeight: "800", color: c.onSurface },
